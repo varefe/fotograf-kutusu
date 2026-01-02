@@ -77,6 +77,33 @@ router.post('/create', async (req, res) => {
 
     const price = parseFloat(orderData.price).toFixed(2);
     
+    // Callback URL'i backend'e ayarla (Iyzico callback'i backend'e gelmeli)
+    // ÖNEMLİ: Callback URL'i backend URL'i olmalı, frontend URL'i değil!
+    // Production: Railway backend URL'i
+    // Development: localhost:5000
+    let backendUrl = process.env.BACKEND_URL;
+    
+    if (!backendUrl) {
+      // Production için Railway backend URL'ini kullan
+      if (process.env.NODE_ENV === 'production' || !req.headers.host?.includes('localhost')) {
+        backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
+      } else {
+        // Development: localhost:5000
+        backendUrl = `http://localhost:${process.env.PORT || 5000}`;
+      }
+    }
+    
+    // Eğer backendUrl frontend domain'i içeriyorsa, Railway URL'ini kullan
+    if (backendUrl.includes('fotografkutusu.com')) {
+      backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
+    }
+    
+    const callbackUrl = `${backendUrl}/api/payment/callback`;
+    console.log('🔗 Callback URL ayarlandı:', callbackUrl);
+    console.log('🔗 Backend URL:', backendUrl);
+    console.log('🔗 NODE_ENV:', process.env.NODE_ENV);
+    console.log('🔗 Request Host:', req.headers.host);
+    
     const request = {
       locale: Iyzipay.LOCALE.TR,
       conversationId: `ORDER-${orderId}`,
@@ -85,33 +112,6 @@ router.post('/create', async (req, res) => {
       currency: Iyzipay.CURRENCY.TRY,
       basketId: `BASKET-${orderId}`,
       paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
-      // Callback URL'i backend'e ayarla (Iyzico callback'i backend'e gelmeli)
-      // ÖNEMLİ: Callback URL'i backend URL'i olmalı, frontend URL'i değil!
-      // Production: Railway backend URL'i
-      // Development: localhost:5000
-      let backendUrl = process.env.BACKEND_URL;
-      
-      if (!backendUrl) {
-        // Production için Railway backend URL'ini kullan
-        if (process.env.NODE_ENV === 'production' || !req.headers.host?.includes('localhost')) {
-          backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
-        } else {
-          // Development: localhost:5000
-          backendUrl = `http://localhost:${process.env.PORT || 5000}`;
-        }
-      }
-      
-      // Eğer backendUrl frontend domain'i içeriyorsa, Railway URL'ini kullan
-      if (backendUrl.includes('fotografkutusu.com')) {
-        backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
-      }
-      
-      const callbackUrl = `${backendUrl}/api/payment/callback`;
-      console.log('🔗 Callback URL ayarlandı:', callbackUrl);
-      console.log('🔗 Backend URL:', backendUrl);
-      console.log('🔗 NODE_ENV:', process.env.NODE_ENV);
-      console.log('🔗 Request Host:', req.headers.host);
-      
       callbackUrl: callbackUrl,
       enabledInstallments: [1, 2, 3, 6, 9],
       buyer: {
@@ -361,6 +361,11 @@ router.post('/create', async (req, res) => {
 
 // Iyzico callback - hem GET hem POST destekler
 router.get('/callback', async (req, res) => {
+  console.log('✅ GET /api/payment/callback route\'u çalışıyor!');
+  console.log('📥 Request URL:', req.url);
+  console.log('📥 Request Query:', req.query);
+  console.log('📥 Request Headers:', req.headers);
+  
   const token = req.query.token || req.query.Token;
   const status = req.query.status || req.query.Status;
   

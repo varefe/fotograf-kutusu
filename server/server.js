@@ -155,6 +155,18 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
+// 404 handler - Tüm route'lardan sonra
+app.use((req, res, next) => {
+  console.log('⚠️ 404 - Route bulunamadı:', req.method, req.path);
+  console.log('⚠️ Kayıtlı route\'lar: /api/orders, /api/payment, /api/user, /api/admin');
+  res.status(404).json({ 
+    error: 'Route bulunamadı', 
+    method: req.method,
+    path: req.path,
+    message: `${req.method} ${req.path} için route tanımlı değil`
+  });
+});
+
 // Error handling
 app.use((err, req, res, next) => {
   console.error('Error:', err);
