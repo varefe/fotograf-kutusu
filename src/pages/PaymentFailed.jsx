@@ -1,10 +1,31 @@
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { useEffect } from 'react'
+import { useCart } from '../context/CartContext'
 
 function PaymentFailed() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const token = searchParams.get('token')
+  const reason = searchParams.get('reason') // 'cancelled' veya 'failed'
+  const { clearCart } = useCart() // Sepeti temizlememek için
+
+  useEffect(() => {
+    // 3 saniye sonra ana sayfaya yönlendir
+    const timer = setTimeout(() => {
+      navigate('/', { replace: true })
+    }, 3000)
+
+    return () => clearTimeout(timer)
+  }, [navigate])
+
+  const getMessage = () => {
+    if (reason === 'cancelled') {
+      return 'Ödeme işlemi iptal edildi. Ürünleriniz sepette kaldı, tekrar deneyebilirsiniz.'
+    }
+    return 'Ödeme işlemi tamamlanamadı. (Bakiye yetersiz veya kart bilgileri hatalı olabilir). Ürünleriniz sepette kaldı.'
+  }
 
   return (
     <>

@@ -13,7 +13,7 @@ function Cart() {
   const { user, isAuthenticated, getAuthHeaders } = useAuth()
   // ProductUpload'dan gelen File objelerini memory'de tut
   // Önce location.state'ten al, yoksa cartItems içindeki file objelerini topla
-  const [photoFiles] = useState(() => {
+  const [photoFiles, setPhotoFiles] = useState(() => {
     if (location.state?.photos && location.state.photos.length > 0) {
       return location.state.photos
     }
@@ -23,6 +23,14 @@ function Cart() {
       .filter(file => file instanceof File)
     return files.length > 0 ? files : []
   })
+
+  // location.state değiştiğinde photoFiles'ı güncelle
+  useEffect(() => {
+    if (location.state?.photos && location.state.photos.length > 0) {
+      console.log('🔄 location.state.photos bulundu, photoFiles güncelleniyor:', location.state.photos.length, 'adet')
+      setPhotoFiles(location.state.photos)
+    }
+  }, [location.state])
   const [shippingType, setShippingType] = useState('standard')
   const [customerInfo, setCustomerInfo] = useState({
     email: '',
@@ -108,17 +116,33 @@ function Cart() {
         if (saved) {
           console.log('✅ Sipariş localStorage\'a kaydedildi, orderId:', orderId)
           // File objelerini Payment sayfasına gönder (base64'e çevirmek için)
-          // Önce location.state'ten al, yoksa cartItems içindeki file objelerini topla
-          let filesToSend = photoFiles
-          if (!filesToSend || filesToSend.length === 0) {
-            // cartItems içindeki file objelerini topla
+          // Önce location.state'ten al, sonra photoFiles state'inden, son olarak cartItems içindeki file objelerini topla
+          let filesToSend = []
+          
+          // 1. Önce location.state'ten al (ProductUpload'dan direkt geliyorsa)
+          if (location.state?.photos && location.state.photos.length > 0) {
+            filesToSend = location.state.photos
+            console.log('📤 location.state.photos bulundu:', filesToSend.length, 'adet')
+          }
+          // 2. Sonra photoFiles state'inden al
+          else if (photoFiles && photoFiles.length > 0) {
+            filesToSend = photoFiles
+            console.log('📤 photoFiles state\'inden alındı:', filesToSend.length, 'adet')
+          }
+          // 3. Son olarak cartItems içindeki file objelerini topla (genellikle boş olur çünkü CartContext'te file: undefined)
+          else {
             filesToSend = cartItems
               .map(item => item.photo?.file)
               .filter(file => file instanceof File)
+            console.log('📤 cartItems içinden file objeleri toplandı:', filesToSend.length, 'adet')
           }
           
           console.log('📤 Cart -> Payment: photoFiles gönderiliyor:', filesToSend.length, 'adet')
-          console.log('📤 photoFiles detayları:', filesToSend.map(f => ({ name: f.name, size: f.size, type: f.type })))
+          if (filesToSend.length > 0) {
+            console.log('📤 photoFiles detayları:', filesToSend.map(f => ({ name: f.name, size: f.size, type: f.type })))
+          } else {
+            console.warn('⚠️ photoFiles boş! location.state:', location.state)
+          }
           
           navigate(`/payment?orderId=${orderId}`, {
             state: {
