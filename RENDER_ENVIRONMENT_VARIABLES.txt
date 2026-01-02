@@ -1,0 +1,10 @@
+NODE_ENV=production
+PORT=5000
+FRONTEND_URL=https://fotografkutusu.com
+IYZIPAY_API_KEY=TZY4COlRiQDLL7ERFUK5FzGW3rNBDLio
+IYZIPAY_SECRET_KEY=Eu1eRgVCgE3EKU90DpoKZdgiRNsIDZXN
+IYZIPAY_URI=https://api.iyzipay.com
+ENCRYPTION_KEY=rastgele-güvenli-anahtar-buraya
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=güvenli-şifre-buraya
+

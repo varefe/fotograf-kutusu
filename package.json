@@ -1,0 +1,42 @@
+{
+  "name": "fotograf-baski-eticaret",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Fotoğraf baskı ve çerçeveleme e-ticaret sitesi - React",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:full": "vite build && cp .htaccess dist/ 2>/dev/null || true",
+    "preview": "vite preview",
+    "start": "node server/server.js",
+    "server": "node server/server.js",
+    "dev:server": "nodemon server/server.js",
+    "start:backend": "NODE_ENV=production node server/server.js",
+    "start:backend:pm2": "pm2 start server/server.js --name fotograf-backend --env production && pm2 save",
+    "stop:backend:pm2": "pm2 stop fotograf-backend",
+    "restart:backend:pm2": "pm2 restart fotograf-backend",
+    "logs:backend:pm2": "pm2 logs fotograf-backend",
+    "rotate-key": "node server/scripts/rotate-encryption-key.js --auto"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "iyzipay": "^2.0.64",
+    "mongodb": "^7.0.0",
+    "mongoose": "^9.0.1",
+    "multer": "^2.0.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.10.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "nodemon": "^3.1.11",
+    "vite": "^5.0.8"
+  }
+}
