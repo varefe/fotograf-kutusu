@@ -336,9 +336,13 @@ function Admin() {
                 <option value="all">Tüm Durumlar</option>
                 <option value="paid">Ödenen</option>
                 <option value="pending">Bekleyen</option>
+                <option value="cancelled">İptal Edilen</option>
+                <option value="failed">Başarısız</option>
                 <option value="Yeni">Yeni</option>
                 <option value="Baskıda">Baskıda</option>
                 <option value="Tamamlandı">Tamamlandı</option>
+                <option value="İptal Edildi">İptal Edildi</option>
+                <option value="Ödeme Başarısız">Ödeme Başarısız</option>
               </select>
             </div>
 
@@ -428,11 +432,17 @@ function Admin() {
                               padding: '0.25rem 0.6rem',
                               borderRadius: '4px',
                               fontSize: '0.75rem',
-                              background: order.paymentStatus === 'paid' ? '#d4edda' : '#fff3cd',
-                              color: order.paymentStatus === 'paid' ? '#155724' : '#856404',
+                              background: order.paymentStatus === 'paid' ? '#d4edda' : 
+                                        order.paymentStatus === 'cancelled' ? '#f8d7da' :
+                                        order.paymentStatus === 'failed' ? '#f8d7da' : '#fff3cd',
+                              color: order.paymentStatus === 'paid' ? '#155724' : 
+                                    order.paymentStatus === 'cancelled' ? '#721c24' :
+                                    order.paymentStatus === 'failed' ? '#721c24' : '#856404',
                               display: 'inline-block'
                             }}>
-                              {order.paymentStatus === 'paid' ? '✅ Ödendi' : '⏳ Bekliyor'}
+                              {order.paymentStatus === 'paid' ? '✅ Ödendi' : 
+                               order.paymentStatus === 'cancelled' ? '❌ İptal Edildi' :
+                               order.paymentStatus === 'failed' ? '❌ Başarısız' : '⏳ Bekliyor'}
                             </span>
                           </div>
                         </td>
