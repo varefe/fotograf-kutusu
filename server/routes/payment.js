@@ -85,7 +85,34 @@ router.post('/create', async (req, res) => {
       currency: Iyzipay.CURRENCY.TRY,
       basketId: `BASKET-${orderId}`,
       paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
-      callbackUrl: `${process.env.FRONTEND_URL || 'https://fotografkutusu.com'}/api/payment/callback`,
+      // Callback URL'i backend'e ayarla (Iyzico callback'i backend'e gelmeli)
+      // ÖNEMLİ: Callback URL'i backend URL'i olmalı, frontend URL'i değil!
+      // Production: Railway backend URL'i
+      // Development: localhost:5000
+      let backendUrl = process.env.BACKEND_URL;
+      
+      if (!backendUrl) {
+        // Production için Railway backend URL'ini kullan
+        if (process.env.NODE_ENV === 'production' || !req.headers.host?.includes('localhost')) {
+          backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
+        } else {
+          // Development: localhost:5000
+          backendUrl = `http://localhost:${process.env.PORT || 5000}`;
+        }
+      }
+      
+      // Eğer backendUrl frontend domain'i içeriyorsa, Railway URL'ini kullan
+      if (backendUrl.includes('fotografkutusu.com')) {
+        backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
+      }
+      
+      const callbackUrl = `${backendUrl}/api/payment/callback`;
+      console.log('🔗 Callback URL ayarlandı:', callbackUrl);
+      console.log('🔗 Backend URL:', backendUrl);
+      console.log('🔗 NODE_ENV:', process.env.NODE_ENV);
+      console.log('🔗 Request Host:', req.headers.host);
+      
+      callbackUrl: callbackUrl,
       enabledInstallments: [1, 2, 3, 6, 9],
       buyer: {
         id: 'BY' + Date.now(),
@@ -236,10 +263,33 @@ router.post('/create', async (req, res) => {
           );
         }
         
-        // İçeriğe font yükleme engelleme script'i ekle
+        // İçeriğe font yükleme engelleme ve pop-up engelleme script'i ekle
         const fontBlockScript = `
           <script>
             (function() {
+              // Pop-up açılmasını tamamen engelle
+              const originalWindowOpen = window.open;
+              window.open = function(...args) {
+                console.log('🚫 Pop-up açılması engellendi:', args[0]);
+                return null;
+              };
+              
+              // window.iyzipayCheckout'u override et (pop-up yerine iframe)
+              Object.defineProperty(window, 'iyzipayCheckout', {
+                value: function(options) {
+                  console.log('🔧 iyzipayCheckout çağrıldı, pop-up devre dışı');
+                  if (options && typeof options === 'object') {
+                    options.popup = false; // Pop-up'ı devre dışı bırak
+                  }
+                  // Iyzico'nun orijinal fonksiyonunu çağır (eğer varsa)
+                  if (window.iyzipay && window.iyzipay.checkoutForm) {
+                    return window.iyzipay.checkoutForm(options);
+                  }
+                },
+                writable: true,
+                configurable: true
+              });
+              
               // Font yüklemelerini engelle
               const originalFetch = window.fetch;
               window.fetch = function(...args) {
@@ -266,6 +316,18 @@ router.post('/create', async (req, res) => {
               
               observer.observe(document.head, { childList: true, subtree: true });
               observer.observe(document.body, { childList: true, subtree: true });
+              
+              // Iframe'leri sayfaya gömülü göster
+              setTimeout(function() {
+                const iframes = document.querySelectorAll('iframe[src*="iyzipay"]');
+                iframes.forEach(function(iframe) {
+                  iframe.style.width = '100%';
+                  iframe.style.minHeight = '600px';
+                  iframe.style.border = 'none';
+                  iframe.style.display = 'block';
+                  iframe.style.position = 'relative';
+                });
+              }, 500);
             })();
           </script>
         `;
@@ -297,9 +359,107 @@ router.post('/create', async (req, res) => {
   }
 });
 
+// Iyzico callback - hem GET hem POST destekler
+router.get('/callback', async (req, res) => {
+  const token = req.query.token || req.query.Token;
+  const status = req.query.status || req.query.Status;
+  
+  console.log('📥 Iyzico GET callback alındı:', { token, status, query: req.query });
+  
+  // Frontend URL'ini belirle
+  const frontendUrl = process.env.FRONTEND_URL || 'https://fotografkutusu.com';
+  
+  // Iyzico callback'inde status kontrolü
+  // success: Ödeme başarılı
+  // failure: Ödeme başarısız (bakiye yetersiz, kart reddedildi, vb.)
+  // cancelled: Ödeme iptal edildi
+  
+  if (status === 'success' || !status) {
+    // Ödeme başarılı veya status yoksa (Iyzico bazen status göndermeyebilir, token ile kontrol edilir)
+    // Token ile ödeme durumunu kontrol et
+    if (token) {
+      iyzipay.checkoutForm.retrieve({ token }, (err, result) => {
+        if (err) {
+          console.error('❌ Iyzico token kontrolü hatası:', err);
+          // Hata durumunda failed sayfasına yönlendir
+          res.redirect(`${frontendUrl}/payment/failed?token=${token}&reason=failed`);
+          return;
+        }
+        
+        console.log('🔍 Iyzico ödeme durumu:', { 
+          status: result.status, 
+          paymentStatus: result.paymentStatus,
+          errorMessage: result.errorMessage 
+        });
+        
+        if (result.status === 'success' && result.paymentStatus === 'SUCCESS') {
+          // Ödeme başarılı
+          console.log('✅ Ödeme başarılı, success sayfasına yönlendiriliyor');
+          res.redirect(`${frontendUrl}/payment/success?token=${token}`);
+        } else {
+          // Ödeme başarısız veya iptal edildi
+          const reason = result.paymentStatus === 'CANCELLED' ? 'cancelled' : 'failed';
+          console.log('❌ Ödeme başarısız/iptal, failed sayfasına yönlendiriliyor:', reason);
+          res.redirect(`${frontendUrl}/payment/failed?token=${token}&reason=${reason}`);
+        }
+      });
+    } else {
+      // Token yoksa failed sayfasına yönlendir
+      console.warn('⚠️ Token yok, failed sayfasına yönlendiriliyor');
+      res.redirect(`${frontendUrl}/payment/failed?reason=failed`);
+    }
+  } else {
+    // Status başarısız veya iptal edildi
+    const reason = status === 'cancelled' || status === 'CANCELLED' ? 'cancelled' : 'failed';
+    console.log('❌ Status başarısız/iptal, failed sayfasına yönlendiriliyor:', reason);
+    res.redirect(`${frontendUrl}/payment/failed?token=${token || ''}&reason=${reason}`);
+  }
+});
+
 router.post('/callback', async (req, res) => {
-  const { token } = req.body;
-  res.redirect(`${process.env.FRONTEND_URL || 'https://fotografkutusu.com'}/payment/success?token=${token}`);
+  const token = req.body.token || req.body.Token;
+  const status = req.body.status || req.body.Status;
+  
+  console.log('📥 Iyzico POST callback alındı:', { token, status, body: req.body });
+  
+  // Frontend URL'ini belirle
+  const frontendUrl = process.env.FRONTEND_URL || 'https://fotografkutusu.com';
+  
+  // Iyzico callback'inde status kontrolü
+  if (status === 'success' || !status) {
+    // Token ile ödeme durumunu kontrol et
+    if (token) {
+      iyzipay.checkoutForm.retrieve({ token }, (err, result) => {
+        if (err) {
+          console.error('❌ Iyzico token kontrolü hatası:', err);
+          res.redirect(`${frontendUrl}/payment/failed?token=${token}&reason=failed`);
+          return;
+        }
+        
+        console.log('🔍 Iyzico ödeme durumu:', { 
+          status: result.status, 
+          paymentStatus: result.paymentStatus,
+          errorMessage: result.errorMessage 
+        });
+        
+        if (result.status === 'success' && result.paymentStatus === 'SUCCESS') {
+          console.log('✅ Ödeme başarılı, success sayfasına yönlendiriliyor');
+          res.redirect(`${frontendUrl}/payment/success?token=${token}`);
+        } else {
+          const reason = result.paymentStatus === 'CANCELLED' ? 'cancelled' : 'failed';
+          console.log('❌ Ödeme başarısız/iptal, failed sayfasına yönlendiriliyor:', reason);
+          res.redirect(`${frontendUrl}/payment/failed?token=${token}&reason=${reason}`);
+        }
+      });
+    } else {
+      console.warn('⚠️ Token yok, failed sayfasına yönlendiriliyor');
+      res.redirect(`${frontendUrl}/payment/failed?reason=failed`);
+    }
+  } else {
+    const reason = status === 'cancelled' || status === 'CANCELLED' ? 'cancelled' : 'failed';
+    console.log('❌ Status başarısız/iptal, failed sayfasına yönlendiriliyor:', reason);
+    res.redirect(`${frontendUrl}/payment/failed?token=${token || ''}&reason=${reason}`);
+  }
 });
 
 export default router;

@@ -27,13 +27,24 @@ function PaymentFailed() {
             <h1 style={{
               color: '#e74c3c',
               marginBottom: '1rem'
-            }}>Ödeme Başarısız</h1>
+            }}>
+              {reason === 'cancelled' ? 'Ödeme İptal Edildi' : 'Ödeme Başarısız'}
+            </h1>
             <p style={{
               color: '#666',
               marginBottom: '2rem',
-              fontSize: '1.1rem'
+              fontSize: '1.1rem',
+              lineHeight: '1.6'
             }}>
-              Ödeme işlemi tamamlanamadı. Lütfen tekrar deneyin veya farklı bir ödeme yöntemi kullanın.
+              {getMessage()}
+            </p>
+            <p style={{
+              color: '#999',
+              fontSize: '0.9rem',
+              marginBottom: '2rem',
+              fontStyle: 'italic'
+            }}>
+              Ana sayfaya yönlendiriliyorsunuz...
             </p>
             {token && (
               <p style={{
@@ -50,40 +61,42 @@ function PaymentFailed() {
               justifyContent: 'center',
               flexWrap: 'wrap'
             }}>
-              <Link
-                to="/order"
+              <button
+                onClick={() => navigate('/')}
                 style={{
-                  display: 'inline-block',
                   padding: '0.75rem 2rem',
-                  background: '#e74c3c',
+                  background: '#3498db',
                   color: 'white',
-                  textDecoration: 'none',
+                  border: 'none',
                   borderRadius: '6px',
                   fontWeight: 'bold',
-                  transition: 'background 0.3s'
+                  cursor: 'pointer',
+                  transition: 'background 0.3s',
+                  fontSize: '1rem'
                 }}
-                onMouseEnter={(e) => e.target.style.background = '#c0392b'}
-                onMouseLeave={(e) => e.target.style.background = '#e74c3c'}
-              >
-                Tekrar Dene
-              </Link>
-              <Link
-                to="/"
-                style={{
-                  display: 'inline-block',
-                  padding: '0.75rem 2rem',
-                  background: '#95a5a6',
-                  color: 'white',
-                  textDecoration: 'none',
-                  borderRadius: '6px',
-                  fontWeight: 'bold',
-                  transition: 'background 0.3s'
-                }}
-                onMouseEnter={(e) => e.target.style.background = '#7f8c8d'}
-                onMouseLeave={(e) => e.target.style.background = '#95a5a6'}
+                onMouseEnter={(e) => e.target.style.background = '#2980b9'}
+                onMouseLeave={(e) => e.target.style.background = '#3498db'}
               >
                 Ana Sayfaya Dön
-              </Link>
+              </button>
+              <button
+                onClick={() => navigate('/cart')}
+                style={{
+                  padding: '0.75rem 2rem',
+                  background: '#27ae60',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'background 0.3s',
+                  fontSize: '1rem'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#229954'}
+                onMouseLeave={(e) => e.target.style.background = '#27ae60'}
+              >
+                Sepete Git
+              </button>
             </div>
           </div>
         </div>

@@ -57,9 +57,27 @@ export const decryptData = (encryptedData) => {
 // Siparişleri localStorage'a kaydet
 export const saveOrderToStorage = (orderData) => {
   try {
-    const existingOrders = getOrdersFromStorage()
-    const newOrder = {
+    // Base64 fotoğrafları kaldır (localStorage quota için)
+    const orderDataWithoutBase64 = {
       ...orderData,
+      photo: orderData.photo ? {
+        ...orderData.photo,
+        base64: undefined, // Base64'i kaldır
+        file: undefined // File objesi de kaldır (serialize edilemez)
+      } : undefined
+    }
+    
+    const existingOrders = getOrdersFromStorage()
+    
+    // Eski siparişleri temizle (son 50 siparişi tut)
+    let cleanedOrders = existingOrders
+    if (cleanedOrders.length > 50) {
+      cleanedOrders = cleanedOrders.slice(-50)
+      console.log('🧹 Eski siparişler temizlendi, son 50 sipariş tutuldu')
+    }
+    
+    const newOrder = {
+      ...orderDataWithoutBase64,
       id: orderData.id || Date.now().toString(),
       createdAt: orderData.createdAt || new Date().toISOString(),
       encrypted: true
@@ -68,9 +86,22 @@ export const saveOrderToStorage = (orderData) => {
     // Şifrele
     const encrypted = encryptData(newOrder)
     if (encrypted) {
-      existingOrders.push(encrypted)
-      localStorage.setItem('encrypted_orders', JSON.stringify(existingOrders))
-      return true
+      cleanedOrders.push(encrypted)
+      
+      // localStorage quota kontrolü
+      try {
+        localStorage.setItem('encrypted_orders', JSON.stringify(cleanedOrders))
+        return true
+      } catch (quotaError) {
+        if (quotaError.name === 'QuotaExceededError') {
+          console.warn('⚠️ localStorage quota aşıldı, daha fazla eski sipariş temizleniyor...')
+          // Daha fazla temizle (son 20 sipariş)
+          const moreCleaned = cleanedOrders.slice(-20)
+          localStorage.setItem('encrypted_orders', JSON.stringify(moreCleaned))
+          return true
+        }
+        throw quotaError
+      }
     }
     return false
   } catch (error) {

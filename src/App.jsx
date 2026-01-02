@@ -14,6 +14,7 @@ import AdminPanel from './pages/AdminPanel'
 import Payment from './pages/Payment'
 import PaymentSuccess from './pages/PaymentSuccess'
 import PaymentFailed from './pages/PaymentFailed'
+import PaymentCallback from './pages/PaymentCallback'
 import About from './pages/About'
 import DeliveryReturns from './pages/DeliveryReturns'
 import Privacy from './pages/Privacy'
@@ -42,6 +43,7 @@ function App() {
               <Route path="/payment" element={<Payment />} />
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/payment/failed" element={<PaymentFailed />} />
+              <Route path="/api/payment/callback" element={<PaymentCallback />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/delivery-returns" element={<DeliveryReturns />} />

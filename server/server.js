@@ -118,6 +118,10 @@ const paymentLimiter = rateLimit({
     success: false,
     error: 'Çok fazla ödeme isteği',
     message: 'Lütfen bir süre sonra tekrar deneyin'
+  },
+  skip: (req) => {
+    // Callback route'unu rate limiting'den muaf tut (Iyzico'dan gelen callback'ler)
+    return req.path === '/api/payment/callback' || req.path.includes('/callback');
   }
 });
 

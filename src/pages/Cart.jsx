@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useCart } from '../context/CartContext'
@@ -8,8 +8,21 @@ import { calculatePrice } from '../utils/priceCalculator'
 
 function Cart() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { cartItems, removeFromCart, clearCart, getCartTotal } = useCart()
   const { user, isAuthenticated, getAuthHeaders } = useAuth()
+  // ProductUpload'dan gelen File objelerini memory'de tut
+  // Önce location.state'ten al, yoksa cartItems içindeki file objelerini topla
+  const [photoFiles] = useState(() => {
+    if (location.state?.photos && location.state.photos.length > 0) {
+      return location.state.photos
+    }
+    // Fallback: cartItems içindeki file objelerini topla (eğer varsa)
+    const files = cartItems
+      .map(item => item.photo?.file)
+      .filter(file => file instanceof File)
+    return files.length > 0 ? files : []
+  })
   const [shippingType, setShippingType] = useState('standard')
   const [customerInfo, setCustomerInfo] = useState({
     email: '',
@@ -45,6 +58,9 @@ function Cart() {
 
     // Ödeme sayfasına yönlendir (tüm sepet öğeleri için)
     try {
+      // OrderId oluştur
+      const orderId = Date.now().toString()
+      
       const firstItem = cartItems[0]
       const calculatedPrice = calculatePrice(
         firstItem.product.size,
@@ -53,8 +69,18 @@ function Cart() {
         firstItem.product.customSize
       )
 
+      // Photo'dan base64 ve file'ı kaldır (localStorage quota için)
+      // Base64 ödeme sayfasına geçerken oluşturulacak
+      const photoData = firstItem.photo ? {
+        ...firstItem.photo,
+        base64: undefined, // Base64'i kaldır (ödeme sayfasında oluşturulacak)
+        file: undefined, // File objesi serialize edilemez
+        preview: firstItem.photo.preview // Preview'ı tut
+      } : undefined
+
       const orderData = {
-        photo: firstItem.photo,
+        id: orderId,
+        photo: photoData,
         size: firstItem.product.size,
         customSize: firstItem.product.customSize,
         quantity: firstItem.quantity,
@@ -68,16 +94,48 @@ function Cart() {
         frameType: 'none',
         paperType: 'glossy',
         colorMode: 'color',
-        price: calculatedPrice
+        price: calculatedPrice,
+        status: 'Yeni',
+        paymentStatus: 'pending',
+        createdAt: new Date().toISOString()
       }
 
-      navigate('/payment', {
-        state: {
-          orderData,
-          remainingItems: cartItems.slice(1),
-          cartItems: cartItems // Tüm sepet öğeleri
+      // Siparişi localStorage'a kaydet (Payment sayfasında kullanılacak)
+      // Async import yerine direkt import kullan (daha hızlı)
+      try {
+        const { saveOrderToStorage } = await import('../utils/encryption')
+        const saved = saveOrderToStorage(orderData)
+        if (saved) {
+          console.log('✅ Sipariş localStorage\'a kaydedildi, orderId:', orderId)
+          // File objelerini Payment sayfasına gönder (base64'e çevirmek için)
+          // Önce location.state'ten al, yoksa cartItems içindeki file objelerini topla
+          let filesToSend = photoFiles
+          if (!filesToSend || filesToSend.length === 0) {
+            // cartItems içindeki file objelerini topla
+            filesToSend = cartItems
+              .map(item => item.photo?.file)
+              .filter(file => file instanceof File)
+          }
+          
+          console.log('📤 Cart -> Payment: photoFiles gönderiliyor:', filesToSend.length, 'adet')
+          console.log('📤 photoFiles detayları:', filesToSend.map(f => ({ name: f.name, size: f.size, type: f.type })))
+          
+          navigate(`/payment?orderId=${orderId}`, {
+            state: {
+              orderData,
+              remainingItems: cartItems.slice(1),
+              cartItems: cartItems, // Tüm sepet öğeleri
+              photoFiles: filesToSend // File objelerini Payment'a gönder
+            }
+          })
+        } else {
+          console.error('❌ Sipariş kaydedilemedi')
+          alert('Sipariş kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.')
         }
-      })
+      } catch (err) {
+        console.error('❌ localStorage\'a kaydetme hatası:', err)
+        alert('Sipariş kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.')
+      }
     } catch (error) {
       console.error('Sipariş oluşturma hatası:', error)
       alert('Sipariş oluşturulurken bir hata oluştu')

@@ -27,14 +27,39 @@ export const CartProvider = ({ children }) => {
 
   // Sepete ekle
   const addToCart = (item) => {
+    // Base64 ve file objelerini kaldır (localStorage quota için)
+    const cartItemWithoutBase64 = {
+      ...item,
+      photo: item.photo ? {
+        ...item.photo,
+        base64: undefined, // Base64'i kaldır (ödeme sayfasında tekrar oluşturulacak)
+        file: undefined, // File objesi serialize edilemez
+        preview: item.photo.preview // Preview'ı tut (küçük thumbnail)
+      } : undefined
+    }
+    
     const newItem = {
       id: Date.now().toString(),
-      ...item,
+      ...cartItemWithoutBase64,
       createdAt: new Date().toISOString()
     }
     const updatedCart = [...cartItems, newItem]
     setCartItems(updatedCart)
-    localStorage.setItem('cart', JSON.stringify(updatedCart))
+    
+    // localStorage quota kontrolü
+    try {
+      localStorage.setItem('cart', JSON.stringify(updatedCart))
+    } catch (error) {
+      if (error.name === 'QuotaExceededError') {
+        console.warn('⚠️ Sepet localStorage quota aşıldı, eski öğeler temizleniyor...')
+        // Son 20 öğeyi tut
+        const cleanedCart = updatedCart.slice(-20)
+        localStorage.setItem('cart', JSON.stringify(cleanedCart))
+        setCartItems(cleanedCart)
+      } else {
+        throw error
+      }
+    }
   }
 
   // Sepetten çıkar
