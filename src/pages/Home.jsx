@@ -1,8 +1,52 @@
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 
 function Home() {
+  const navigate = useNavigate()
+
+  const products = [
+    {
+      size: '10x15',
+      name: '10x15 cm',
+      description: 'Küçük boyut',
+      unitPrice: 16, // 15 adet birim fiyat
+      totalPrice: 240, // 15 adet × 16 TL = 240 TL
+      features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat']
+    },
+    {
+      size: '15x20',
+      name: '15x20 cm',
+      description: 'Orta boyut',
+      unitPrice: 19, // 15 adet birim fiyat
+      totalPrice: 285, // 15 adet × 19 TL = 285 TL
+      features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat']
+    },
+    {
+      size: '20x30',
+      name: '20x30 cm',
+      description: 'Popüler boyut',
+      unitPrice: 26, // 15 adet birim fiyat
+      totalPrice: 390, // 15 adet × 26 TL = 390 TL
+      features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat'],
+      featured: true
+    },
+    {
+      size: '30x40',
+      name: '30x40 cm',
+      description: 'Büyük boyut',
+      unitPrice: 36, // 15 adet birim fiyat
+      totalPrice: 540, // 15 adet × 36 TL = 540 TL
+      features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat']
+    }
+  ]
+
+  const handleProductClick = (product) => {
+    navigate('/product', {
+      state: { product }
+    })
+  }
+
   return (
     <>
       <Navbar />
@@ -11,7 +55,9 @@ function Home() {
           <div className="container">
             <h1>Fotoğrafınızı Baskıya Dönüştürün</h1>
             <p className="hero-subtitle">Yüksek kaliteli baskı ve profesyonel çerçeveleme hizmeti</p>
-            <Link to="/order" className="btn btn-primary">Sipariş Ver</Link>
+            <p style={{ marginTop: '1rem', fontSize: '1.1rem', color: '#666' }}>
+              Ürün seçin, fotoğraflarınızı yükleyin, sepete ekleyin!
+            </p>
           </div>
         </div>
 
@@ -45,55 +91,73 @@ function Home() {
 
         <section className="pricing">
           <div className="container">
-            <h2>Boyut ve Fiyat Listesi</h2>
+            <h2>Ürünlerimiz</h2>
+            <p style={{ textAlign: 'center', color: '#666', marginBottom: '2rem' }}>
+              Ürün seçin, fotoğraflarınızı yükleyin ve sepete ekleyin
+            </p>
             <div className="pricing-grid">
-              <div className="pricing-card">
-                <h3>10x15 cm</h3>
-                <div className="price">₺15</div>
-                <p>Küçük boyut</p>
-                <ul>
-                  <li>Yüksek kalite baskı</li>
-                  <li>Çerçeve dahil</li>
-                </ul>
-              </div>
-              <div className="pricing-card">
-                <h3>15x20 cm</h3>
-                <div className="price">₺18</div>
-                <p>Orta boyut</p>
-                <ul>
-                  <li>Yüksek kalite baskı</li>
-                  <li>Çerçeve dahil</li>
-                </ul>
-              </div>
-              <div className="pricing-card featured">
-                <h3>20x30 cm</h3>
-                <div className="price">₺25</div>
-                <p>Popüler boyut</p>
-                <ul>
-                  <li>Yüksek kalite baskı</li>
-                  <li>Çerçeve dahil</li>
-                </ul>
-              </div>
-              <div className="pricing-card">
-                <h3>30x40 cm</h3>
-                <div className="price">₺35</div>
-                <p>Büyük boyut</p>
-                <ul>
-                  <li>Yüksek kalite baskı</li>
-                  <li>Çerçeve dahil</li>
-                </ul>
-              </div>
-              <div className="pricing-card">
-                <h3>Özel Boyut</h3>
-                <div className="price">Özel</div>
-                <p>İstediğiniz boyut</p>
-                <ul>
-                  <li>Yüksek kalite baskı</li>
-                  <li>Çerçeve dahil</li>
-                </ul>
-              </div>
+              {products.map((product) => (
+                <div
+                  key={product.size}
+                  className={`pricing-card ${product.featured ? 'featured' : ''}`}
+                  onClick={() => handleProductClick(product)}
+                >
+                  <div className="pricing-card-image">
+                    📷
+                  </div>
+                  <div className="pricing-card-content">
+                    <h3>{product.name}</h3>
+                    <div className="price">
+                      ₺{product.totalPrice}
+                      <span className="price-unit"> / 15 adet</span>
+                    </div>
+                    <p className="price-note" style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}>
+                      Birim fiyat: ₺{product.unitPrice}
+                    </p>
+                    <p style={{ color: '#666', marginBottom: '1rem', fontSize: '0.95rem' }}>{product.description}</p>
+                    <ul style={{ textAlign: 'left', marginBottom: '1.5rem', listStyle: 'none', padding: 0 }}>
+                      {product.features.map((feature, index) => (
+                        <li key={index} style={{ padding: '0.25rem 0', fontSize: '0.875rem', color: '#555' }}>
+                          ✓ {feature}
+                        </li>
+                      ))}
+                    </ul>
+                    <button style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      background: 'var(--primary-color)',
+                      color: '#000000',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontWeight: '700',
+                      fontSize: '1rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 4px 15px rgba(212, 175, 55, 0.3)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = 'var(--primary-gold)'
+                      e.target.style.transform = 'translateY(-2px)'
+                      e.target.style.boxShadow = '0 6px 20px rgba(212, 175, 55, 0.4)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = 'var(--primary-color)'
+                      e.target.style.transform = 'translateY(0)'
+                      e.target.style.boxShadow = '0 4px 15px rgba(212, 175, 55, 0.3)'
+                    }}
+                    >
+                      Fotoğraf Yükle →
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <p className="pricing-note">* Fiyatlar çerçeve dahildir. Adet arttıkça fiyat çarpılır.</p>
+            <p className="pricing-note">
+              * Minimum 15 adet (tekli fiyat yok)<br/>
+              * 15+ adet için toplu fiyat uygulanır<br/>
+              * 99 TL üzeri ücretsiz kargo<br/>
+              * Tüm ürünler yüksek kalite baskı ve çerçeve dahildir
+            </p>
           </div>
         </section>
 

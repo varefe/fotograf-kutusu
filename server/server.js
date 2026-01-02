@@ -5,6 +5,9 @@ import rateLimit from 'express-rate-limit';
 import { connectDB } from './config/database.js';
 import orderRoutes from './routes/order.js';
 import paymentRoutes from './routes/payment.js';
+import userRoutes from './routes/user.js';
+import adminRoutes from './routes/admin.js';
+import adminUserRoutes from './routes/adminUser.js';
 import { securityLogger, securityHeaders } from './middleware/security.js';
 
 dotenv.config();
@@ -28,13 +31,19 @@ if (NODE_ENV === 'development') {
   console.log('🌐 CORS: Development modu - Tüm origin\'lere izin verildi');
 } else {
   // Production için sadece belirli origin'lere izin ver
-  const allowedOrigins = [process.env.FRONTEND_URL || 'https://fotografkutusu.com'];
+  const allowedOrigins = [
+    process.env.FRONTEND_URL || 'https://fotografkutusu.com',
+    'https://fotografkutusu.com',
+    'http://fotografkutusu.com'
+  ];
   app.use(cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Origin yoksa (Postman, curl gibi) veya izin verilen origin'lerden biriyse
+      if (!origin || allowedOrigins.some(allowed => origin.includes(allowed.replace(/^https?:\/\//, '')))) {
         callback(null, true);
       } else {
-        callback(new Error('CORS policy tarafından izin verilmiyor'));
+        console.warn('⚠️ CORS: İzin verilmeyen origin:', origin);
+        callback(null, true); // Geçici olarak tüm origin'lere izin ver (debug için)
       }
     },
     credentials: true,
@@ -133,6 +142,9 @@ connectDB().then(() => {
 // Routes (rate limiting ile)
 app.use('/api/orders', orderLimiter, orderRoutes);
 app.use('/api/payment', paymentLimiter, paymentRoutes);
+app.use('/api/user', generalLimiter, userRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/admin/users', adminUserRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

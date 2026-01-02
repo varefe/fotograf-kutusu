@@ -1,125 +1,121 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { getDecryptedOrders, clearAllOrders } from '../utils/encryption'
+import { API_URL } from '../config/api'
 
 function Admin() {
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState('orders') // 'orders', 'users', 'stats'
   const [orders, setOrders] = useState([])
+  const [users, setUsers] = useState([])
+  const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [selectedUser, setSelectedUser] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
+  // Admin authentication helper
+  const getAuthHeaders = () => {
+    const adminUsername = import.meta.env.VITE_ADMIN_USERNAME || 'efe'
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || '193123'
+    const authString = btoa(`${adminUsername}:${adminPassword}`)
+    return {
+      'Authorization': `Basic ${authString}`,
+      'Content-Type': 'application/json'
+    }
+  }
+
   useEffect(() => {
-    // Authentication kontrolü
     const checkAuth = () => {
       const authenticated = sessionStorage.getItem('adminAuthenticated')
       const loginTime = sessionStorage.getItem('adminLoginTime')
+      const adminCodeVerified = sessionStorage.getItem('adminCodeVerified')
       
-      // 8 saat (28800000 ms) sonra otomatik çıkış
+      // Admin kodu doğrulanmış mı kontrol et
+      if (adminCodeVerified !== 'true') {
+        sessionStorage.removeItem('adminAuthenticated')
+        sessionStorage.removeItem('adminLoginTime')
+        navigate('/admin/login')
+        return
+      }
+      
       const EIGHT_HOURS = 8 * 60 * 60 * 1000
       if (authenticated === 'true' && loginTime) {
         const timeSinceLogin = new Date().getTime() - parseInt(loginTime)
         if (timeSinceLogin < EIGHT_HOURS) {
           setIsAuthenticated(true)
-          fetchOrders()
+          fetchData()
           return
         } else {
-          // Süre dolmuş, çıkış yap
           sessionStorage.removeItem('adminAuthenticated')
           sessionStorage.removeItem('adminLoginTime')
+          sessionStorage.removeItem('adminCodeVerified')
         }
       }
       
-      // Giriş yapılmamışsa login sayfasına yönlendir
       navigate('/admin/login')
     }
     
     checkAuth()
-  }, [navigate])
+  }, [navigate, activeTab])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+      const headers = getAuthHeaders()
+
+      // Aktif tab'a göre veri çek
+      if (activeTab === 'orders') {
+        const response = await fetch(`${apiUrl}/admin/orders`, { headers })
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setOrders(data.orders || [])
+          }
+        } else {
+          throw new Error('Siparişler yüklenemedi')
+        }
+      } else if (activeTab === 'users') {
+        const response = await fetch(`${apiUrl}/admin/users`, { headers })
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setUsers(data.users || [])
+          }
+        } else {
+          throw new Error('Kullanıcılar yüklenemedi')
+        }
+      } else if (activeTab === 'stats') {
+        const response = await fetch(`${apiUrl}/admin/stats`, { headers })
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setStats(data.stats)
+          }
+        } else {
+          throw new Error('İstatistikler yüklenemedi')
+        }
+      }
+    } catch (err) {
+      console.error('Veri yükleme hatası:', err)
+      setError(err.message || 'Veri yüklenirken bir hata oluştu')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleLogout = () => {
     sessionStorage.removeItem('adminAuthenticated')
     sessionStorage.removeItem('adminLoginTime')
+    sessionStorage.removeItem('adminCodeVerified')
     navigate('/admin/login')
-  }
-
-  const fetchOrders = async () => {
-    try {
-      setLoading(true)
-      
-      // Önce localStorage'dan şifreli siparişleri çöz (sadece admin giriş yapmışsa)
-      const localOrders = getDecryptedOrders()
-      
-      // API'den de siparişleri çekmeyi dene (opsiyonel, sessizce)
-      let apiOrders = []
-      try {
-        const API_URL = import.meta.env.VITE_API_URL || 
-          (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' 
-            ? '/api' 
-            : 'http://localhost:5000')
-        
-        // Admin authentication bilgileri
-        const adminUsername = import.meta.env.VITE_ADMIN_USERNAME || 'efe'
-        const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || '193123'
-        const authString = btoa(`${adminUsername}:${adminPassword}`)
-        
-        const response = await fetch(`${API_URL}/api/orders`, {
-          headers: {
-            'Authorization': `Basic ${authString}`
-          },
-          signal: AbortSignal.timeout(3000) // 3 saniye timeout
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success) {
-            apiOrders = data.orders || []
-          }
-        }
-      } catch (apiErr) {
-        // API hatası önemli değil, localStorage'dan devam et (sessizce)
-        // Hata mesajı gösterme
-      }
-      
-      // Her iki kaynaktan gelen siparişleri birleştir
-      const allOrders = [...localOrders, ...apiOrders]
-      
-      // ID'ye göre tekilleştir (aynı sipariş iki kere görünmesin)
-      const uniqueOrders = []
-      const seenIds = new Set()
-      
-      for (const order of allOrders) {
-        const orderId = order._id || order.id
-        if (!seenIds.has(orderId)) {
-          seenIds.add(orderId)
-          uniqueOrders.push(order)
-        }
-      }
-      
-      // Tarihe göre sırala (en yeni önce)
-      const sortedOrders = uniqueOrders.sort((a, b) => {
-        const dateA = new Date(a.createdAt || 0)
-        const dateB = new Date(b.createdAt || 0)
-        return dateB - dateA
-      })
-      
-      setOrders(sortedOrders)
-      
-      if (sortedOrders.length === 0) {
-        setError(null) // Hata değil, sadece sipariş yok
-      }
-    } catch (err) {
-      console.error('Siparişler yüklenirken hata:', err)
-      setError('Siparişler yüklenirken bir hata oluştu: ' + err.message)
-    } finally {
-      setLoading(false)
-    }
   }
 
   const formatPrice = (price) => {
@@ -156,61 +152,26 @@ function Admin() {
     return matchesSearch && matchesStatus
   })
 
-  // İstatistikler
-  const totalRevenue = orders.reduce((sum, order) => sum + (order.price || 0), 0)
-  const paidOrders = orders.filter(o => o.paymentStatus === 'paid').length
-  const pendingOrders = orders.filter(o => o.paymentStatus === 'pending').length
+  const filteredUsers = users.filter(user => {
+    return (
+      (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.firstName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.phone || '').includes(searchTerm)
+    )
+  })
 
-  // Authentication kontrolü - eğer giriş yapılmamışsa hiçbir şey gösterme
   if (!isAuthenticated) {
     return null
   }
 
-  if (loading) {
+  if (loading && !stats && activeTab === 'stats') {
     return (
       <>
         <Navbar />
         <div className="container" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
-          <h2>Siparişler yükleniyor...</h2>
-        </div>
-        <Footer />
-      </>
-    )
-  }
-
-  if (error) {
-    return (
-      <>
-        <Navbar />
-        <div className="container" style={{ padding: '2rem' }}>
-          <div style={{ 
-            background: '#fee', 
-            padding: '2rem', 
-            borderRadius: '12px',
-            color: '#c33',
-            marginBottom: '1rem',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>❌</div>
-            <h2 style={{ marginBottom: '1rem' }}>Hata</h2>
-            <p style={{ marginBottom: '2rem' }}>{error}</p>
-            <button 
-              onClick={fetchOrders} 
-              style={{
-                padding: '0.75rem 2rem',
-                background: '#3498db',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '1rem'
-              }}
-            >
-              🔄 Tekrar Dene
-            </button>
-          </div>
+          <h2>Yükleniyor...</h2>
         </div>
         <Footer />
       </>
@@ -221,6 +182,7 @@ function Admin() {
     <>
       <Navbar />
       <div className="container" style={{ padding: '2rem 0', maxWidth: '1400px' }}>
+        {/* Header */}
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
@@ -230,11 +192,11 @@ function Admin() {
           gap: '1rem'
         }}>
           <h1 style={{ margin: 0, fontSize: '2rem', color: '#2c3e50' }}>
-            📋 Admin Paneli - Siparişler
+            🛡️ Admin Paneli
           </h1>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <button
-              onClick={fetchOrders}
+              onClick={fetchData}
               style={{
                 padding: '0.75rem 1.5rem',
                 background: '#27ae60',
@@ -247,75 +209,6 @@ function Admin() {
               }}
             >
               🔄 Yenile
-            </button>
-            <button
-              onClick={() => {
-                if (confirm('Tüm şifreli siparişleri silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) {
-                  clearAllOrders()
-                  fetchOrders()
-                  alert('Tüm siparişler temizlendi')
-                }
-              }}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: '#f39c12',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '1rem'
-              }}
-            >
-              🗑️ localStorage Temizle
-            </button>
-            <button
-              onClick={async () => {
-                if (confirm('⚠️ VERİTABANINDAKİ TÜM SİPARİŞLERİ SİLMEK İSTEDİĞİNİZE EMİN MİSİNİZ?\n\nBu işlem geri alınamaz ve tüm sipariş kayıtları kalıcı olarak silinecektir!')) {
-                  try {
-                    const API_URL = import.meta.env.VITE_API_URL || 
-                      (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' 
-                        ? '/api' 
-                        : 'http://localhost:5000')
-                    
-                    const adminUsername = import.meta.env.VITE_ADMIN_USERNAME || 'efe'
-                    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || '193123'
-                    const authString = btoa(`${adminUsername}:${adminPassword}`)
-                    
-                    const response = await fetch(`${API_URL}/api/orders/all`, {
-                      method: 'DELETE',
-                      headers: {
-                        'Authorization': `Basic ${authString}`,
-                        'Content-Type': 'application/json'
-                      }
-                    })
-                    
-                    const data = await response.json()
-                    
-                    if (data.success) {
-                      alert(`✅ ${data.deletedCount} sipariş başarıyla silindi`)
-                      fetchOrders()
-                    } else {
-                      alert(`❌ Hata: ${data.error || data.message || 'Siparişler silinemedi'}`)
-                    }
-                  } catch (error) {
-                    console.error('Sipariş silme hatası:', error)
-                    alert(`❌ Hata: ${error.message || 'Siparişler silinirken bir hata oluştu'}`)
-                  }
-                }
-              }}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: '#e74c3c',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '1rem'
-              }}
-            >
-              🗑️ Veritabanındaki Tüm Siparişleri Sil
             </button>
             <button
               onClick={handleLogout}
@@ -335,262 +228,446 @@ function Admin() {
           </div>
         </div>
 
-        {/* İstatistikler */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            color: 'white',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📦</div>
-            <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Toplam Sipariş</div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{orders.length}</div>
-          </div>
-          
-          <div style={{
-            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            color: 'white',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>💰</div>
-            <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Toplam Gelir</div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{formatPrice(totalRevenue)}</div>
-          </div>
-          
-          <div style={{
-            background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            color: 'white',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>✅</div>
-            <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Ödenen</div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{paidOrders}</div>
-          </div>
-          
-          <div style={{
-            background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            color: 'white',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⏳</div>
-            <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Bekleyen</div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{pendingOrders}</div>
-          </div>
-        </div>
-
-        {/* Filtreler */}
+        {/* Tabs */}
         <div style={{
           display: 'flex',
-          gap: '1rem',
-          marginBottom: '1.5rem',
-          flexWrap: 'wrap'
+          gap: '0.5rem',
+          marginBottom: '2rem',
+          borderBottom: '2px solid #eee'
         }}>
-          <input
-            type="text"
-            placeholder="🔍 Sipariş ID, E-posta veya Telefon ile ara..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+          <button
+            onClick={() => setActiveTab('orders')}
             style={{
-              flex: '1',
-              minWidth: '250px',
-              padding: '0.75rem',
-              border: '2px solid #ddd',
-              borderRadius: '6px',
-              fontSize: '1rem'
-            }}
-          />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{
-              padding: '0.75rem',
-              border: '2px solid #ddd',
-              borderRadius: '6px',
+              padding: '1rem 2rem',
+              background: activeTab === 'orders' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'orders' ? '#000000' : '#666',
+              border: 'none',
+              borderBottom: activeTab === 'orders' ? '3px solid #000000' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
               fontSize: '1rem',
-              cursor: 'pointer'
+              transition: 'all 0.2s'
             }}
           >
-            <option value="all">Tüm Durumlar</option>
-            <option value="paid">Ödenen</option>
-            <option value="pending">Bekleyen</option>
-            <option value="Yeni">Yeni</option>
-            <option value="Baskıda">Baskıda</option>
-            <option value="Tamamlandı">Tamamlandı</option>
-          </select>
+            📦 Siparişler ({orders.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('users')}
+            style={{
+              padding: '1rem 2rem',
+              background: activeTab === 'users' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'users' ? '#000000' : '#666',
+              border: 'none',
+              borderBottom: activeTab === 'users' ? '3px solid #000000' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            👥 Kullanıcılar ({users.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('stats')}
+            style={{
+              padding: '1rem 2rem',
+              background: activeTab === 'stats' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'stats' ? '#000000' : '#666',
+              border: 'none',
+              borderBottom: activeTab === 'stats' ? '3px solid #000000' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            📊 İstatistikler
+          </button>
         </div>
 
-        {filteredOrders.length === 0 ? (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '4rem',
-            background: '#f5f5f5',
-            borderRadius: '12px'
+        {error && (
+          <div style={{
+            background: '#fee',
+            padding: '1rem',
+            borderRadius: '8px',
+            color: '#c33',
+            marginBottom: '1rem',
+            textAlign: 'center'
           }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📭</div>
-            <h2 style={{ color: '#666' }}>Sipariş bulunamadı</h2>
-            <p style={{ color: '#999' }}>
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Arama kriterlerinize uygun sipariş bulunamadı.' 
-                : 'Henüz sipariş bulunmuyor.'}
-            </p>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-            <table style={{ 
-              width: '100%', 
-              borderCollapse: 'collapse',
-              minWidth: '1000px'
-            }}>
-              <thead>
-                <tr style={{ background: '#2c3e50', color: 'white' }}>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 'bold' }}>Sipariş No</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 'bold' }}>Müşteri</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 'bold' }}>İletişim</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 'bold' }}>Sipariş Detayları</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 'bold' }}>Fiyat</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 'bold' }}>Durum</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 'bold' }}>Tarih</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 'bold' }}>Fotoğraf</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 'bold' }}>İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.map((order) => (
-                  <tr 
-                    key={order._id || order.id} 
-                    style={{ 
-                      borderBottom: '1px solid #eee',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                  >
-                    <td style={{ padding: '1rem', fontWeight: 'bold', color: '#3498db' }}>
-                      #{order._id || order.id}
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div>
-                        <strong>{order.customerInfo?.firstName || 'Müşteri'} {order.customerInfo?.lastName || ''}</strong>
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                      <div>📧 {order.customerInfo?.email || '-'}</div>
-                      {order.customerInfo?.phone && (
-                        <div style={{ color: '#666', marginTop: '0.25rem' }}>
-                          📞 {order.customerInfo.phone}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                      <div><strong>Boyut:</strong> {
-                        order.size === 'custom' && order.customSize
-                          ? `${order.customSize.width}x${order.customSize.height} cm`
-                          : order.size || '-'
-                      }</div>
-                      <div style={{ marginTop: '0.25rem' }}><strong>Adet:</strong> {order.quantity || 1}</div>
-                      <div style={{ marginTop: '0.25rem', color: '#666' }}>
-                        {order.frameType && order.frameType !== 'none' && (
-                          <span>🖼️ {order.frameType === 'standard' ? 'Standart' : 'Premium'} Çerçeve</span>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem', fontWeight: 'bold', color: '#27ae60', fontSize: '1.1rem' }}>
-                      {formatPrice(order.price || 0)}
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ marginBottom: '0.5rem' }}>
-                        <span style={{
-                          padding: '0.35rem 0.75rem',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          fontWeight: 'bold',
-                          background: order.status === 'Yeni' ? '#e3f2fd' : 
-                                     order.status === 'Baskıda' ? '#fff3e0' :
-                                     order.status === 'Tamamlandı' ? '#e8f5e9' : '#f5f5f5',
-                          color: order.status === 'Yeni' ? '#1976d2' :
-                                order.status === 'Baskıda' ? '#f57c00' :
-                                order.status === 'Tamamlandı' ? '#388e3c' : '#666',
-                          display: 'inline-block'
-                        }}>
-                          {order.status || 'Yeni'}
-                        </span>
-                      </div>
-                      <div>
-                        <span style={{
-                          padding: '0.25rem 0.6rem',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          background: order.paymentStatus === 'paid' ? '#d4edda' : '#fff3cd',
-                          color: order.paymentStatus === 'paid' ? '#155724' : '#856404',
-                          display: 'inline-block'
-                        }}>
-                          {order.paymentStatus === 'paid' ? '✅ Ödendi' : '⏳ Bekliyor'}
-                        </span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#666' }}>
-                      {formatDate(order.createdAt)}
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      {order.photo?.base64 ? (
-                        <img 
-                          src={`data:${order.photo.mimetype || 'image/jpeg'};base64,${order.photo.base64}`}
-                          alt="Sipariş fotoğrafı"
-                          style={{
-                            width: '70px',
-                            height: '70px',
-                            objectFit: 'cover',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                            transition: 'transform 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-                          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-                          onClick={() => setSelectedOrder(order)}
-                        />
-                      ) : (
-                        <span style={{ color: '#999' }}>-</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <button
-                        onClick={() => setSelectedOrder(order)}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          background: '#3498db',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        👁️ Detay
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {error}
           </div>
         )}
 
-        {/* Sipariş Detay Modal */}
+        {/* Orders Tab */}
+        {activeTab === 'orders' && (
+          <>
+            {/* Filtreler */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap'
+            }}>
+              <input
+                type="text"
+                placeholder="🔍 Sipariş ID, E-posta veya Telefon ile ara..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  flex: '1',
+                  minWidth: '250px',
+                  padding: '0.75rem',
+                  border: '2px solid #ddd',
+                  borderRadius: '6px',
+                  fontSize: '1rem'
+                }}
+              />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{
+                  padding: '0.75rem',
+                  border: '2px solid #ddd',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="all">Tüm Durumlar</option>
+                <option value="paid">Ödenen</option>
+                <option value="pending">Bekleyen</option>
+                <option value="Yeni">Yeni</option>
+                <option value="Baskıda">Baskıda</option>
+                <option value="Tamamlandı">Tamamlandı</option>
+              </select>
+            </div>
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '4rem' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                <h2>Siparişler yükleniyor...</h2>
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '4rem',
+                background: '#f5f5f5',
+                borderRadius: '12px'
+              }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📭</div>
+                <h2 style={{ color: '#666' }}>Sipariş bulunamadı</h2>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
+                  <thead>
+                    <tr style={{ background: '#2c3e50', color: 'white' }}>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Sipariş No</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Müşteri</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>İletişim</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Detaylar</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Fiyat</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Durum</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Tarih</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOrders.map((order) => (
+                      <tr 
+                        key={order._id || order.id} 
+                        style={{ borderBottom: '1px solid #eee' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                      >
+                        <td style={{ padding: '1rem', fontWeight: 'bold', color: '#3498db' }}>
+                          #{order._id || order.id}
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          {order.customerInfo?.firstName || 'Müşteri'} {order.customerInfo?.lastName || ''}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
+                          <div>📧 {order.customerInfo?.email || '-'}</div>
+                          {order.customerInfo?.phone && (
+                            <div style={{ color: '#666', marginTop: '0.25rem' }}>
+                              📞 {order.customerInfo.phone}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
+                          <div><strong>Boyut:</strong> {
+                            order.size === 'custom' && order.customSize
+                              ? `${order.customSize.width}x${order.customSize.height} cm`
+                              : order.size || '-'
+                          }</div>
+                          <div style={{ marginTop: '0.25rem' }}><strong>Adet:</strong> {order.quantity || 1}</div>
+                        </td>
+                        <td style={{ padding: '1rem', fontWeight: 'bold', color: '#27ae60' }}>
+                          {formatPrice(order.price || 0)}
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ marginBottom: '0.5rem' }}>
+                            <span style={{
+                              padding: '0.35rem 0.75rem',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              fontWeight: 'bold',
+                              background: order.status === 'Yeni' ? '#e3f2fd' : 
+                                         order.status === 'Baskıda' ? '#fff3e0' :
+                                         order.status === 'Tamamlandı' ? '#e8f5e9' : '#f5f5f5',
+                              color: order.status === 'Yeni' ? '#1976d2' :
+                                    order.status === 'Baskıda' ? '#f57c00' :
+                                    order.status === 'Tamamlandı' ? '#388e3c' : '#666',
+                              display: 'inline-block'
+                            }}>
+                              {order.status || 'Yeni'}
+                            </span>
+                          </div>
+                          <div>
+                            <span style={{
+                              padding: '0.25rem 0.6rem',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              background: order.paymentStatus === 'paid' ? '#d4edda' : '#fff3cd',
+                              color: order.paymentStatus === 'paid' ? '#155724' : '#856404',
+                              display: 'inline-block'
+                            }}>
+                              {order.paymentStatus === 'paid' ? '✅ Ödendi' : '⏳ Bekliyor'}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#666' }}>
+                          {formatDate(order.createdAt)}
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <button
+                            onClick={() => setSelectedOrder(order)}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: '#3498db',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            👁️ Detay
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap'
+            }}>
+              <input
+                type="text"
+                placeholder="🔍 E-posta, Ad, Soyad veya Telefon ile ara..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  flex: '1',
+                  minWidth: '250px',
+                  padding: '0.75rem',
+                  border: '2px solid #ddd',
+                  borderRadius: '6px',
+                  fontSize: '1rem'
+                }}
+              />
+            </div>
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '4rem' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                <h2>Kullanıcılar yükleniyor...</h2>
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '4rem',
+                background: '#f5f5f5',
+                borderRadius: '12px'
+              }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>👤</div>
+                <h2 style={{ color: '#666' }}>Kullanıcı bulunamadı</h2>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#2c3e50', color: 'white' }}>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Ad Soyad</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>E-posta</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Telefon</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Sipariş Sayısı</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Kayıt Tarihi</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr 
+                        key={user._id || user.id}
+                        style={{ borderBottom: '1px solid #eee' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                      >
+                        <td style={{ padding: '1rem', fontWeight: 'bold' }}>
+                          {user.firstName} {user.lastName}
+                        </td>
+                        <td style={{ padding: '1rem' }}>{user.email}</td>
+                        <td style={{ padding: '1rem' }}>{user.phone || '-'}</td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            padding: '0.35rem 0.75rem',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            fontWeight: 'bold',
+                            background: '#e3f2fd',
+                            color: '#1976d2',
+                            display: 'inline-block'
+                          }}>
+                            {user.orderCount || 0}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#666' }}>
+                          {formatDate(user.createdAt)}
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <button
+                            onClick={() => setSelectedUser(user)}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: '#3498db',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            👁️ Detay
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Stats Tab */}
+        {activeTab === 'stats' && stats && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              padding: '2rem',
+              borderRadius: '12px',
+              color: 'white',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>👥</div>
+              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Toplam Kullanıcı</div>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.totalUsers || 0}</div>
+            </div>
+            
+            <div style={{
+              background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+              padding: '2rem',
+              borderRadius: '12px',
+              color: 'white',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📦</div>
+              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Toplam Sipariş</div>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.totalOrders || 0}</div>
+            </div>
+            
+            <div style={{
+              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              padding: '2rem',
+              borderRadius: '12px',
+              color: 'white',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>💰</div>
+              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Toplam Gelir</div>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{formatPrice(stats.totalRevenue || 0)}</div>
+            </div>
+            
+            <div style={{
+              background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+              padding: '2rem',
+              borderRadius: '12px',
+              color: 'white',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>✅</div>
+              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Ödenen Sipariş</div>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.paidOrders || 0}</div>
+            </div>
+            
+            <div style={{
+              background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+              padding: '2rem',
+              borderRadius: '12px',
+              color: 'white',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>⏳</div>
+              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Bekleyen Sipariş</div>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.pendingOrders || 0}</div>
+            </div>
+            
+            <div style={{
+              background: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+              padding: '2rem',
+              borderRadius: '12px',
+              color: 'white',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📅</div>
+              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Son 30 Gün Sipariş</div>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.recentOrders || 0}</div>
+            </div>
+            
+            <div style={{
+              background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+              padding: '2rem',
+              borderRadius: '12px',
+              color: '#333',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🆕</div>
+              <div style={{ fontSize: '0.9rem', opacity: 0.8, marginBottom: '0.5rem' }}>Son 30 Gün Yeni Kullanıcı</div>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.recentUsers || 0}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Order Detail Modal */}
         {selectedOrder && (
           <div 
             style={{
@@ -653,21 +730,6 @@ function Admin() {
                         : selectedOrder.size || '-'
                     }</div>
                     <div><strong>Adet:</strong> {selectedOrder.quantity || 1}</div>
-                    <div><strong>Çerçeve:</strong> {
-                      selectedOrder.frameType === 'none' ? 'Çerçevesiz' :
-                      selectedOrder.frameType === 'standard' ? 'Standart Çerçeve' :
-                      selectedOrder.frameType === 'premium' ? 'Premium Çerçeve' : '-'
-                    }</div>
-                    <div><strong>Kağıt:</strong> {
-                      selectedOrder.paperType === 'glossy' ? 'Parlak' :
-                      selectedOrder.paperType === 'matte' ? 'Mat' :
-                      selectedOrder.paperType === 'satin' ? 'Saten' : '-'
-                    }</div>
-                    <div><strong>Renk:</strong> {
-                      selectedOrder.colorMode === 'color' ? 'Renkli' :
-                      selectedOrder.colorMode === 'blackwhite' ? 'Siyah-Beyaz' :
-                      selectedOrder.colorMode === 'sepia' ? 'Sepya' : '-'
-                    }</div>
                     <div><strong>Kargo:</strong> {
                       selectedOrder.shippingType === 'standard' ? 'Standart' :
                       selectedOrder.shippingType === 'express' ? 'Express' : '-'
@@ -710,6 +772,108 @@ function Admin() {
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                   <button
                     onClick={() => setSelectedOrder(null)}
+                    style={{
+                      padding: '0.75rem 2rem',
+                      background: '#95a5a6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* User Detail Modal */}
+        {selectedUser && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '2rem'
+            }}
+            onClick={() => setSelectedUser(null)}
+          >
+            <div 
+              style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '2rem',
+                maxWidth: '600px',
+                width: '100%',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <h2 style={{ margin: 0, color: '#2c3e50' }}>Kullanıcı Detayları</h2>
+                <button
+                  onClick={() => setSelectedUser(null)}
+                  style={{
+                    background: '#e74c3c',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
+                  <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Kişisel Bilgiler</h3>
+                  <div><strong>Ad Soyad:</strong> {selectedUser.firstName} {selectedUser.lastName}</div>
+                  <div style={{ marginTop: '0.5rem' }}><strong>E-posta:</strong> {selectedUser.email}</div>
+                  {selectedUser.phone && (
+                    <div style={{ marginTop: '0.5rem' }}><strong>Telefon:</strong> {selectedUser.phone}</div>
+                  )}
+                  {selectedUser.address && (
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <strong>Adres:</strong>
+                      <p style={{ margin: '0.5rem 0 0 0', color: '#666' }}>{selectedUser.address}</p>
+                    </div>
+                  )}
+                  <div style={{ marginTop: '0.5rem' }}><strong>Kayıt Tarihi:</strong> {formatDate(selectedUser.createdAt)}</div>
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <span style={{
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold',
+                      background: '#e3f2fd',
+                      color: '#1976d2',
+                      display: 'inline-block'
+                    }}>
+                      {selectedUser.orderCount || 0} Sipariş
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setSelectedUser(null)}
                     style={{
                       padding: '0.75rem 2rem',
                       background: '#95a5a6',

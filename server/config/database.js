@@ -16,9 +16,8 @@ export const connectDB = async () => {
       'mongodb://mongo:DpZZNKhEweSoBgjnsTmwjOpjpmtRlSqP@yamanote.proxy.rlwy.net:38288';
 
     // Bağlantı seçenekleri
+    // Mongoose 7+ versiyonunda useNewUrlParser ve useUnifiedTopology artık desteklenmiyor
     const options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 5000, // 5 saniye timeout
       socketTimeoutMS: 45000, // 45 saniye socket timeout
     };
@@ -44,7 +43,7 @@ export const connectDB = async () => {
       console.log('✅ MongoDB yeniden bağlandı');
       isConnected = true;
     });
-
+    
     return mongoose.connection;
   } catch (error) {
     console.error('❌ MongoDB bağlantı hatası:', error.message);
@@ -60,7 +59,7 @@ export const getDB = () => {
   }
   return mongoose.connection;
 };
-
+  
 // Bağlantıyı kapat
 export const disconnectDB = async () => {
   if (isConnected) {

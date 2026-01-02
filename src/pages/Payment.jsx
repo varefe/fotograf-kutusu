@@ -65,11 +65,34 @@ function Payment() {
       return
     }
 
+    // ÖNEMLİ: Siparişin ödeme durumunu kontrol et
+    const orders = getDecryptedOrders()
+    const localOrder = orders.find(o => o.id === orderId || o.id?.toString() === orderId)
+    
+    if (localOrder) {
+      // Eğer sipariş zaten ödendiyse, PaymentSuccess sayfasına yönlendir
+      if (localOrder.paymentStatus === 'paid' || localOrder.paymentStatus === 'completed') {
+        console.log('⚠️ Bu sipariş zaten ödendi, PaymentSuccess sayfasına yönlendiriliyor...')
+        navigate(`/payment/success?orderId=${orderId}&token=${localOrder.paymentToken || ''}`, { replace: true })
+        return
+      }
+      
+      // localStorage'da ödeme durumu kontrolü
+      const paymentStatusKey = `payment_status_${orderId}`
+      const storedPaymentStatus = localStorage.getItem(paymentStatusKey)
+      
+      if (storedPaymentStatus === 'paid' || storedPaymentStatus === 'completed') {
+        console.log('⚠️ localStorage\'da bu sipariş için ödeme durumu "paid" olarak işaretlenmiş')
+        navigate(`/payment/success?orderId=${orderId}`, { replace: true })
+        return
+      }
+    }
+
     // Ödeme formu oluştur
     console.log('🚀 Ödeme formu oluşturuluyor, orderId:', orderId)
     createPaymentForm()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId])
+  }, [orderId, navigate])
 
   // Font URL'lerini engellemek için useEffect - Agresif yaklaşım
   useEffect(() => {
@@ -311,8 +334,13 @@ function Payment() {
             success: data.success,
             token: data.token || 'TOKEN YOK!',
             hasCheckoutFormContent: !!data.checkoutFormContent,
-            paymentPageUrl: data.paymentPageUrl || 'YOK'
+            checkoutFormContentLength: data.checkoutFormContent?.length || 0,
+            paymentPageUrl: data.paymentPageUrl || 'YOK',
+            error: data.error || 'YOK'
           })
+          
+          // Debug: Response'un tamamını logla
+          console.log('📋 Full Response Data:', data)
           
           if (data.success && data.checkoutFormContent) {
             // Token kontrolü
@@ -322,12 +350,22 @@ function Payment() {
               console.warn('⚠️ Token frontend\'e gelmedi!')
             }
             
+            console.log('✅ checkoutFormContent set ediliyor, uzunluk:', data.checkoutFormContent.length)
+            console.log('✅ İlk 200 karakter:', data.checkoutFormContent.substring(0, 200))
+            
+            // checkoutFormContent'i set et
             setPaymentForm(data.checkoutFormContent)
             setLoading(false)
+            
+            console.log('✅ paymentForm state set edildi, render edilecek')
+            
             return
           } else {
             console.error('❌ Ödeme formu oluşturulamadı:', data.error)
-            setError(data.error || 'Ödeme formu oluşturulamadı')
+            console.error('❌ Response Data:', data)
+            console.error('❌ success:', data.success)
+            console.error('❌ checkoutFormContent var mı?', !!data.checkoutFormContent)
+            setError(data.error || 'Ödeme formu oluşturulamadı. Lütfen tekrar deneyin.')
             setLoading(false)
             return
           }
@@ -486,13 +524,33 @@ function Payment() {
                   }
                 `}</style>
                 <div 
+                  ref={(el) => {
+                    if (el && paymentForm) {
+                      console.log('🔍 paymentForm container render edildi')
+                      console.log('🔍 paymentForm uzunluğu:', paymentForm.length)
+                      // Script tag'lerini manuel olarak çalıştır
+                      const tempDiv = document.createElement('div')
+                      tempDiv.innerHTML = paymentForm
+                      const scripts = tempDiv.querySelectorAll('script')
+                      scripts.forEach((oldScript) => {
+                        const newScript = document.createElement('script')
+                        Array.from(oldScript.attributes).forEach((attr) => {
+                          newScript.setAttribute(attr.name, attr.value)
+                        })
+                        if (oldScript.innerHTML) {
+                          newScript.innerHTML = oldScript.innerHTML
+                        }
+                        document.body.appendChild(newScript)
+                        console.log('✅ Script çalıştırıldı:', newScript.src || newScript.innerHTML.substring(0, 50))
+                      })
+                    }
+                  }}
                   dangerouslySetInnerHTML={{ __html: paymentForm }}
                   style={{
                     minHeight: '400px'
                   }}
                   onLoad={() => {
-                    // 3. iyzico.js yükleniyor mu? - KONTROL
-                    console.log('🔍 iyzico form yüklendi, script kontrolü yapılıyor...')
+                    console.log('🔍 iyzico form container yüklendi')
                     
                     // iyzico script'inin yüklenip yüklenmediğini kontrol et
                     setTimeout(() => {
@@ -508,6 +566,10 @@ function Payment() {
                       } else {
                         console.warn('⚠️ window.iyzipayCheckout bulunamadı')
                       }
+                      
+                      // iframe kontrolü
+                      const iframes = document.querySelectorAll('iframe[src*="iyzipay"]')
+                      console.log('🖼️ İyzico iframe sayısı:', iframes.length)
                     }, 1000)
                   }}
                 />

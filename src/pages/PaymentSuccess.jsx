@@ -1,25 +1,69 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { useAuth } from '../context/AuthContext'
 import { getDecryptedOrders } from '../utils/encryption'
 
 function PaymentSuccess() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const { user, isAuthenticated, getAuthHeaders } = useAuth()
   const token = searchParams.get('token')
   const orderId = searchParams.get('orderId')
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Sayfa her yüklendiğinde benzersiz bir ID oluştur (yeni sayfa garantisi)
+  const [pageId] = useState(() => `success_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
 
   useEffect(() => {
-    if (orderId) {
-      // ÖNEMLİ: Ödeme başarılı oldu, şimdi siparişi backend'e kaydet
-      saveOrderToBackend()
-    } else {
-      setLoading(false)
+    // Eğer orderId yoksa ve sayfa direkt açıldıysa, ana sayfaya yönlendir
+    if (!orderId) {
+      console.warn('⚠️ PaymentSuccess sayfası orderId olmadan açıldı, ana sayfaya yönlendiriliyor...')
+      navigate('/', { replace: true })
+      return
     }
-  }, [orderId])
+    
+    // ÖNEMLİ: Ödeme başarılı oldu, şimdi siparişi backend'e kaydet
+    // Önce localStorage'da ödeme durumunu işaretle (tekrar ödeme sayfasına gelinmesini engelle)
+    const paymentStatusKey = `payment_status_${orderId}`
+    localStorage.setItem(paymentStatusKey, 'paid')
+    
+    // Sayfa ID'sini de kaydet (her ödeme için yeni sayfa garantisi)
+    localStorage.setItem(`payment_success_page_${orderId}`, pageId)
+    
+    // localStorage'daki siparişin paymentStatus'unu güncelle
+    const orders = getDecryptedOrders()
+    const localOrder = orders.find(o => o.id === orderId || o.id?.toString() === orderId)
+    if (localOrder) {
+      localOrder.paymentStatus = 'paid'
+      localOrder.paymentToken = token || ''
+      // Güncellenmiş siparişi tekrar kaydet
+      try {
+        const encrypted = JSON.stringify(localOrder)
+        const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]')
+        const orderIndex = existingOrders.findIndex((o) => {
+          try {
+            const decrypted = JSON.parse(atob(o))
+            return decrypted.id === orderId || decrypted.id?.toString() === orderId
+          } catch {
+            return false
+          }
+        })
+        if (orderIndex !== -1) {
+          existingOrders[orderIndex] = btoa(encrypted)
+          localStorage.setItem('orders', JSON.stringify(existingOrders))
+        }
+      } catch (err) {
+        console.error('localStorage güncelleme hatası:', err)
+      }
+    }
+    
+    saveOrderToBackend()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId, token, pageId])
 
   const saveOrderToBackend = async () => {
     try {
@@ -35,12 +79,15 @@ function PaymentSuccess() {
       if (localOrder) {
         console.log('✅ localStorage\'da sipariş bulundu, backend\'e kaydediliyor...')
         
-        // Backend'e siparişi kaydet
+        // Backend'e siparişi kaydet (kullanıcı giriş yapmışsa token ile)
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(isAuthenticated ? getAuthHeaders() : {})
+        }
+
         const createResponse = await fetch(`${API_URL}/api/orders`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers,
           body: JSON.stringify({
             photo: localOrder.photo,
             size: localOrder.size,
@@ -58,7 +105,8 @@ function PaymentSuccess() {
             price: localOrder.price,
             notes: '',
             paymentStatus: 'paid', // Ödeme yapıldı
-            status: 'Ödeme Alındı'
+            status: 'Ödeme Alındı',
+            userId: user ? user.id : null // Kullanıcı giriş yapmışsa userId ekle
           })
         })
         
@@ -68,6 +116,17 @@ function PaymentSuccess() {
           
           if (savedOrder) {
             console.log('✅ Sipariş backend\'e kaydedildi (ödeme durumu ile):', savedOrder._id || savedOrder.id)
+            
+            // Ödeme durumunu localStorage'da da güncelle
+            const paymentStatusKey = `payment_status_${orderId}`
+            localStorage.setItem(paymentStatusKey, 'paid')
+            
+            // Sipariş ID'sini backend'den gelen ID ile güncelle
+            if (savedOrder._id || savedOrder.id) {
+              const newOrderId = savedOrder._id || savedOrder.id
+              localStorage.setItem(`payment_status_${newOrderId}`, 'paid')
+            }
+            
             setOrder(savedOrder)
             setLoading(false)
             return

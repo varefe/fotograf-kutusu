@@ -6,17 +6,23 @@
 }
 
 :root {
-    --primary-color: #4f46e5;
-    --primary-dark: #4338ca;
+    --primary-color: #D4AF37;
+    --primary-dark: #B8941F;
+    --primary-light: #E5C158;
+    --primary-gold: #FFD700;
     --secondary-color: #10b981;
     --danger-color: #ef4444;
-    --text-color: #1f2937;
-    --text-light: #6b7280;
+    --text-color: #000000;
+    --text-light: #4a4a4a;
     --bg-color: #ffffff;
-    --bg-light: #f9fafb;
-    --border-color: #e5e7eb;
+    --bg-light: #fafafa;
+    --bg-gray: #f5f5f5;
+    --bg-dark: #1a1a1a;
+    --border-color: #e5e5e5;
     --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-gold: 0 4px 15px rgba(212, 175, 55, 0.3);
 }
 
 body {
@@ -32,25 +38,67 @@ body {
     padding: 0 20px;
 }
 
-/* Navbar */
+/* Navbar - Modern E-ticaret Stili */
 .navbar {
     background-color: var(--bg-color);
-    box-shadow: var(--shadow);
-    padding: 1rem 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 1000;
 }
 
-.navbar .container {
+.navbar-top {
+    background-color: var(--bg-gray);
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.navbar-top .container {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-size: 0.875rem;
+    color: var(--text-light);
+}
+
+.navbar-top-links {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.navbar-top-links a {
+    color: var(--text-light);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.navbar-top-links a:hover {
+    color: var(--primary-color);
+}
+
+.navbar-main {
+    padding: 1rem 0;
+}
+
+.navbar-main .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+}
+
+.navbar-main .container .nav-brand {
+    flex: 0 0 auto;
+}
+
+.navbar-main .container .nav-links {
+    flex: 1;
+    justify-content: flex-end;
 }
 
 .nav-brand a {
-    font-size: 1.5rem;
-    font-weight: bold;
+    font-size: 1.75rem;
+    font-weight: 800;
     color: var(--primary-color);
     text-decoration: none;
     display: flex;
@@ -59,27 +107,108 @@ body {
 }
 
 .nav-brand .logo {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
     object-fit: cover;
-    border: 2px solid var(--primary-color);
+}
+
+.navbar-search {
+    flex: 1;
+    max-width: 600px;
+    position: relative;
+}
+
+.navbar-search input {
+    width: 100%;
+    padding: 0.75rem 3rem 0.75rem 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+
+.navbar-search input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+}
+
+.navbar-search button {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--primary-color);
+    color: #000000;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.2s;
+    box-shadow: var(--shadow-gold);
+}
+
+.navbar-search button:hover {
+    background: var(--primary-gold);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+    transform: translateY(-50%) scale(1.05);
 }
 
 .nav-links {
     display: flex;
-    gap: 2rem;
+    align-items: center;
+    gap: 1.5rem;
 }
 
 .nav-links a {
     color: var(--text-color);
     text-decoration: none;
     font-weight: 500;
+    font-size: 0.95rem;
     transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .nav-links a:hover {
     color: var(--primary-color);
+}
+
+.nav-cart {
+    position: relative;
+}
+
+.nav-cart-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--danger-color);
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.nav-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    background: var(--bg-light);
+    transition: background 0.2s;
+}
+
+.nav-user:hover {
+    background: var(--bg-gray);
 }
 
 /* Buttons */
@@ -98,13 +227,15 @@ body {
 
 .btn-primary {
     background-color: var(--primary-color);
-    color: white;
+    color: #000000;
+    font-weight: 700;
+    box-shadow: var(--shadow-gold);
 }
 
 .btn-primary:hover {
-    background-color: var(--primary-dark);
+    background-color: var(--primary-gold);
     transform: translateY(-1px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
 }
 
 .btn-secondary {
@@ -135,24 +266,45 @@ body {
     font-size: 0.875rem;
 }
 
-/* Hero Section */
+/* Hero Section - Modern Banner */
 .hero {
-    background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
-    color: white;
-    padding: 5rem 0;
+    background: linear-gradient(135deg, var(--primary-gold) 0%, var(--primary-color) 50%, var(--primary-dark) 100%);
+    color: #000000;
+    padding: 4rem 0;
     text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M 100 0 L 0 0 0 100" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+    opacity: 0.3;
+}
+
+.hero .container {
+    position: relative;
+    z-index: 1;
 }
 
 .hero h1 {
-    font-size: 3rem;
+    font-size: 3.5rem;
     margin-bottom: 1rem;
-    font-weight: 800;
+    font-weight: 900;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    color: #000000;
 }
 
 .hero-subtitle {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     margin-bottom: 2rem;
-    opacity: 0.9;
+    color: #1a1a1a;
+    font-weight: 500;
 }
 
 /* How It Works */
@@ -225,41 +377,84 @@ body {
 
 .pricing-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 2rem;
     margin-bottom: 2rem;
 }
 
 .pricing-card {
     background-color: var(--bg-color);
-    padding: 2rem;
-    border-radius: 1rem;
+    padding: 0;
+    border-radius: 12px;
     text-align: center;
-    box-shadow: var(--shadow);
-    transition: transform 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
 }
 
 .pricing-card:hover {
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-lg);
+    transform: translateY(-8px);
+    box-shadow: 0 12px 24px rgba(212, 175, 55, 0.25);
+    border-color: var(--primary-color);
 }
 
 .pricing-card.featured {
     border: 2px solid var(--primary-color);
-    transform: scale(1.05);
+    position: relative;
+    box-shadow: var(--shadow-gold);
+}
+
+.pricing-card.featured::before {
+    content: '⭐ Popüler';
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: var(--primary-color);
+    color: #000000;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    z-index: 1;
+    box-shadow: var(--shadow-gold);
+}
+
+.pricing-card-image {
+    width: 100%;
+    height: 200px;
+    background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-gray) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    color: var(--primary-color);
+}
+
+.pricing-card-content {
+    padding: 1.5rem;
 }
 
 .pricing-card h3 {
     font-size: 1.5rem;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     color: var(--text-color);
+    font-weight: 700;
 }
 
 .pricing-card .price {
-    font-size: 2rem;
-    font-weight: bold;
+    font-size: 2.25rem;
+    font-weight: 900;
     color: var(--primary-color);
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.pricing-card .price-unit {
+    font-size: 1rem;
+    color: var(--text-light);
+    font-weight: 400;
 }
 
 .pricing-card p {
@@ -649,25 +844,29 @@ body {
     font-size: 1.2rem;
 }
 
-/* Footer */
+/* Footer - Modern E-ticaret Stili */
 .footer {
-    background-color: var(--text-color);
+    background: linear-gradient(180deg, #000000 0%, #1a1a1a 100%);
     color: white;
-    padding: 3rem 0 2rem;
+    padding: 4rem 0 2rem;
     margin-top: 4rem;
+    border-top: 3px solid var(--primary-color);
 }
 
 .footer-content {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 3rem;
+    margin-bottom: 3rem;
 }
 
 .footer-section h3 {
-    font-size: 1.25rem;
-    margin-bottom: 1rem;
-    color: white;
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+    color: var(--primary-color);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .footer-links {
@@ -737,6 +936,24 @@ body {
 
 /* Responsive */
 @media (max-width: 768px) {
+    .navbar-top {
+        display: none;
+    }
+
+    .navbar-main .container {
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .nav-brand a {
+        font-size: 1.5rem;
+    }
+
+    .nav-links {
+        gap: 1rem;
+        font-size: 0.875rem;
+    }
+
     .hero h1 {
         font-size: 2rem;
     }
@@ -757,9 +974,9 @@ body {
         transform: scale(1);
     }
 
-    .nav-links {
-        gap: 1rem;
-        font-size: 0.875rem;
+    .pricing-card.featured::before {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.6rem;
     }
 
     .form-row {

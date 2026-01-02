@@ -5,23 +5,29 @@
 const getApiUrl = () => {
   // Environment variable varsa onu kullan (en yüksek öncelik)
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL
+    const url = import.meta.env.VITE_API_URL.trim()
+    // Eğer URL zaten /api ile bitiyorsa veya /api içeriyorsa, olduğu gibi döndür
+    return url
   }
   
   // Production ortamında (localhost değilse)
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    // Backend aynı sunucuda çalışıyorsa (mod_proxy ile):
-    return '/api'
+    // Railway backend URL'i - /api eklemeyin, çünkü route'larda zaten /api var
+    const railwayUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app'
+    console.log('🌐 Production API URL:', railwayUrl)
+    return railwayUrl
     
-    // Eğer backend ayrı bir sunucudaysa (Render.com, Railway, vb.):
-    // return 'https://fotograf-backend.onrender.com'
+    // Eğer backend aynı sunucudaysa (mod_proxy ile):
+    // return '/api'
     
     // Eğer backend ayrı subdomain'deyse (örn: api.fotografkutusu.com):
     // return 'https://api.fotografkutusu.com'
   }
   
   // Development ortamında
-  return 'http://localhost:5000'
+  const devUrl = 'http://localhost:5000'
+  console.log('🌐 Development API URL:', devUrl)
+  return devUrl
 }
 
 export const API_URL = getApiUrl()

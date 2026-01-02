@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -17,15 +17,92 @@ function Order() {
     size: '20x30',
     customWidth: '',
     customHeight: '',
-    quantity: 1,
-    frameType: 'standard',
-    paperType: 'glossy',
-    colorMode: 'color',
+    quantity: 15, // Minimum 15 adet
     shippingType: 'standard',
     email: '',
     address: '',
     phone: ''
   })
+
+  // Canlı fiyat hesaplama
+  const currentPrice = useMemo(() => {
+    if (!selectedFile) return null
+    
+    const customSize = formData.size === 'custom' && formData.customWidth && formData.customHeight
+      ? { width: parseFloat(formData.customWidth), height: parseFloat(formData.customHeight) }
+      : undefined
+
+    return calculatePrice(
+      formData.size,
+      parseInt(formData.quantity) || 1,
+      formData.shippingType,
+      customSize
+    )
+  }, [selectedFile, formData.size, formData.quantity, formData.shippingType, formData.customWidth, formData.customHeight])
+
+  // Fiyat detayları (kargo ücretsiz kontrolü için)
+  const priceDetails = useMemo(() => {
+    if (!currentPrice) return null
+    
+    // Toplu fiyat kontrolü (sadece toplu fiyatlar)
+    const getBulkPrice = (size, quantity) => {
+      const bulkPrices = {
+        '10x15': {
+          bulk: { 25: 14, 35: 8, 50: 7.5, 100: 7 }
+        },
+        '15x20': {
+          bulk: { 25: 16, 35: 14, 50: 13, 100: 12 }
+        },
+        '20x30': {
+          bulk: { 25: 22, 35: 20, 50: 19, 100: 18 }
+        },
+        '30x40': {
+          bulk: { 25: 32, 35: 30, 50: 29, 100: 28 }
+        }
+      }
+      const sizeData = bulkPrices[formData.size]
+      if (!sizeData) return null
+      const qty = parseInt(formData.quantity) || 1
+      if (qty >= 100 && sizeData.bulk[100]) return sizeData.bulk[100]
+      if (qty >= 50 && sizeData.bulk[50]) return sizeData.bulk[50]
+      if (qty >= 35 && sizeData.bulk[35]) return sizeData.bulk[35]
+      if (qty >= 25 && sizeData.bulk[25]) return sizeData.bulk[25]
+      return null // 25'ten az adet için null (toplu fiyat yok)
+    }
+    
+    // Base price hesaplama (sadece toplu fiyat)
+    let basePrice = 0
+    if (formData.size === 'custom' && formData.customWidth && formData.customHeight) {
+      const area = parseFloat(formData.customWidth) * parseFloat(formData.customHeight)
+      basePrice = Math.ceil(area / 100) * 0.5
+    } else {
+      const bulkPrice = getBulkPrice(formData.size, parseInt(formData.quantity) || 1)
+      if (bulkPrice) {
+        basePrice = bulkPrice
+      } else {
+        // 25'ten az adet için minimum fiyat
+        basePrice = { '10x15': 15, '15x20': 18, '20x30': 25, '30x40': 35 }[formData.size] || 25
+      }
+    }
+    
+    const quantity = parseInt(formData.quantity) || 1
+    const subtotal = basePrice * quantity
+    
+    const shippingPrices = { 'standard': 15, 'express': 35 }
+    let shippingPrice = shippingPrices[formData.shippingType] || 15
+    if (subtotal >= 99) {
+      shippingPrice = 0
+    }
+    
+    return {
+      basePrice,
+      quantity,
+      subtotal,
+      shippingPrice,
+      total: currentPrice,
+      isBulkPrice: getBulkPrice(formData.size, quantity) !== null
+    }
+  }, [currentPrice, formData])
 
   const handleFileChange = (e) => {
     const file = e.target.files[0]
@@ -98,25 +175,23 @@ function Order() {
             height: parseFloat(formData.customHeight)
           } : undefined,
           quantity: parseInt(formData.quantity),
-          frameType: formData.frameType,
-          paperType: formData.paperType,
-          colorMode: formData.colorMode,
           shippingType: formData.shippingType,
           email: formData.email,
           address: formData.address,
           phone: formData.phone || '',
           firstName: 'Müşteri',
           lastName: 'Müşteri',
-          notes: ''
+          notes: '',
+          // Varsayılan değerler (backend uyumluluğu için)
+          frameType: 'none',
+          paperType: 'glossy',
+          colorMode: 'color'
         }
         
         // Fiyatı hesapla
         const calculatedPrice = calculatePrice(
           formData.size,
           parseInt(formData.quantity),
-          formData.frameType,
-          formData.paperType,
-          formData.colorMode,
           formData.shippingType,
           formData.size === 'custom' ? {
             width: parseFloat(formData.customWidth),
@@ -224,9 +299,6 @@ function Order() {
                         customWidth: '',
                         customHeight: '',
                         quantity: 1,
-                        frameType: 'standard',
-                        paperType: 'glossy',
-                        colorMode: 'color',
                         shippingType: 'standard',
                         email: '',
                         address: '',
@@ -385,71 +457,28 @@ function Order() {
                     type="number" 
                     id="quantity" 
                     name="quantity" 
-                    min="1" 
+                    min="15" 
                     value={formData.quantity}
                     onChange={handleInputChange}
                     required
                   />
-                  <small className="form-help">3+ adet %5, 5+ adet %10, 10+ adet %15 indirim!</small>
+                  <small className="form-help">Minimum 15 adet (tekli fiyat yok)</small>
                 </div>
               </div>
 
               <div className="form-section">
-                <h2>3. Baskı Seçenekleri</h2>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="frameType">Çerçeve Tipi</label>
-                    <select 
-                      id="frameType" 
-                      name="frameType"
-                      value={formData.frameType}
-                      onChange={handleInputChange}
-                    >
-                      <option value="none">Çerçevesiz (₺0)</option>
-                      <option value="standard">Standart Çerçeve (₺10)</option>
-                      <option value="premium">Premium Çerçeve (₺20)</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="paperType">Kağıt Tipi</label>
-                    <select 
-                      id="paperType" 
-                      name="paperType"
-                      value={formData.paperType}
-                      onChange={handleInputChange}
-                    >
-                      <option value="glossy">Parlak (Ek ücret yok)</option>
-                      <option value="matte">Mat (₺2 ek)</option>
-                      <option value="satin">Saten (₺3 ek)</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="colorMode">Renk Modu</label>
-                    <select 
-                      id="colorMode" 
-                      name="colorMode"
-                      value={formData.colorMode}
-                      onChange={handleInputChange}
-                    >
-                      <option value="color">Renkli (Ek ücret yok)</option>
-                      <option value="blackwhite">Siyah-Beyaz (₺1 indirim)</option>
-                      <option value="sepia">Sepya (₺1 ek)</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="shippingType">Kargo Tipi</label>
-                    <select 
-                      id="shippingType" 
-                      name="shippingType"
-                      value={formData.shippingType}
-                      onChange={handleInputChange}
-                    >
-                      <option value="standard">Standart Kargo (3-5 gün, ₺15)</option>
-                      <option value="express">Express Kargo (1-2 gün, ₺35)</option>
-                    </select>
-                  </div>
+                <h2>3. Kargo Seçimi</h2>
+                <div className="form-group">
+                  <label htmlFor="shippingType">Kargo Tipi</label>
+                  <select 
+                    id="shippingType" 
+                    name="shippingType"
+                    value={formData.shippingType}
+                    onChange={handleInputChange}
+                  >
+                    <option value="standard">Standart Kargo (3-5 gün, ₺15)</option>
+                    <option value="express">Express Kargo (1-2 gün, ₺35)</option>
+                  </select>
                 </div>
               </div>
 
@@ -492,12 +521,93 @@ function Order() {
                 </div>
               </div>
 
+              {/* Fiyat Özeti */}
+              {currentPrice && selectedFile && (
+                <div className="form-section" style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: '12px',
+                  padding: '2rem',
+                  marginTop: '2rem',
+                  color: 'white',
+                  boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)'
+                }}>
+                  <h2 style={{ color: 'white', marginBottom: '1.5rem', fontSize: '1.5rem' }}>
+                    💰 Fiyat Özeti
+                  </h2>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '1rem',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{ background: 'rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Birim Fiyat</div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                        ₺{priceDetails ? (priceDetails.subtotal / priceDetails.quantity).toFixed(2) : '0.00'}
+                      </div>
+                      {priceDetails?.isBulkPrice && (
+                        <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
+                          🎁 Toplu Fiyat
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Adet</div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{formData.quantity} adet</div>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Kargo</div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                        {priceDetails && priceDetails.shippingPrice === 0 ? 'ÜCRETSİZ 🎉' : `₺${priceDetails?.shippingPrice || (formData.shippingType === 'standard' ? '15' : '35')}`}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{
+                    borderTop: '2px solid rgba(255,255,255,0.3)',
+                    paddingTop: '1.5rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Toplam Tutar</div>
+                      {priceDetails?.isBulkPrice ? (
+                        <div style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: '0.25rem' }}>
+                          🎁 Toplu fiyat uygulandı! (25+ adet)
+                        </div>
+                      ) : parseInt(formData.quantity) >= 3 && (
+                        <div style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: '0.25rem' }}>
+                          {parseInt(formData.quantity) >= 10 ? '🎁 %15 indirim uygulandı!' :
+                           parseInt(formData.quantity) >= 5 ? '🎁 %10 indirim uygulandı!' :
+                           '🎁 %5 indirim uygulandı!'}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
+                      ₺{currentPrice.toFixed(2)}
+                    </div>
+                  </div>
+                  {priceDetails && priceDetails.subtotal < 99 && (
+                    <div style={{
+                      marginTop: '1rem',
+                      padding: '0.75rem',
+                      background: 'rgba(255,255,255,0.2)',
+                      borderRadius: '6px',
+                      fontSize: '0.9rem',
+                      textAlign: 'center'
+                    }}>
+                      🚚 ₺{(99 - priceDetails.subtotal).toFixed(2)} daha ekleyin, kargo ücretsiz olsun!
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="form-actions" style={{ textAlign: 'center', marginTop: '40px' }}>
                 <button 
                   type="submit" 
                   className="btn btn-primary btn-large" 
                   style={{ fontSize: '18px', padding: '15px 40px' }}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !selectedFile}
                 >
                   {isSubmitting ? '⏳ Sipariş Oluşturuluyor...' : '📸 Sipariş Ver ve Ödemeye Geç'}
                 </button>

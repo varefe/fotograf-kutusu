@@ -3,6 +3,11 @@ import { encryptSensitiveFields, decryptSensitiveFields } from '../utils/encrypt
 
 // Order Schema
 const orderSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null // Opsiyonel - misafir siparişleri için null olabilir
+  },
   photo: {
     filename: { type: String, required: true },
     originalName: { type: String, required: true },
@@ -84,6 +89,12 @@ const OrderModel = {
   // Tüm siparişleri getir
   findAll: async (isAdmin = false) => {
     const orders = await Order.find({}).sort({ createdAt: -1 });
+    return orders.map(order => OrderModel.formatOrder(order.toObject(), isAdmin));
+  },
+
+  // Kullanıcının siparişlerini getir
+  findByUserId: async (userId, isAdmin = false) => {
+    const orders = await Order.find({ userId }).sort({ createdAt: -1 });
     return orders.map(order => OrderModel.formatOrder(order.toObject(), isAdmin));
   },
 

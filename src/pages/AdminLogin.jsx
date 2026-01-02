@@ -6,29 +6,32 @@ import Footer from '../components/Footer'
 function AdminLogin() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [adminCode, setAdminCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  // Admin kullanıcı adı ve şifre (.env dosyasından alınır)
+  // Admin kullanıcı adı, şifre ve özel kod (.env dosyasından alınır)
   const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME || 'efe'
   const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '193123'
+  const ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE || 'ADMIN2024SECRET'
 
   const handleSubmit = (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
 
-    // Basit authentication kontrolü
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    // Basit authentication kontrolü - Üç alan da doğru olmalı
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD && adminCode === ADMIN_CODE) {
       // Session storage'a kaydet
       sessionStorage.setItem('adminAuthenticated', 'true')
       sessionStorage.setItem('adminLoginTime', new Date().getTime().toString())
+      sessionStorage.setItem('adminCodeVerified', 'true') // Admin kodu doğrulandı
       
       // Admin sayfasına yönlendir
       navigate('/admin')
     } else {
-      setError('Kullanıcı adı veya şifre hatalı!')
+      setError('Kullanıcı adı, şifre veya admin kodu hatalı!')
       setLoading(false)
     }
   }
@@ -118,7 +121,7 @@ function AdminLogin() {
                 />
               </div>
 
-              <div style={{ marginBottom: '2rem' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
                 <label 
                   htmlFor="password" 
                   style={{ 
@@ -150,6 +153,58 @@ function AdminLogin() {
                   placeholder="Şifrenizi girin"
                   disabled={loading}
                 />
+              </div>
+
+              <div style={{ marginBottom: '2rem' }}>
+                <label 
+                  htmlFor="adminCode" 
+                  style={{ 
+                    display: 'block', 
+                    marginBottom: '0.5rem',
+                    fontWeight: '600',
+                    color: '#2c3e50'
+                  }}
+                >
+                  🔑 Admin Kodu
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#e74c3c', 
+                    marginLeft: '0.5rem',
+                    fontWeight: 'normal'
+                  }}>
+                    (Zorunlu)
+                  </span>
+                </label>
+                <input
+                  type="password"
+                  id="adminCode"
+                  value={adminCode}
+                  onChange={(e) => setAdminCode(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '2px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '1rem',
+                    transition: 'border-color 0.3s',
+                    boxSizing: 'border-box',
+                    background: '#fffbf0'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#f39c12'}
+                  onBlur={(e) => e.target.style.borderColor = '#ddd'}
+                  placeholder="Sadece adminlerin bildiği özel kodu girin"
+                  disabled={loading}
+                />
+                <small style={{
+                  display: 'block',
+                  marginTop: '0.5rem',
+                  fontSize: '0.8rem',
+                  color: '#e67e22',
+                  fontStyle: 'italic'
+                }}>
+                  ⚠️ Bu kod sadece yetkili adminler tarafından bilinir
+                </small>
               </div>
 
               <button
