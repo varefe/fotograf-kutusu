@@ -162,7 +162,11 @@ router.post('/', optionalAuth, async (req, res) => {
       phone,
       firstName,
       lastName,
-      notes
+      notes,
+      paymentStatus,
+      status,
+      userId: requestUserId,
+      price: requestPrice
     } = req.body;
 
     // Veri temizleme
@@ -206,8 +210,8 @@ router.post('/', optionalAuth, async (req, res) => {
       });
     }
 
-    // Fiyat hesapla
-    const price = calculatePrice(
+    // Fiyat hesapla (eğer request'te fiyat gönderilmişse onu kullan, yoksa hesapla)
+    const price = requestPrice ? parseFloat(requestPrice) : calculatePrice(
       sanitizedData.size,
       sanitizedData.quantity,
       sanitizedData.shippingType,
@@ -215,14 +219,21 @@ router.post('/', optionalAuth, async (req, res) => {
     );
 
     // Kullanıcı ID'sini al (opsiyonel - giriş yapmış kullanıcılar için)
+    // Önce request body'den, sonra auth token'dan, son olarak null
     let userId = null;
-    if (req.user && req.user.id) {
+    if (requestUserId) {
+      userId = requestUserId;
+    } else if (req.user && req.user.id) {
       userId = req.user.id;
     }
 
+    // Payment status ve status'u al (eğer gönderilmişse)
+    const finalPaymentStatus = paymentStatus || 'pending';
+    const finalStatus = status || 'Yeni';
+
     // Sipariş oluştur
     const orderData = {
-      userId: userId, // Giriş yapmış kullanıcı için
+      userId: userId, // Giriş yapmış kullanıcı veya request'ten gelen userId
       photo: sanitizedData.photo,
       size: sanitizedData.size,
       customSize: sanitizedData.customSize,
@@ -239,12 +250,23 @@ router.post('/', optionalAuth, async (req, res) => {
         address: sanitizedData.customerInfo.address
       },
       price,
-      status: 'Yeni',
-      paymentStatus: 'pending',
+      status: finalStatus, // Request'ten gelen veya varsayılan 'Yeni'
+      paymentStatus: finalPaymentStatus, // Request'ten gelen veya varsayılan 'pending'
       notes: sanitizedData.notes
     };
 
+    console.log('📦 Yeni sipariş kaydediliyor:', {
+      email: sanitizedData.customerInfo.email,
+      paymentStatus: finalPaymentStatus,
+      status: finalStatus,
+      price: price,
+      quantity: sanitizedData.quantity,
+      userId: userId || 'Misafir'
+    });
+
     const savedOrder = await Order.create(orderData);
+
+    console.log('✅ Sipariş başarıyla kaydedildi:', savedOrder._id || savedOrder.id);
 
     res.status(201).json({
       success: true,

@@ -151,36 +151,49 @@ function Login() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  id="rememberMe"
-                  name="rememberMe"
-                  checked={formData.rememberMe}
-                  onChange={(e) => setFormData({ ...formData, rememberMe: e.target.checked })}
-                  style={{
-                    width: '18px',
-                    height: '18px',
-                    marginRight: '0.5rem',
-                    cursor: 'pointer'
+              <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    id="rememberMe"
+                    name="rememberMe"
+                    checked={formData.rememberMe}
+                    onChange={(e) => setFormData({ ...formData, rememberMe: e.target.checked })}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      marginRight: '0.5rem',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  <label htmlFor="rememberMe" style={{ 
+                    cursor: 'pointer', 
+                    fontSize: '0.95rem',
+                    color: 'var(--text-color)',
+                    userSelect: 'none'
+                  }}>
+                    Beni Hatırla
+                  </label>
+                  <span style={{ 
+                    marginLeft: '0.5rem', 
+                    fontSize: '0.85rem', 
+                    color: 'var(--text-light)',
+                    fontStyle: 'italic'
+                  }}>
+                    (Bu tarayıcıda kalıcı oturum)
+                  </span>
+                </div>
+                <Link 
+                  to="/forgot-password" 
+                  style={{ 
+                    color: '#667eea', 
+                    fontWeight: '600',
+                    fontSize: '0.95rem',
+                    textDecoration: 'none'
                   }}
-                />
-                <label htmlFor="rememberMe" style={{ 
-                  cursor: 'pointer', 
-                  fontSize: '0.95rem',
-                  color: 'var(--text-color)',
-                  userSelect: 'none'
-                }}>
-                  Beni Hatırla
-                </label>
-                <span style={{ 
-                  marginLeft: '0.5rem', 
-                  fontSize: '0.85rem', 
-                  color: 'var(--text-light)',
-                  fontStyle: 'italic'
-                }}>
-                  (Bu tarayıcıda kalıcı oturum)
-                </span>
+                >
+                  Şifremi Unuttum
+                </Link>
               </div>
 
               <button

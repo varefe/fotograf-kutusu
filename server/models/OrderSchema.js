@@ -92,6 +92,14 @@ const OrderModel = {
     return orders.map(order => OrderModel.formatOrder(order.toObject(), isAdmin));
   },
 
+  // Belirli bir tarihten itibaren siparişleri getir
+  findAllAfterDate: async (date, isAdmin = false) => {
+    const orders = await Order.find({
+      createdAt: { $gte: date }
+    }).sort({ createdAt: -1 });
+    return orders.map(order => OrderModel.formatOrder(order.toObject(), isAdmin));
+  },
+
   // Kullanıcının siparişlerini getir
   findByUserId: async (userId, isAdmin = false) => {
     const orders = await Order.find({ userId }).sort({ createdAt: -1 });

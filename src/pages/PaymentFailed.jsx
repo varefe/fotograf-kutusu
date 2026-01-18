@@ -58,7 +58,9 @@ function PaymentFailed() {
         const paymentStatus = reason === 'cancelled' ? 'cancelled' : 'failed'
         const status = reason === 'cancelled' ? 'İptal Edildi' : 'Ödeme Başarısız'
 
-        const createResponse = await fetch(`${API_URL}/api/orders`, {
+        // API_URL zaten backend URL'ini içeriyor, /api eklememize gerek yok
+        const ordersEndpoint = API_URL.includes('/api') ? `${API_URL}/orders` : `${API_URL}/api/orders`
+        const createResponse = await fetch(ordersEndpoint, {
           method: 'POST',
           headers,
           body: JSON.stringify({

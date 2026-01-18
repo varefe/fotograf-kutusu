@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
 import { getDecryptedOrders } from '../utils/encryption'
+import { API_URL } from '../config/api'
 
 function PaymentSuccess() {
   const [searchParams] = useSearchParams()
@@ -67,11 +68,6 @@ function PaymentSuccess() {
 
   const saveOrderToBackend = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 
-        (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' 
-          ? '/api' 
-          : 'http://localhost:5000')
-      
       // localStorage'dan siparişi bul
       const orders = getDecryptedOrders()
       const localOrder = orders.find(o => o.id === orderId || o.id?.toString() === orderId)
@@ -85,7 +81,9 @@ function PaymentSuccess() {
           ...(isAuthenticated ? getAuthHeaders() : {})
         }
 
-        const createResponse = await fetch(`${API_URL}/api/orders`, {
+        // API_URL zaten backend URL'ini içeriyor, /api eklememize gerek yok
+        const ordersEndpoint = API_URL.includes('/api') ? `${API_URL}/orders` : `${API_URL}/api/orders`
+        const createResponse = await fetch(ordersEndpoint, {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -130,7 +128,12 @@ function PaymentSuccess() {
             setOrder(savedOrder)
             setLoading(false)
             return
+          } else {
+            console.error('❌ Sipariş kaydedildi ama order objesi dönmedi')
           }
+        } else {
+          const errorText = await createResponse.text()
+          console.error('❌ Sipariş kaydetme hatası:', createResponse.status, errorText)
         }
       }
       
@@ -138,7 +141,8 @@ function PaymentSuccess() {
       const orderIdInt = parseInt(orderId)
       if (!isNaN(orderIdInt) && orderIdInt < 1000000000000) {
         // Veritabanında var, getir
-        const response = await fetch(`${API_URL}/api/orders/${orderIdInt}`)
+        const orderEndpoint = API_URL.includes('/api') ? `${API_URL}/orders/${orderIdInt}` : `${API_URL}/api/orders/${orderIdInt}`
+        const response = await fetch(orderEndpoint)
         const data = await response.json()
         
         if (data.success && data.order) {

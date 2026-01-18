@@ -64,7 +64,7 @@ function Contact() {
                     📞 Telefon
                   </h3>
                   <p style={{ fontSize: '1.3rem', fontWeight: '700', color: 'var(--text-color)', marginBottom: '0.5rem' }}>
-                    <a href="tel:05067087648" style={{
+                    <a href="tel:05067087684" style={{
                       color: 'var(--primary-color)',
                       textDecoration: 'none',
                       transition: 'all 0.2s'
@@ -78,7 +78,7 @@ function Contact() {
                       e.target.style.textDecoration = 'none'
                     }}
                     >
-                      0506 708 76 48
+                      0 (506) 708 76 84
                     </a>
                   </p>
                   <p style={{ color: 'var(--text-light)', fontSize: '0.95rem' }}>
@@ -95,8 +95,9 @@ function Contact() {
                     📍 Adres
                   </h3>
                   <p style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--text-color)', lineHeight: '1.8' }}>
-                    Fotoğraf Kutusu<br />
-                    İstanbul, Türkiye
+                    Altın Oran Fotoğrafçılık<br />
+                    Ozan Sokak No 11<br />
+                    Manisa Turgutlu
                   </p>
                 </div>
 

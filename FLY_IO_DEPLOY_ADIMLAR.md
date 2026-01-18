@@ -84,3 +84,6 @@ Backend artık Fly.io'da çalışıyor. URL'i bana ver, frontend'i ona bağlayay
 
 
 
+
+
+

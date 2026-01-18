@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import User from '../models/UserSchema.js';
 import { connectDB } from '../config/database.js';
 import { generateToken } from '../utils/jwt.js';
@@ -261,6 +262,135 @@ router.put('/profile', requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Profil güncelleme hatası',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Şifre sıfırlama isteği gönder
+ */
+router.post('/forgot-password', async (req, res) => {
+  try {
+    await connectDB();
+
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'E-posta gereklidir',
+        message: 'Lütfen e-posta adresinizi giriniz'
+      });
+    }
+
+    // Kullanıcıyı bul
+    const user = await User.findOne({ email: email.toLowerCase() });
+    
+    // Güvenlik için: Kullanıcı yoksa bile başarılı mesajı döndür
+    if (!user) {
+      return res.json({
+        success: true,
+        message: 'Eğer bu e-posta adresi ile kayıtlı bir hesap varsa, şifre sıfırlama bağlantısı gönderildi'
+      });
+    }
+
+    // Reset token oluştur
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date();
+    resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 1); // 1 saat geçerli
+
+    // Token'ı veritabanına kaydet
+    user.resetToken = resetToken;
+    user.resetTokenExpiry = resetTokenExpiry;
+    await user.save();
+
+    // Geliştirme ortamı için token'ı response'da döndür
+    // Production'da bu kaldırılmalı ve e-posta gönderilmeli
+    console.log(`🔑 Şifre sıfırlama token'ı (${user.email}): ${resetToken}`);
+
+    res.json({
+      success: true,
+      message: 'Şifre sıfırlama bağlantısı oluşturuldu',
+      // Geliştirme için token'ı döndür (production'da kaldırılmalı)
+      resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined,
+      resetUrl: `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`
+    });
+  } catch (error) {
+    console.error('Şifre sıfırlama isteği hatası:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Şifre sıfırlama isteği gönderilemedi',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Şifre sıfırlama (token ile)
+ */
+router.post('/reset-password', async (req, res) => {
+  try {
+    await connectDB();
+
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Eksik bilgi',
+        message: 'Token ve yeni şifre gereklidir'
+      });
+    }
+
+    // Şifre validasyonu
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: 'Şifre çok kısa',
+        message: 'Şifre en az 8 karakter olmalıdır'
+      });
+    }
+
+    // Şifre güçlülük kontrolü
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Şifre yeterince güçlü değil',
+        message: 'Şifre en az 8 karakter olmalı ve büyük harf, küçük harf, rakam ve özel karakter (@$!%*?&) içermelidir'
+      });
+    }
+
+    // Token ile kullanıcıyı bul
+    const user = await User.findOne({
+      resetToken: token,
+      resetTokenExpiry: { $gt: new Date() } // Token süresi dolmamış olmalı
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: 'Geçersiz token',
+        message: 'Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş'
+      });
+    }
+
+    // Yeni şifreyi kaydet
+    user.password = newPassword;
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Şifre başarıyla sıfırlandı'
+    });
+  } catch (error) {
+    console.error('Şifre sıfırlama hatası:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Şifre sıfırlanamadı',
       message: error.message
     });
   }

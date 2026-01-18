@@ -92,7 +92,7 @@ function Footer() {
             <ul className="footer-links" style={{ listStyle: 'none', padding: 0 }}>
               <li style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>📞</span>
-                <span>0506 708 76 48</span>
+                <span>0 (506) 708 76 84</span>
               </li>
               <li style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>✉️</span>
@@ -100,7 +100,7 @@ function Footer() {
               </li>
               <li style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                 <span>📍</span>
-                <span>İstanbul, Türkiye</span>
+                <span>Ozan Sokak No 11<br />Altın Oran Fotoğrafçılık<br />Manisa Turgutlu</span>
               </li>
             </ul>
           </div>
@@ -108,7 +108,7 @@ function Footer() {
 
         <div className="footer-bottom">
           <p style={{ marginBottom: '1rem', color: 'rgba(255, 255, 255, 0.8)' }}>
-            &copy; 2024 Fotoğraf Baskı Hizmeti. Tüm hakları saklıdır.
+            &copy; 2026 Fotoğraf Kutusu. Tüm hakları saklıdır.
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap', fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.6)' }}>
             <span>KVKK</span>

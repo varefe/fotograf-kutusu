@@ -18,7 +18,7 @@ function Navbar() {
             <Link to="/delivery-returns">Teslimat ve İade</Link>
           </div>
           <div style={{ fontSize: '0.875rem' }}>
-            📞 Destek: <strong>0506 708 76 48</strong>
+            📞 Destek: <strong>0 (506) 708 76 84</strong>
           </div>
         </div>
       </div>
@@ -30,13 +30,12 @@ function Navbar() {
             <Link to="/">
               <img 
                 src="/logo.jpg" 
-                alt="Logo" 
+                alt="Fotoğraf Kutusu" 
                 className="logo"
                 onError={(e) => {
                   e.target.style.display = 'none'
                 }}
               />
-              <span>Fotoğraf Baskı</span>
             </Link>
           </div>
 

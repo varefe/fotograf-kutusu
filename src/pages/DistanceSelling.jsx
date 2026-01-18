@@ -23,7 +23,7 @@ function DistanceSelling() {
                 sipariş veren alıcı arasında aşağıdaki şartlara göre düzenlenmiştir.
               </p>
               <p>
-                <strong>Satıcı:</strong> Fotoğraf Baskı Hizmeti<br />
+                <strong>Satıcı:</strong> Fotoğraf Kutusu<br />
                 <strong>Alıcı:</strong> Web sitesi üzerinden sipariş veren müşteri
               </p>
 
