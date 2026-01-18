@@ -139,11 +139,6 @@ const OrderModel = {
 
   // Sipariş formatını düzenle (sadece admin için çözülmüş)
   formatOrder: (order, isAdmin = false) => {
-    // Sadece admin ise şifreleri çöz
-    if (isAdmin && order.isEncrypted) {
-      return decryptSensitiveFields(order);
-    }
-
     // Admin değilse hassas bilgileri gizle
     if (!isAdmin) {
       return {
@@ -161,6 +156,24 @@ const OrderModel = {
         },
         notes: null
       };
+    }
+
+    // Admin ise şifreleri çöz (isEncrypted flag'ine bakmaksızın - eski siparişler için de)
+    if (isAdmin) {
+      try {
+        // Önce şifre çözme işlemini dene
+        const decrypted = decryptSensitiveFields(order);
+        if (decrypted) {
+          return decrypted;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Sipariş #${order._id || order.id} şifre çözme hatası:`, error.message);
+        // Şifre çözme başarısız olsa bile siparişi göster
+      }
+      
+      // Şifre çözme başarısız olduysa veya sipariş zaten çözülmüşse, olduğu gibi döndür
+      // Eski siparişler için de çalışır (isEncrypted flag'i olmayan siparişler)
+      return order;
     }
 
     return order;
