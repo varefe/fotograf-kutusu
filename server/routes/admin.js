@@ -266,25 +266,56 @@ router.get('/orders', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
     
-    // Tüm siparişleri getir (filtre yok - eski ve yeni tüm siparişler)
+    // Direkt MongoDB'den ham veriyi al (formatOrder olmadan)
+    const mongoose = await import('mongoose');
+    const OrderCollection = mongoose.default.connection.collection('orders');
+    const rawOrders = await OrderCollection.find({}).sort({ createdAt: -1 }).toArray();
+    console.log(`🔍 MongoDB'den ${rawOrders.length} ham sipariş alındı`);
+    
+    // Tarih aralığını kontrol et
+    if (rawOrders.length > 0) {
+      const dates = rawOrders.map(o => o.createdAt ? new Date(o.createdAt) : null).filter(d => d);
+      const oldestDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const newestDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+      console.log(`📅 Sipariş tarih aralığı: ${oldestDate?.toISOString()} - ${newestDate?.toISOString()}`);
+      console.log(`📊 Toplam ${rawOrders.length} sipariş, ${dates.length} tanesinde tarih var`);
+      
+      // İlk 5 siparişin detaylarını göster
+      console.log('🔍 İlk 5 ham sipariş örneği:', rawOrders.slice(0, 5).map(o => ({
+        _id: o._id,
+        createdAt: o.createdAt,
+        isEncrypted: o.isEncrypted,
+        hasCustomerInfo: !!o.customerInfo
+      })));
+    }
+    
+    // Tüm siparişleri formatla (formatOrder ile)
     const orders = await OrderModel.findAll(true);
     
-    console.log(`✅ Admin siparişleri getirildi: ${orders.length} sipariş bulundu (tüm siparişler)`);
+    console.log(`✅ Admin siparişleri getirildi: ${orders.length} sipariş formatlandı (${rawOrders.length} ham sipariş)`);
+    
+    // Eğer formatlanan sipariş sayısı ham sipariş sayısından azsa, sorun var
+    if (orders.length < rawOrders.length) {
+      console.warn(`⚠️ UYARI: ${rawOrders.length - orders.length} sipariş formatlanırken kayboldu!`);
+    }
     
     // Siparişlerin tarihlerini kontrol et
     if (orders.length > 0) {
-      const sampleDates = orders.slice(0, 5).map(o => ({
+      const sampleDates = orders.slice(0, 10).map(o => ({
         id: o.id || o._id,
         createdAt: o.createdAt,
-        dateStr: o.createdAt ? new Date(o.createdAt).toISOString() : 'Tarih yok'
+        dateStr: o.createdAt ? new Date(o.createdAt).toISOString() : 'Tarih yok',
+        hasCustomerInfo: !!o.customerInfo,
+        customerEmail: o.customerInfo?.email || 'Yok'
       }));
-      console.log('🔍 Örnek sipariş tarihleri (ilk 5):', sampleDates);
+      console.log('🔍 Örnek sipariş tarihleri (ilk 10):', JSON.stringify(sampleDates, null, 2));
     }
     
     res.status(200).json({
       success: true,
       orders,
-      total: orders.length
+      total: orders.length,
+      rawTotal: rawOrders.length // Debug için
     });
   } catch (error) {
     console.error('❌ Siparişleri getirme hatası:', error);

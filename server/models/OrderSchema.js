@@ -89,7 +89,47 @@ const OrderModel = {
   // Tüm siparişleri getir
   findAll: async (isAdmin = false) => {
     const orders = await Order.find({}).sort({ createdAt: -1 });
-    return orders.map(order => OrderModel.formatOrder(order.toObject(), isAdmin));
+    console.log(`🔍 findAll: ${orders.length} sipariş bulundu, isAdmin: ${isAdmin}`);
+    
+    if (orders.length === 0) {
+      console.warn('⚠️ Veritabanında hiç sipariş bulunamadı!');
+      return [];
+    }
+    
+    const formattedOrders = orders.map((order, index) => {
+      try {
+        const orderObj = order.toObject();
+        const formatted = OrderModel.formatOrder(orderObj, isAdmin);
+        
+        // formatOrder artık hiçbir zaman null döndürmemeli
+        if (!formatted) {
+          console.error(`❌ Sipariş #${orderObj._id || orderObj.id} formatOrder null döndürdü!`);
+          // Yine de siparişi göster
+          return orderObj;
+        }
+        
+        // Eski sipariş kontrolü
+        if (isAdmin && formatted) {
+          const orderDate = formatted.createdAt ? new Date(formatted.createdAt) : null;
+          if (orderDate) {
+            const isOld = orderDate < new Date('2024-01-01'); // Örnek: 2024'ten önceki siparişler
+            if (isOld) {
+              console.log(`📅 Eski sipariş bulundu: #${formatted._id || formatted.id}, Tarih: ${orderDate.toISOString()}`);
+            }
+          }
+        }
+        
+        return formatted;
+      } catch (error) {
+        console.error(`❌ Sipariş formatlama hatası (index ${index}):`, error);
+        // Hata olsa bile siparişi göster
+        return order.toObject();
+      }
+    });
+    
+    // Artık null filtreleme yok - formatOrder hiçbir zaman null döndürmemeli
+    console.log(`✅ findAll: ${formattedOrders.length} sipariş formatlandı (${orders.length} ham sipariş)`);
+    return formattedOrders;
   },
 
   // Belirli bir tarihten itibaren siparişleri getir
@@ -139,6 +179,18 @@ const OrderModel = {
 
   // Sipariş formatını düzenle (sadece admin için çözülmüş)
   formatOrder: (order, isAdmin = false) => {
+    // Null kontrolü - eğer order null ise, boş bir obje döndür (null değil!)
+    if (!order) {
+      console.warn('⚠️ formatOrder: order null veya undefined, boş obje döndürülüyor');
+      return {
+        _id: 'unknown',
+        createdAt: new Date(),
+        customerInfo: { email: '', firstName: '', lastName: '', phone: '', address: '' },
+        status: 'Bilinmiyor',
+        paymentStatus: 'unknown'
+      };
+    }
+
     // Admin değilse hassas bilgileri gizle
     if (!isAdmin) {
       return {
@@ -161,22 +213,67 @@ const OrderModel = {
     // Admin ise şifreleri çöz (isEncrypted flag'ine bakmaksızın - eski siparişler için de)
     if (isAdmin) {
       try {
-        // Önce şifre çözme işlemini dene
+        // Eski siparişler için de şifre çözme işlemini dene
+        // isEncrypted flag'i olmayan veya false olan siparişler için de çalışır
         const decrypted = decryptSensitiveFields(order);
-        if (decrypted) {
-          return decrypted;
+        if (decrypted && decrypted !== null) {
+          // Başarılı çözme - tüm alanları kontrol et
+          return {
+            ...order,
+            ...decrypted,
+            // Eğer customerInfo eksikse, orijinalinden al
+            customerInfo: decrypted.customerInfo || order.customerInfo || {
+              firstName: '',
+              lastName: '',
+              email: '',
+              phone: '',
+              address: ''
+            }
+          };
+        } else {
+          // Çözme başarısız ama siparişi göster (eski format olabilir)
+          // Eski siparişler zaten şifrelenmemiş olabilir
+          console.log(`ℹ️ Sipariş #${order._id || order.id} çözülemedi veya zaten çözülmüş, orijinal format gösteriliyor`);
+          return {
+            ...order,
+            // customerInfo eksikse boş obje ekle
+            customerInfo: order.customerInfo || {
+              firstName: '',
+              lastName: '',
+              email: '',
+              phone: '',
+              address: ''
+            }
+          };
         }
       } catch (error) {
         console.warn(`⚠️ Sipariş #${order._id || order.id} şifre çözme hatası:`, error.message);
-        // Şifre çözme başarısız olsa bile siparişi göster
+        // Şifre çözme başarısız olsa bile siparişi göster (eski sipariş olabilir)
+        // Hiçbir zaman null döndürme!
+        return {
+          ...order,
+          customerInfo: order.customerInfo || {
+            firstName: '',
+            lastName: '',
+            email: '',
+            phone: '',
+            address: ''
+          }
+        };
       }
-      
-      // Şifre çözme başarısız olduysa veya sipariş zaten çözülmüşse, olduğu gibi döndür
-      // Eski siparişler için de çalışır (isEncrypted flag'i olmayan siparişler)
-      return order;
     }
 
-    return order;
+    // Son çare: order'ı olduğu gibi döndür
+    return {
+      ...order,
+      customerInfo: order.customerInfo || {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        address: ''
+      }
+    };
   },
 
   // Sipariş durumunu güncelle

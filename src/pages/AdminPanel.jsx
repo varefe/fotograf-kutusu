@@ -58,6 +58,13 @@ function AdminPanel() {
         
         if (response.ok) {
           if (data.success) {
+            console.log(`✅ AdminPanel: ${data.orders?.length || 0} sipariş alındı`)
+            console.log('📦 İlk 3 sipariş örneği:', data.orders?.slice(0, 3).map(o => ({
+              id: o._id || o.id,
+              createdAt: o.createdAt,
+              customerEmail: o.customerInfo?.email,
+              isEncrypted: o.isEncrypted
+            })))
             setOrders(data.orders || [])
           } else {
             throw new Error(data.message || 'Siparişler yüklenemedi')

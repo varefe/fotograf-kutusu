@@ -160,31 +160,80 @@ export const encryptSensitiveFields = (orderData) => {
 export const decryptSensitiveFields = (orderData) => {
   if (!orderData) return null;
   
-  const decrypted = { ...orderData };
-  
-  // Müşteri bilgilerini çöz
-  if (decrypted.customerInfo) {
-    decrypted.customerInfo = {
-      firstName: decrypt(decrypted.customerInfo.firstName) || '',
-      lastName: decrypt(decrypted.customerInfo.lastName) || '',
-      email: decrypt(decrypted.customerInfo.email) || '',
-      phone: decrypt(decrypted.customerInfo.phone) || '',
-      address: decrypt(decrypted.customerInfo.address) || ''
-    };
+  try {
+    const decrypted = { ...orderData };
+    
+    // Müşteri bilgilerini çöz
+    if (decrypted.customerInfo) {
+      try {
+        // Eski siparişler için: eğer zaten çözülmüşse (string ise), olduğu gibi bırak
+        // Şifrelenmişse (base64 string ise), çöz
+        // decrypt() başarılı olursa string, başarısız olursa null döndürür
+        const decryptedFirstName = decrypt(decrypted.customerInfo.firstName);
+        const decryptedLastName = decrypt(decrypted.customerInfo.lastName);
+        const decryptedEmail = decrypt(decrypted.customerInfo.email);
+        const decryptedPhone = decrypt(decrypted.customerInfo.phone);
+        const decryptedAddress = decrypt(decrypted.customerInfo.address);
+        
+        decrypted.customerInfo = {
+          firstName: decryptedFirstName || decrypted.customerInfo.firstName || '',
+          lastName: decryptedLastName || decrypted.customerInfo.lastName || '',
+          email: decryptedEmail || decrypted.customerInfo.email || '',
+          phone: decryptedPhone || decrypted.customerInfo.phone || '',
+          address: decryptedAddress || decrypted.customerInfo.address || ''
+        };
+      } catch (error) {
+        console.warn('⚠️ decryptSensitiveFields: customerInfo çözme hatası:', error.message);
+        // Hata olsa bile orijinal customerInfo'yu kullan
+        decrypted.customerInfo = decrypted.customerInfo || {
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          address: ''
+        };
+      }
+    } else {
+      // customerInfo yoksa boş obje ekle
+      decrypted.customerInfo = {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        address: ''
+      };
+    }
+    
+    // Fotoğraf base64'ünü çöz
+    if (decrypted.photo && decrypted.photo.base64) {
+      try {
+        const decryptedBase64 = decrypt(decrypted.photo.base64);
+        decrypted.photo = {
+          ...decrypted.photo,
+          base64: decryptedBase64 || decrypted.photo.base64 // Çözülemezse orijinali kullan
+        };
+      } catch (error) {
+        console.warn('⚠️ decryptSensitiveFields: photo base64 çözme hatası:', error.message);
+        // Hata olsa bile orijinal photo'yu kullan
+      }
+    }
+    
+    // Notları çöz
+    if (decrypted.notes) {
+      try {
+        const decryptedNotes = decrypt(decrypted.notes);
+        decrypted.notes = decryptedNotes || decrypted.notes || '';
+      } catch (error) {
+        console.warn('⚠️ decryptSensitiveFields: notes çözme hatası:', error.message);
+        // Hata olsa bile orijinal notes'u kullan
+        decrypted.notes = decrypted.notes || '';
+      }
+    }
+    
+    return decrypted;
+  } catch (error) {
+    console.error('❌ decryptSensitiveFields: Genel hata:', error);
+    // Hata olsa bile orijinal orderData'yı döndür (null değil!)
+    return orderData;
   }
-  
-  // Fotoğraf base64'ünü çöz
-  if (decrypted.photo && decrypted.photo.base64) {
-    decrypted.photo = {
-      ...decrypted.photo,
-      base64: decrypt(decrypted.photo.base64)
-    };
-  }
-  
-  // Notları çöz
-  if (decrypted.notes) {
-    decrypted.notes = decrypt(decrypted.notes) || '';
-  }
-  
-  return decrypted;
 };
