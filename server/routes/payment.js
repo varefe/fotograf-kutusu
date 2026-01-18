@@ -1,6 +1,7 @@
 import express from 'express';
 import Iyzipay from 'iyzipay';
 import { connectDB } from '../config/database.js';
+import OrderModel from '../models/OrderSchema.js';
 import dotenv from 'dotenv';
 import https from 'https';
 
@@ -421,16 +422,250 @@ router.get('/callback', async (req, res) => {
   }
 });
 
+// Direct Payment - Kart bilgileri sitede girilir
+router.post('/direct', async (req, res) => {
+  try {
+    const { 
+      orderId, 
+      orderData, 
+      cardHolderName, 
+      cardNumber, 
+      expireMonth, 
+      expireYear, 
+      cvc, 
+      installments,
+      saveCard 
+    } = req.body;
+
+    if (!orderId || !orderData || !cardHolderName || !cardNumber || !expireMonth || !expireYear || !cvc) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Eksik bilgi',
+        message: 'Tüm kart bilgileri gereklidir'
+      });
+    }
+
+    const price = parseFloat(orderData.price).toFixed(2);
+    
+    // Backend URL'i belirle
+    let backendUrl = process.env.BACKEND_URL;
+    if (!backendUrl) {
+      if (process.env.NODE_ENV === 'production' || !req.headers.host?.includes('localhost')) {
+        backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
+      } else {
+        backendUrl = `http://localhost:${process.env.PORT || 5001}`;
+      }
+    }
+    
+    const callbackUrl = `${backendUrl}/api/payment/callback`;
+
+    // 3D Secure Initialize Request
+    const request = {
+      locale: Iyzipay.LOCALE.TR,
+      conversationId: `ORDER-${orderId}`,
+      price: price,
+      paidPrice: price,
+      currency: Iyzipay.CURRENCY.TRY,
+      basketId: `BASKET-${orderId}`,
+      paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
+      callbackUrl: callbackUrl,
+      enabledInstallments: installments ? [parseInt(installments)] : [1, 2, 3, 6, 9],
+      paymentCard: {
+        cardHolderName: cardHolderName.toUpperCase(),
+        cardNumber: cardNumber.replace(/\s/g, ''),
+        expireMonth: expireMonth,
+        expireYear: expireYear,
+        cvc: cvc,
+        registerCard: saveCard ? 1 : 0
+      },
+      buyer: {
+        id: 'BY' + Date.now(),
+        name: orderData.customerInfo?.firstName || 'Musteri',
+        surname: orderData.customerInfo?.lastName || 'Musteri',
+        gsmNumber: orderData.customerInfo?.phone || '+905000000000',
+        email: orderData.customerInfo?.email || 'test@test.com',
+        identityNumber: '11111111111',
+        lastLoginDate: '2023-01-01 00:00:00',
+        registrationDate: '2023-01-01 00:00:00',
+        registrationAddress: orderData.customerInfo?.address || 'Istanbul',
+        ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+        city: 'Istanbul',
+        country: 'Turkey',
+        zipCode: '34000'
+      },
+      shippingAddress: {
+        contactName: (orderData.customerInfo?.firstName + ' ' + orderData.customerInfo?.lastName) || 'Musteri',
+        city: 'Istanbul',
+        country: 'Turkey',
+        address: orderData.customerInfo?.address || 'Istanbul',
+        zipCode: '34000'
+      },
+      billingAddress: {
+        contactName: (orderData.customerInfo?.firstName + ' ' + orderData.customerInfo?.lastName) || 'Musteri',
+        city: 'Istanbul',
+        country: 'Turkey',
+        address: orderData.customerInfo?.address || 'Istanbul',
+        zipCode: '34000'
+      },
+      basketItems: [
+        {
+          id: 'ITEM-' + orderId,
+          name: 'Fotograf Baski Hizmeti',
+          category1: 'Gorsel Sanatlar',
+          category2: 'Fotograf',
+          itemType: Iyzipay.BASKET_ITEM_TYPE.PHYSICAL,
+          price: price
+        }
+      ]
+    };
+
+    console.log('💳 Direct Payment isteği gönderiliyor:', {
+      orderId,
+      price,
+      cardNumber: cardNumber.replace(/\d(?=\d{4})/g, '*'), // Son 4 haneyi göster
+      installments
+    });
+
+    // 3D Secure Initialize
+    iyzipay.threedsInitialize.create(request, (err, result) => {
+      if (err) {
+        console.error('❌ Iyzico 3D Secure Initialize Error:', err);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Ödeme başlatılamadı',
+          message: err.message || 'Iyzico bağlantı hatası'
+        });
+      }
+
+      if (result.status === 'success') {
+        console.log('✅ 3D Secure başlatıldı:', {
+          conversationId: result.conversationId,
+          paymentId: result.paymentId
+        });
+
+        // 3D Secure HTML content döndür
+        res.json({
+          success: true,
+          htmlContent: result.threeDSHtmlContent,
+          paymentId: result.paymentId,
+          conversationId: result.conversationId
+        });
+      } else {
+        console.error('❌ Iyzico 3D Secure Logic Error:', result.errorMessage);
+        res.status(400).json({ 
+          success: false, 
+          error: result.errorMessage || 'Ödeme başlatılamadı',
+          errorCode: result.errorCode
+        });
+      }
+    });
+  } catch (error) {
+    console.error('❌ Direct Payment Server Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Sunucu hatası',
+      message: error.message 
+    });
+  }
+});
+
 router.post('/callback', async (req, res) => {
-  const token = req.body.token || req.body.Token;
-  const status = req.body.status || req.body.Status;
+  console.log('📥 Iyzico POST callback alındı');
+  console.log('📥 Request Body:', req.body);
+  console.log('📥 Request Query:', req.query);
   
-  console.log('📥 Iyzico POST callback alındı:', { token, status, body: req.body });
+  // 3D Secure callback için goreq parametresini kontrol et
+  const goreq = req.body.goreq || req.query.goreq;
+  const token = req.body.token || req.body.Token || req.query.token || req.query.Token;
+  const status = req.body.status || req.body.Status || req.query.status || req.query.Status;
   
   // Frontend URL'ini belirle
   const frontendUrl = process.env.FRONTEND_URL || 'https://fotografkutusu.com';
   
-  // Iyzico callback'inde status kontrolü
+  // 3D Secure callback (goreq parametresi varsa)
+  if (goreq) {
+    try {
+      // goreq base64 encoded JSON, decode et
+      const decoded = Buffer.from(goreq, 'base64').toString('utf-8');
+      const goreqData = JSON.parse(decoded);
+      
+      console.log('🔍 3D Secure callback (goreq):', {
+        paymentId: goreqData.id,
+        conversationId: goreqData.conversationId,
+        status: goreqData.status
+      });
+      
+      // 3D Secure sonucunu kontrol et - payment.retrieve ile
+      if (goreqData.id) {
+        // Payment ID ile ödeme durumunu kontrol et
+        iyzipay.payment.retrieve({ paymentId: goreqData.id }, (err, result) => {
+          if (err) {
+            console.error('❌ Iyzico payment retrieve hatası:', err);
+            res.redirect(`${frontendUrl}/payment/failed?reason=failed`);
+            return;
+          }
+          
+          console.log('🔍 Iyzico ödeme durumu (3D Secure):', {
+            status: result.status,
+            paymentStatus: result.paymentStatus,
+            conversationId: result.conversationId,
+            paymentId: result.paymentId,
+            errorMessage: result.errorMessage
+          });
+          
+          if (result.status === 'success' && result.paymentStatus === 'SUCCESS') {
+            // Ödeme başarılı - siparişi kaydet
+            console.log('✅ 3D Secure ödeme başarılı, sipariş kaydediliyor...');
+            
+            // Siparişi kaydet (orderId'yi conversationId'den çıkar)
+            // Iyzico conversationId'yi aynen geri döndürür: "ORDER-{orderId}"
+            const conversationId = result.conversationId || goreqData.conversationId;
+            console.log('🔍 ConversationId:', conversationId);
+            
+            const orderIdMatch = conversationId?.match(/ORDER-(\d+)/);
+            const orderId = orderIdMatch ? orderIdMatch[1] : null;
+            
+            console.log('🔍 Çıkarılan orderId:', orderId);
+            
+            if (orderId) {
+              // Siparişi veritabanına kaydet
+              OrderModel.findOneAndUpdate(
+                { id: orderId },
+                {
+                  paymentStatus: 'paid',
+                  paymentToken: goreqData.id,
+                  paymentMethod: '3D Secure',
+                  paidAt: new Date()
+                },
+                { new: true }
+              ).then(() => {
+                console.log('✅ Sipariş kaydedildi:', orderId);
+                res.redirect(`${frontendUrl}/payment/success?orderId=${orderId}&token=${goreqData.id}`);
+              }).catch((saveErr) => {
+                console.error('❌ Sipariş kaydetme hatası:', saveErr);
+                res.redirect(`${frontendUrl}/payment/success?orderId=${orderId}&token=${goreqData.id}`);
+              });
+            } else {
+              res.redirect(`${frontendUrl}/payment/success?token=${goreqData.id}`);
+            }
+          } else {
+            const reason = result.paymentStatus === 'CANCELLED' ? 'cancelled' : 'failed';
+            console.log('❌ 3D Secure ödeme başarısız/iptal:', reason);
+            res.redirect(`${frontendUrl}/payment/failed?reason=${reason}`);
+          }
+        });
+      } else {
+        console.warn('⚠️ goreq içinde payment ID yok');
+        res.redirect(`${frontendUrl}/payment/failed?reason=failed`);
+      }
+    } catch (error) {
+      console.error('❌ goreq decode/parse hatası:', error);
+      res.redirect(`${frontendUrl}/payment/failed?reason=failed`);
+    }
+    return;
+  }
+  
+  // Eski callback formatı (token ile)
   if (status === 'success' || !status) {
     // Token ile ödeme durumunu kontrol et
     if (token) {

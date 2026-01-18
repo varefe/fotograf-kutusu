@@ -16,25 +16,12 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// OPTIONS (preflight) request'leri için özel handler - CORS'dan ÖNCE
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  res.header('Access-Control-Allow-Origin', origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Session, X-API-Key, Accept, Origin, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400');
-  res.sendStatus(204);
-});
-
 // CORS - EN BAŞTA, HER ŞEYDEN ÖNCE
 // Development modunda tüm origin'lere izin ver (sadece development için!)
 if (NODE_ENV === 'development') {
+  // Development için basit CORS - tüm origin'lere izin ver
   app.use(cors({
-    origin: (origin, callback) => {
-      // Development'ta tüm origin'lere izin ver
-      callback(null, true);
-    },
+    origin: true, // Tüm origin'lere izin ver
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Session', 'X-API-Key', 'Accept', 'Origin', 'X-Requested-With'],

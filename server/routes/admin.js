@@ -92,7 +92,7 @@ const requireAdminRole = async (req, res, next) => {
 /**
  * Admin Dashboard - İstatistikler
  */
-router.get('/stats', requireAdmin, async (req, res) => {
+router.get('/stats', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
 
@@ -152,7 +152,7 @@ router.get('/stats', requireAdmin, async (req, res) => {
 /**
  * Tüm kullanıcıları getir (Admin)
  */
-router.get('/users', requireAdmin, async (req, res) => {
+router.get('/users', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
     
@@ -260,20 +260,26 @@ router.delete('/users/:id', requireAdminRole, async (req, res) => {
 });
 
 /**
- * Tüm siparişleri getir (Admin) - 15 Ocak 2025'ten itibaren
+ * Tüm siparişleri getir (Admin) - Tüm siparişler (eski ve yeni)
  */
-router.get('/orders', requireAdmin, async (req, res) => {
+router.get('/orders', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
     
-    // 15 Ocak 2025 tarihinden itibaren siparişleri filtrele (Türkiye saati UTC+3)
-    // 15 Ocak 2025 00:00:00 UTC+3 = 14 Ocak 2025 21:00:00 UTC
-    const filterDate = new Date('2025-01-14T21:00:00.000Z');
+    // Tüm siparişleri getir (filtre yok - eski ve yeni tüm siparişler)
+    const orders = await OrderModel.findAll(true);
     
-    // Veritabanı seviyesinde filtreleme yaparak performansı artır
-    const orders = await OrderModel.findAllAfterDate(filterDate, true);
+    console.log(`✅ Admin siparişleri getirildi: ${orders.length} sipariş bulundu (tüm siparişler)`);
     
-    console.log(`✅ Admin siparişleri getirildi: ${orders.length} sipariş bulundu (15 Ocak 2025'ten itibaren)`);
+    // Siparişlerin tarihlerini kontrol et
+    if (orders.length > 0) {
+      const sampleDates = orders.slice(0, 5).map(o => ({
+        id: o.id || o._id,
+        createdAt: o.createdAt,
+        dateStr: o.createdAt ? new Date(o.createdAt).toISOString() : 'Tarih yok'
+      }));
+      console.log('🔍 Örnek sipariş tarihleri (ilk 5):', sampleDates);
+    }
     
     res.status(200).json({
       success: true,

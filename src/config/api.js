@@ -25,7 +25,7 @@ const getApiUrl = () => {
   }
   
   // Development ortamında
-  const devUrl = 'http://localhost:5000'
+  const devUrl = 'http://localhost:5001'
   console.log('🌐 Development API URL:', devUrl)
   return devUrl
 }

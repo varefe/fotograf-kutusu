@@ -94,9 +94,33 @@ const OrderModel = {
 
   // Belirli bir tarihten itibaren siparişleri getir
   findAllAfterDate: async (date, isAdmin = false) => {
-    const orders = await Order.find({
+    console.log('🔍 findAllAfterDate çağrıldı:', {
+      filterDate: date,
+      filterDateISO: date.toISOString(),
+      isAdmin
+    });
+    
+    // Tarih filtresi ile sorgu
+    const query = {
       createdAt: { $gte: date }
-    }).sort({ createdAt: -1 });
+    };
+    
+    console.log('🔍 MongoDB sorgusu:', JSON.stringify(query));
+    
+    const orders = await Order.find(query).sort({ createdAt: -1 });
+    
+    console.log(`🔍 findAllAfterDate sonucu: ${orders.length} sipariş bulundu`);
+    
+    if (orders.length > 0) {
+      const sampleOrder = orders[0].toObject();
+      console.log('🔍 Örnek sipariş tarihi:', {
+        createdAt: sampleOrder.createdAt,
+        createdAtISO: sampleOrder.createdAt ? new Date(sampleOrder.createdAt).toISOString() : 'Yok',
+        filterDateISO: date.toISOString(),
+        isAfter: sampleOrder.createdAt ? new Date(sampleOrder.createdAt) >= date : false
+      });
+    }
+    
     return orders.map(order => OrderModel.formatOrder(order.toObject(), isAdmin));
   },
 

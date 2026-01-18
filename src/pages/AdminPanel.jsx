@@ -54,33 +54,58 @@ function AdminPanel() {
 
       if (activeTab === 'orders') {
         const response = await fetch(`${apiUrl}/admin/orders`, { headers })
+        const data = await response.json()
+        
         if (response.ok) {
-          const data = await response.json()
           if (data.success) {
             setOrders(data.orders || [])
+          } else {
+            throw new Error(data.message || 'Siparişler yüklenemedi')
           }
         } else {
-          throw new Error('Siparişler yüklenemedi')
+          console.error('❌ Admin orders hatası:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: data.error,
+            message: data.message
+          })
+          throw new Error(data.message || data.error || 'Siparişler yüklenemedi')
         }
       } else if (activeTab === 'users') {
         const response = await fetch(`${apiUrl}/admin/users`, { headers })
+        const data = await response.json()
+        
         if (response.ok) {
-          const data = await response.json()
           if (data.success) {
             setUsers(data.users || [])
+          } else {
+            throw new Error(data.message || 'Kullanıcılar yüklenemedi')
           }
         } else {
-          throw new Error('Kullanıcılar yüklenemedi')
+          console.error('❌ Admin users hatası:', {
+            status: response.status,
+            error: data.error,
+            message: data.message
+          })
+          throw new Error(data.message || data.error || 'Kullanıcılar yüklenemedi')
         }
       } else if (activeTab === 'stats') {
         const response = await fetch(`${apiUrl}/admin/stats`, { headers })
+        const data = await response.json()
+        
         if (response.ok) {
-          const data = await response.json()
           if (data.success) {
             setStats(data.stats)
+          } else {
+            throw new Error(data.message || 'İstatistikler yüklenemedi')
           }
         } else {
-          throw new Error('İstatistikler yüklenemedi')
+          console.error('❌ Admin stats hatası:', {
+            status: response.status,
+            error: data.error,
+            message: data.message
+          })
+          throw new Error(data.message || data.error || 'İstatistikler yüklenemedi')
         }
       }
     } catch (err) {

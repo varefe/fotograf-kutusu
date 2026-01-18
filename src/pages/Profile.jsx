@@ -7,7 +7,7 @@ import { API_URL } from '../config/api'
 
 function Profile() {
   const navigate = useNavigate()
-  const { user, loading: authLoading, logout, updateProfile, changePassword } = useAuth()
+  const { user, loading: authLoading, logout, updateProfile, changePassword, getAuthHeaders } = useAuth()
   const [activeTab, setActiveTab] = useState('profile')
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
@@ -51,22 +51,29 @@ function Profile() {
 
   const loadOrders = async () => {
     try {
-      const token = localStorage.getItem('authToken')
-      const apiEndpoint = API_URL.includes('/api') ? `${API_URL}/orders/user` : `${API_URL}/api/orders/user`
-      const response = await fetch(apiEndpoint, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      setLoading(true)
+      const headers = getAuthHeaders()
+      
+      const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+      const apiEndpoint = `${apiUrl}/orders/user`
+      
+      const response = await fetch(apiEndpoint, { headers })
 
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
           setOrders(data.orders || [])
+        } else {
+          setError('Siparişler yüklenemedi')
         }
+      } else {
+        setError('Siparişler yüklenemedi')
       }
     } catch (error) {
       console.error('Sipariş yükleme hatası:', error)
+      setError('Siparişler yüklenirken bir hata oluştu')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -489,61 +496,188 @@ function Profile() {
 
               {activeTab === 'orders' && (
                 <div>
-                  <h2 style={{ marginBottom: '1.5rem' }}>Siparişlerim</h2>
-                  {orders.length === 0 ? (
-                    <p style={{ color: '#666', textAlign: 'center', padding: '2rem' }}>
-                      Henüz siparişiniz bulunmamaktadır.
-                    </p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h2 style={{ margin: 0 }}>Siparişlerim</h2>
+                    <button
+                      onClick={loadOrders}
+                      disabled={loading}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: loading ? '#ccc' : '#667eea',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      {loading ? 'Yükleniyor...' : '🔄 Yenile'}
+                    </button>
+                  </div>
+                  
+                  {loading && orders.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem' }}>
+                      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                      <p>Siparişler yükleniyor...</p>
+                    </div>
+                  ) : orders.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem', background: '#f9fafb', borderRadius: '12px' }}>
+                      <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📭</div>
+                      <p style={{ color: '#666', fontSize: '1.1rem', marginBottom: '1rem' }}>
+                        Henüz siparişiniz bulunmamaktadır.
+                      </p>
+                      <button
+                        onClick={() => navigate('/order')}
+                        style={{
+                          padding: '0.75rem 2rem',
+                          background: 'var(--primary-color)',
+                          color: '#000000',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        Yeni Sipariş Oluştur
+                      </button>
+                    </div>
                   ) : (
-                    <div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       {orders.map((order) => (
                         <div
                           key={order._id || order.id}
                           style={{
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '12px',
                             padding: '1.5rem',
-                            marginBottom: '1rem',
-                            background: 'white'
+                            background: 'white',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                            transition: 'all 0.2s',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#667eea'
+                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(102, 126, 234, 0.2)'
+                            e.currentTarget.style.transform = 'translateY(-2px)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#e5e7eb'
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)'
+                            e.currentTarget.style.transform = 'translateY(0)'
                           }}
                         >
                           <div style={{ 
                             display: 'flex', 
                             flexDirection: isMobile ? 'column' : 'row',
                             justifyContent: 'space-between', 
+                            alignItems: isMobile ? 'flex-start' : 'center',
                             marginBottom: '1rem',
-                            gap: isMobile ? '0.5rem' : '0'
+                            gap: isMobile ? '0.75rem' : '0',
+                            paddingBottom: '1rem',
+                            borderBottom: '1px solid #e5e7eb'
                           }}>
                             <div>
-                              <strong>Sipariş No:</strong> #{String(order._id || order.id).substring(0, 8)}...
+                              <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
+                                Sipariş No
+                              </div>
+                              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#2c3e50', fontFamily: 'monospace' }}>
+                                #{String(order._id || order.id).substring(0, 12)}
+                              </div>
                             </div>
-                            <div>
-                              <strong>Durum:</strong> <span style={{ 
-                                color: order.status === 'Ödeme Alındı' ? '#22c55e' : 
-                                       order.status === 'Hazırlanıyor' ? '#f59e0b' : 
-                                       order.status === 'Kargoda' ? '#3b82f6' : '#666'
-                              }}>{order.status || 'Yeni'}</span>
+                            <div style={{ textAlign: isMobile ? 'left' : 'center' }}>
+                              <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
+                                Durum
+                              </div>
+                              <span style={{ 
+                                padding: '0.5rem 1rem',
+                                borderRadius: '20px',
+                                fontSize: '0.9rem',
+                                fontWeight: 'bold',
+                                display: 'inline-block',
+                                background: order.status === 'Tamamlandı' || order.paymentStatus === 'paid' ? '#d1fae5' : 
+                                           order.status === 'Baskıda' ? '#fef3c7' : 
+                                           order.status === 'Yeni' ? '#dbeafe' : '#f3f4f6',
+                                color: order.status === 'Tamamlandı' || order.paymentStatus === 'paid' ? '#065f46' : 
+                                       order.status === 'Baskıda' ? '#92400e' : 
+                                       order.status === 'Yeni' ? '#1e40af' : '#374151'
+                              }}>
+                                {order.status || 'Yeni'}
+                              </span>
                             </div>
-                            <div>
-                              <strong>Fiyat:</strong> ₺{order.price?.toFixed(2) || '0.00'}
+                            <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                              <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
+                                Toplam
+                              </div>
+                              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#22c55e' }}>
+                                {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(order.price || 0)}
+                              </div>
                             </div>
                           </div>
+                          
                           <div style={{ 
                             display: 'grid',
-                            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-                            gap: '0.5rem',
-                            marginBottom: '0.5rem'
+                            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr',
+                            gap: '1rem',
+                            marginBottom: '1rem'
                           }}>
                             <div>
-                              <strong>Boyut:</strong> {order.size}
-                              {order.customSize && ` (${order.customSize.width}x${order.customSize.height} cm)`}
+                              <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
+                                📐 Boyut
+                              </div>
+                              <div style={{ fontWeight: '600', color: '#2c3e50' }}>
+                                {order.size === 'custom' && order.customSize
+                                  ? `${order.customSize.width}x${order.customSize.height} cm`
+                                  : order.size || '-'}
+                              </div>
                             </div>
                             <div>
-                              <strong>Adet:</strong> {order.quantity}
+                              <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
+                                🔢 Adet
+                              </div>
+                              <div style={{ fontWeight: '600', color: '#2c3e50' }}>
+                                {order.quantity || 1} adet
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
+                                📦 Kargo
+                              </div>
+                              <div style={{ fontWeight: '600', color: '#2c3e50' }}>
+                                {order.shippingType === 'express' ? 'Express' : 'Standart'}
+                              </div>
                             </div>
                           </div>
-                          <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
-                            📅 {new Date(order.createdAt).toLocaleString('tr-TR')}
+                          
+                          <div style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            paddingTop: '1rem',
+                            borderTop: '1px solid #e5e7eb',
+                            fontSize: '0.9rem',
+                            color: '#666'
+                          }}>
+                            <div>
+                              📅 {new Date(order.createdAt).toLocaleDateString('tr-TR', { 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
+                            <div style={{ 
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '12px',
+                              fontSize: '0.85rem',
+                              background: order.paymentStatus === 'paid' ? '#d1fae5' : '#fef3c7',
+                              color: order.paymentStatus === 'paid' ? '#065f46' : '#92400e',
+                              fontWeight: 'bold'
+                            }}>
+                              {order.paymentStatus === 'paid' ? '✅ Ödendi' : '⏳ Bekliyor'}
+                            </div>
                           </div>
                         </div>
                       ))}
