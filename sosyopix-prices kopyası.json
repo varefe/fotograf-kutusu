@@ -1,0 +1,136 @@
+{
+  "klasikBaskilar": {
+    "10x15": {
+      "single": {
+        "parlak": 15,
+        "mat": 17
+      },
+      "bulk": {
+        "25": {
+          "parlak": 14,
+          "mat": 11.2,
+          "toplam": "349.90 TL (parlak) / 279.90 TL (mat)"
+        },
+        "35": {
+          "parlak": 8,
+          "mat": 8,
+          "toplam": "Pola kart referansı"
+        },
+        "50": {
+          "parlak": 7.5,
+          "mat": 7.5
+        },
+        "100": {
+          "parlak": 7,
+          "mat": 7
+        }
+      },
+      "description": "10x15 cm Klasik Fotoğraf Baskı - Toplu fiyatlar 25+ adet için geçerlidir"
+    },
+    "15x20": {
+      "single": {
+        "parlak": 18,
+        "mat": 20
+      },
+      "bulk": {
+        "25": {
+          "parlak": 16,
+          "mat": 18
+        },
+        "35": {
+          "parlak": 14,
+          "mat": 16
+        },
+        "50": {
+          "parlak": 13,
+          "mat": 15
+        },
+        "100": {
+          "parlak": 12,
+          "mat": 14
+        }
+      },
+      "description": "15x20 cm Klasik Fotoğraf Baskı - Toplu fiyatlar 25+ adet için geçerlidir"
+    },
+    "20x30": {
+      "single": {
+        "parlak": 25,
+        "mat": 27
+      },
+      "bulk": {
+        "25": {
+          "parlak": 22,
+          "mat": 24
+        },
+        "35": {
+          "parlak": 20,
+          "mat": 22
+        },
+        "50": {
+          "parlak": 19,
+          "mat": 21
+        },
+        "100": {
+          "parlak": 18,
+          "mat": 20
+        }
+      },
+      "description": "20x30 cm Klasik Fotoğraf Baskı - Toplu fiyatlar 25+ adet için geçerlidir"
+    },
+    "30x40": {
+      "single": {
+        "parlak": 35,
+        "mat": 37
+      },
+      "bulk": {
+        "25": {
+          "parlak": 32,
+          "mat": 34
+        },
+        "35": {
+          "parlak": 30,
+          "mat": 32
+        },
+        "50": {
+          "parlak": 29,
+          "mat": 31
+        },
+        "100": {
+          "parlak": 28,
+          "mat": 30
+        }
+      },
+      "description": "30x40 cm Klasik Fotoğraf Baskı - Toplu fiyatlar 25+ adet için geçerlidir"
+    }
+  },
+  "polaBaskilar": {
+    "9x11": {
+      "parlak": 10,
+      "mat": 8,
+      "description": "9x11 cm Pola Baskı",
+      "not": "35 adet için 279.90 TL (mat) veya 349.90 TL (parlak)"
+    }
+  },
+  "kargo": {
+    "standard": 15,
+    "express": 35,
+    "freeOver": 99
+  },
+  "notlar": {
+    "kaynak": "Sosyopix.com - Toplu fiyat referansları",
+    "guncelleme": "Manuel olarak güncellenmelidir",
+    "yasal": "Bu fiyatlar sadece referans amaçlıdır. Kendi fiyat yapınızı oluşturmanız önerilir.",
+    "topluFiyatlar": {
+      "25": "25+ adet için toplu fiyat uygulanır",
+      "35": "35+ adet için ek indirim",
+      "50": "50+ adet için ek indirim",
+      "100": "100+ adet için maksimum indirim"
+    },
+    "ornekler": {
+      "10x15_25_parlak": "25 adet 10x15 parlak = 14 TL/adet = 350 TL",
+      "10x15_25_mat": "25 adet 10x15 mat = 11.2 TL/adet = 280 TL",
+      "10x15_35_parlak": "35 adet 10x15 parlak = 8 TL/adet = 280 TL"
+    }
+  }
+}
+

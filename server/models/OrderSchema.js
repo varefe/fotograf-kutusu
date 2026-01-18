@@ -88,48 +88,42 @@ const OrderModel = {
 
   // Tüm siparişleri getir
   findAll: async (isAdmin = false) => {
-    const orders = await Order.find({}).sort({ createdAt: -1 });
-    console.log(`🔍 findAll: ${orders.length} sipariş bulundu, isAdmin: ${isAdmin}`);
+    console.log('🔍 OrderModel.findAll çağrıldı, isAdmin:', isAdmin);
     
-    if (orders.length === 0) {
-      console.warn('⚠️ Veritabanında hiç sipariş bulunamadı!');
-      return [];
-    }
-    
-    const formattedOrders = orders.map((order, index) => {
-      try {
-        const orderObj = order.toObject();
-        const formatted = OrderModel.formatOrder(orderObj, isAdmin);
-        
-        // formatOrder artık hiçbir zaman null döndürmemeli
-        if (!formatted) {
-          console.error(`❌ Sipariş #${orderObj._id || orderObj.id} formatOrder null döndürdü!`);
-          // Yine de siparişi göster
-          return orderObj;
-        }
-        
-        // Eski sipariş kontrolü
-        if (isAdmin && formatted) {
-          const orderDate = formatted.createdAt ? new Date(formatted.createdAt) : null;
-          if (orderDate) {
-            const isOld = orderDate < new Date('2024-01-01'); // Örnek: 2024'ten önceki siparişler
-            if (isOld) {
-              console.log(`📅 Eski sipariş bulundu: #${formatted._id || formatted.id}, Tarih: ${orderDate.toISOString()}`);
-            }
-          }
-        }
-        
-        return formatted;
-      } catch (error) {
-        console.error(`❌ Sipariş formatlama hatası (index ${index}):`, error);
-        // Hata olsa bile siparişi göster
-        return order.toObject();
+    try {
+      const orders = await Order.find({}).sort({ createdAt: -1 });
+      console.log(`✅ Order.find tamamlandı: ${orders.length} sipariş bulundu`);
+      
+      if (orders.length > 0) {
+        console.log('🔍 İlk sipariş örneği (formatOrder öncesi):', {
+          _id: orders[0]._id,
+          createdAt: orders[0].createdAt,
+          isEncrypted: orders[0].isEncrypted,
+          hasCustomerInfo: !!orders[0].customerInfo
+        });
       }
-    });
-    
-    // Artık null filtreleme yok - formatOrder hiçbir zaman null döndürmemeli
-    console.log(`✅ findAll: ${formattedOrders.length} sipariş formatlandı (${orders.length} ham sipariş)`);
-    return formattedOrders;
+      
+      const formattedOrders = orders.map(order => {
+        const formatted = OrderModel.formatOrder(order.toObject(), isAdmin);
+        return formatted;
+      });
+      
+      console.log(`✅ formatOrder tamamlandı: ${formattedOrders.length} sipariş formatlandı`);
+      
+      if (formattedOrders.length > 0) {
+        console.log('🔍 İlk sipariş örneği (formatOrder sonrası):', {
+          id: formattedOrders[0].id || formattedOrders[0]._id,
+          customerEmail: formattedOrders[0].customerInfo?.email || 'Email yok',
+          price: formattedOrders[0].price,
+          status: formattedOrders[0].status
+        });
+      }
+      
+      return formattedOrders;
+    } catch (error) {
+      console.error('❌ OrderModel.findAll hatası:', error);
+      throw error;
+    }
   },
 
   // Belirli bir tarihten itibaren siparişleri getir
@@ -179,101 +173,54 @@ const OrderModel = {
 
   // Sipariş formatını düzenle (sadece admin için çözülmüş)
   formatOrder: (order, isAdmin = false) => {
-    // Null kontrolü - eğer order null ise, boş bir obje döndür (null değil!)
-    if (!order) {
-      console.warn('⚠️ formatOrder: order null veya undefined, boş obje döndürülüyor');
-      return {
-        _id: 'unknown',
-        createdAt: new Date(),
-        customerInfo: { email: '', firstName: '', lastName: '', phone: '', address: '' },
-        status: 'Bilinmiyor',
-        paymentStatus: 'unknown'
-      };
-    }
-
-    // Admin değilse hassas bilgileri gizle
-    if (!isAdmin) {
-      return {
-        ...order,
-        customerInfo: {
-          firstName: '***',
-          lastName: '***',
-          email: '***',
-          phone: '***',
-          address: '***'
-        },
-        photo: {
-          ...order.photo,
-          base64: null
-        },
-        notes: null
-      };
-    }
-
-    // Admin ise şifreleri çöz (isEncrypted flag'ine bakmaksızın - eski siparişler için de)
-    if (isAdmin) {
-      try {
-        // Eski siparişler için de şifre çözme işlemini dene
-        // isEncrypted flag'i olmayan veya false olan siparişler için de çalışır
+    try {
+      // Sadece admin ise şifreleri çöz
+      if (isAdmin && order.isEncrypted) {
         const decrypted = decryptSensitiveFields(order);
-        if (decrypted && decrypted !== null) {
-          // Başarılı çözme - tüm alanları kontrol et
-          return {
-            ...order,
-            ...decrypted,
-            // Eğer customerInfo eksikse, orijinalinden al
-            customerInfo: decrypted.customerInfo || order.customerInfo || {
-              firstName: '',
-              lastName: '',
-              email: '',
-              phone: '',
-              address: ''
-            }
-          };
-        } else {
-          // Çözme başarısız ama siparişi göster (eski format olabilir)
-          // Eski siparişler zaten şifrelenmemiş olabilir
-          console.log(`ℹ️ Sipariş #${order._id || order.id} çözülemedi veya zaten çözülmüş, orijinal format gösteriliyor`);
-          return {
-            ...order,
-            // customerInfo eksikse boş obje ekle
-            customerInfo: order.customerInfo || {
-              firstName: '',
-              lastName: '',
-              email: '',
-              phone: '',
-              address: ''
-            }
-          };
-        }
-      } catch (error) {
-        console.warn(`⚠️ Sipariş #${order._id || order.id} şifre çözme hatası:`, error.message);
-        // Şifre çözme başarısız olsa bile siparişi göster (eski sipariş olabilir)
-        // Hiçbir zaman null döndürme!
         return {
-          ...order,
-          customerInfo: order.customerInfo || {
-            firstName: '',
-            lastName: '',
-            email: '',
-            phone: '',
-            address: ''
-          }
+          ...decrypted,
+          id: order._id?.toString() || order.id,
+          _id: order._id?.toString() || order.id
         };
       }
-    }
 
-    // Son çare: order'ı olduğu gibi döndür
-    return {
-      ...order,
-      customerInfo: order.customerInfo || {
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        address: ''
+      // Admin değilse hassas bilgileri gizle
+      if (!isAdmin) {
+        return {
+          ...order,
+          id: order._id?.toString() || order.id,
+          _id: order._id?.toString() || order.id,
+          customerInfo: {
+            firstName: '***',
+            lastName: '***',
+            email: '***',
+            phone: '***',
+            address: '***'
+          },
+          photo: {
+            ...order.photo,
+            base64: null
+          },
+          notes: null
+        };
       }
-    };
+
+      // Admin ama şifrelenmemişse
+      return {
+        ...order,
+        id: order._id?.toString() || order.id,
+        _id: order._id?.toString() || order.id
+      };
+    } catch (error) {
+      console.error('❌ formatOrder hatası:', error);
+      // Hata durumunda en azından temel bilgileri döndür
+      return {
+        ...order,
+        id: order._id?.toString() || order.id,
+        _id: order._id?.toString() || order.id,
+        error: 'Format hatası: ' + error.message
+      };
+    }
   },
 
   // Sipariş durumunu güncelle

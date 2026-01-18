@@ -1,0 +1,11 @@
+NODE_ENV=production
+PORT=5000
+FRONTEND_URL=https://fotografkutusu.com
+MONGODB_URI=mongodb://mongo:DpZZNKhEweSoBgjnsTmwjOpjpmtRlSqP@yamanote.proxy.rlwy.net:38288
+IYZIPAY_API_KEY=TZY4COlRiQDLL7ERFUK5FzGW3rNBDLio
+IYZIPAY_SECRET_KEY=Eu1eRgVCgE3EKU90DpoKZdgiRNsIDZXN
+IYZIPAY_URI=https://api.iyzipay.com
+ENCRYPTION_KEY=CTJXtl9tnkQVwEF1pscutNxDqUf3NUcyETPc1QjkPb8=
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-secure-admin-password-here
+

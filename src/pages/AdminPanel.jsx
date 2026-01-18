@@ -53,20 +53,47 @@ function AdminPanel() {
       })
 
       if (activeTab === 'orders') {
+        console.log('📥 Siparişler isteniyor:', `${apiUrl}/admin/orders`)
+        console.log('🔑 Headers:', headers)
+        
         const response = await fetch(`${apiUrl}/admin/orders`, { headers })
+        console.log('📥 Response status:', response.status, response.statusText)
+        
         const data = await response.json()
+        console.log('📥 Response data (detaylı):', JSON.stringify(data, null, 2))
+        console.log('📥 Response data (kısa):', {
+          success: data.success,
+          ordersCount: data.orders?.length || 0,
+          total: data.total,
+          rawCount: data.rawCount,
+          error: data.error,
+          message: data.message,
+          hasOrders: Array.isArray(data.orders),
+          ordersType: typeof data.orders
+        })
+        
+        // Eğer rawCount undefined ise, backend'de bir sorun var
+        if (data.rawCount === undefined) {
+          console.error('❌ KRİTİK: Backend\'den rawCount gelmedi!');
+          console.error('❌ Bu, backend route\'unun düzgün çalışmadığını gösterir');
+          console.error('❌ Backend terminal loglarını kontrol edin');
+        }
         
         if (response.ok) {
           if (data.success) {
-            console.log(`✅ AdminPanel: ${data.orders?.length || 0} sipariş alındı`)
-            console.log('📦 İlk 3 sipariş örneği:', data.orders?.slice(0, 3).map(o => ({
-              id: o._id || o.id,
-              createdAt: o.createdAt,
-              customerEmail: o.customerInfo?.email,
-              isEncrypted: o.isEncrypted
-            })))
+            console.log('✅ Siparişler başarıyla alındı:', data.orders?.length || 0, 'sipariş')
             setOrders(data.orders || [])
+            
+            // Eğer sipariş yoksa logla
+            if (!data.orders || data.orders.length === 0) {
+              console.warn('⚠️ Backend\'den sipariş gelmedi:', {
+                total: data.total,
+                rawCount: data.rawCount,
+                orders: data.orders
+              })
+            }
           } else {
+            console.error('❌ Backend success=false:', data)
             throw new Error(data.message || 'Siparişler yüklenemedi')
           }
         } else {
@@ -74,7 +101,8 @@ function AdminPanel() {
             status: response.status,
             statusText: response.statusText,
             error: data.error,
-            message: data.message
+            message: data.message,
+            fullData: data
           })
           throw new Error(data.message || data.error || 'Siparişler yüklenemedi')
         }
@@ -116,8 +144,22 @@ function AdminPanel() {
         }
       }
     } catch (err) {
-      console.error('Veri yükleme hatası:', err)
-      setError(err.message || 'Veri yüklenirken bir hata oluştu')
+      console.error('❌ Veri yükleme hatası:', err)
+      console.error('❌ Hata detayı:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      })
+      
+      // Network hatası kontrolü
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        setError('Backend sunucusuna bağlanılamadı. Lütfen backend\'in çalıştığından emin olun.')
+      } else if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+        setError('Yetkilendirme hatası. Lütfen tekrar giriş yapın.')
+        setTimeout(() => navigate('/login'), 2000)
+      } else {
+        setError(err.message || 'Veri yüklenirken bir hata oluştu')
+      }
     } finally {
       setLoading(false)
     }
@@ -336,6 +378,34 @@ function AdminPanel() {
               }}>
                 <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📭</div>
                 <h2 style={{ color: '#666' }}>Sipariş bulunamadı</h2>
+                {orders.length === 0 && !loading && (
+                  <div style={{ marginTop: '1rem', color: '#999', fontSize: '0.9rem' }}>
+                    <p>Henüz hiç sipariş alınmamış veya siparişler yüklenemedi.</p>
+                    <p style={{ marginTop: '0.5rem' }}>
+                      Backend loglarını kontrol edin veya tarayıcı konsolunu açın (F12).
+                    </p>
+                    <button
+                      onClick={fetchData}
+                      style={{
+                        marginTop: '1rem',
+                        padding: '0.75rem 1.5rem',
+                        background: '#27ae60',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      🔄 Tekrar Dene
+                    </button>
+                  </div>
+                )}
+                {orders.length > 0 && filteredOrders.length === 0 && (
+                  <p style={{ marginTop: '1rem', color: '#999', fontSize: '0.9rem' }}>
+                    Arama kriterlerinize uygun sipariş bulunamadı. Filtreleri temizleyip tekrar deneyin.
+                  </p>
+                )}
               </div>
             ) : (
               <div style={{ overflowX: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>

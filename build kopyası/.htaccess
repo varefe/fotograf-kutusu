@@ -1,0 +1,36 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # HTTP'den HTTPS'e yönlendirme (SSL aktif olduğunda)
+  RewriteCond %{HTTPS} off
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+  
+  # React Router için SPA routing
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# MIME Types
+<IfModule mod_mime.c>
+  AddType application/javascript .js
+  AddType application/javascript .jsx
+  AddType application/javascript .mjs
+  AddType text/css .css
+  AddType application/json .json
+  AddType application/wasm .wasm
+  AddType image/svg+xml .svg
+</IfModule>
+
+# Enable CORS for module scripts
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|jsx|mjs|wasm)$">
+    Header set Content-Type "application/javascript"
+  </FilesMatch>
+  <FilesMatch "\.svg$">
+    Header set Content-Type "image/svg+xml"
+  </FilesMatch>
+</IfModule>
+

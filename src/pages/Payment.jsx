@@ -110,12 +110,116 @@ function Payment() {
     }
   }, [orderId, navigate, location.state])
 
-  // 3D Secure HTML yüklendiğinde iframe'i hazırla
+  // 3D Secure HTML yüklendiğinde iframe'de göster ve formu otomatik submit et
   useEffect(() => {
     if (!show3DSecure || !threeDSecureHtml) return;
     
-    // 3D Secure iframe'i için özel işlemler (gerekirse)
-    console.log('✅ 3D Secure HTML yüklendi');
+    console.log('✅ 3D Secure HTML yüklendi, işleniyor...');
+    console.log('📄 HTML içeriği uzunluğu:', threeDSecureHtml.length);
+    console.log('📄 HTML içeriği ilk 500 karakter:', threeDSecureHtml.substring(0, 500));
+    
+    // HTML içeriğinin Base64 kodlu olup olmadığını kontrol et
+    let htmlContent = threeDSecureHtml.trim();
+    
+    // Eğer Base64 kodlu ise decode et
+    if (htmlContent.match(/^[A-Za-z0-9+/=\s]+$/) && htmlContent.length > 100) {
+      try {
+        // Base64 decode dene
+        const decoded = atob(htmlContent.replace(/\s/g, ''));
+        if (decoded.includes('<html') || decoded.includes('<form') || decoded.includes('<!DOCTYPE')) {
+          console.log('✅ Base64 kodlu HTML decode edildi');
+          htmlContent = decoded;
+        }
+      } catch (e) {
+        console.log('⚠️ Base64 decode başarısız, normal HTML olarak işleniyor:', e.message);
+      }
+    }
+    
+    // HTML içeriğini blob URL olarak oluştur ve iframe'de göster
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+    
+    const iframe = document.createElement('iframe');
+    iframe.id = 'threeds-iframe';
+    iframe.src = blobUrl;
+    iframe.style.width = '100%';
+    iframe.style.minHeight = '600px';
+    iframe.style.border = 'none';
+    iframe.style.borderRadius = '12px';
+    iframe.style.background = 'white';
+    
+    const container = document.getElementById('threeds-container');
+    if (container) {
+      // Önce container'ı temizle
+      container.innerHTML = '';
+      container.appendChild(iframe);
+      
+      // Iframe yüklendiğinde formu otomatik submit et
+      iframe.onload = () => {
+        console.log('✅ 3D Secure iframe yüklendi');
+        
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          const form = iframeDoc.querySelector('form') || 
+                       iframeDoc.querySelector('#iyzipay-form') ||
+                       iframeDoc.querySelector('form[action*="iyzipay"]');
+          
+          if (form) {
+            console.log('🔍 3D Secure formu bulundu, submit ediliyor...');
+            console.log('📋 Form action:', form.action);
+            console.log('📋 Form method:', form.method);
+            
+            // Formu otomatik submit et
+            setTimeout(() => {
+              try {
+                form.submit();
+                console.log('✅ Form submit edildi');
+              } catch (e) {
+                console.error('❌ Form submit hatası:', e);
+                // Alternatif: form içindeki submit butonuna tıkla
+                const submitButton = form.querySelector('input[type="submit"]') || 
+                                   form.querySelector('button[type="submit"]') ||
+                                   form.querySelector('button');
+                if (submitButton) {
+                  submitButton.click();
+                }
+              }
+            }, 500);
+          } else {
+            console.warn('⚠️ 3D Secure formu bulunamadı, HTML içeriği kontrol ediliyor...');
+            // Eğer form yoksa, HTML içeriğinde bir script varsa çalıştır
+            const scripts = iframeDoc.querySelectorAll('script');
+            scripts.forEach(script => {
+              try {
+                const newScript = iframeDoc.createElement('script');
+                newScript.textContent = script.textContent;
+                iframeDoc.body.appendChild(newScript);
+              } catch (e) {
+                console.error('❌ Script çalıştırma hatası:', e);
+              }
+            });
+          }
+        } catch (e) {
+          console.error('❌ Iframe içeriğine erişim hatası (CORS):', e.message);
+          // CORS hatası varsa, HTML içeriğini doğrudan container'a yaz
+          container.innerHTML = htmlContent;
+          
+          // Formu bul ve submit et
+          setTimeout(() => {
+            const form = container.querySelector('form');
+            if (form) {
+              console.log('🔍 Form bulundu (CORS fallback), submit ediliyor...');
+              form.submit();
+            }
+          }, 500);
+        }
+      };
+      
+      // Cleanup
+      return () => {
+        URL.revokeObjectURL(blobUrl);
+      };
+    }
   }, [show3DSecure, threeDSecureHtml])
 
   // Ödeme formu submit handler
@@ -510,9 +614,47 @@ function Payment() {
                 minHeight: '600px',
                 border: '1px solid #e9ecef',
                 borderRadius: '12px',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                position: 'relative'
               }}>
-                <div dangerouslySetInnerHTML={{ __html: threeDSecureHtml }} />
+                <div style={{
+                  padding: '2rem',
+                  textAlign: 'center',
+                  background: '#f8f9fa',
+                  borderBottom: '1px solid #e9ecef'
+                }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔐</div>
+                  <h3 style={{ margin: 0, color: '#2c3e50' }}>3D Secure Doğrulama</h3>
+                  <p style={{ margin: '0.5rem 0 0 0', color: '#6c757d' }}>
+                    Güvenli ödeme için bankanızın doğrulama sayfasına yönlendiriliyorsunuz...
+                  </p>
+                </div>
+                <div 
+                  id="threeds-container"
+                  style={{ 
+                    width: '100%', 
+                    minHeight: '600px',
+                    padding: '0',
+                    background: 'white',
+                    borderRadius: '12px',
+                    overflow: 'hidden'
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  background: 'white',
+                  padding: '2rem',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  display: 'none',
+                  zIndex: 1000
+                }} id="threeds-loading">
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                  <p style={{ margin: 0, color: '#2c3e50' }}>Yönlendiriliyor...</p>
+                </div>
               </div>
             ) : orderData ? (
               <div>

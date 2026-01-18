@@ -260,69 +260,149 @@ router.delete('/users/:id', requireAdminRole, async (req, res) => {
 });
 
 /**
- * Tüm siparişleri getir (Admin) - Tüm siparişler (eski ve yeni)
+ * Veritabanı durumunu kontrol et (Admin) - Debug için
+ */
+router.get('/debug/orders', requireAdminRole, async (req, res) => {
+  try {
+    await connectDB();
+    const Order = mongoose.models.Order || mongoose.model('Order');
+    
+    const totalCount = await Order.countDocuments({});
+    const sampleOrder = await Order.findOne({}).lean();
+    
+    res.json({
+      success: true,
+      totalCount,
+      hasOrders: totalCount > 0,
+      sampleOrder: sampleOrder ? {
+        _id: sampleOrder._id,
+        createdAt: sampleOrder.createdAt,
+        price: sampleOrder.price,
+        status: sampleOrder.status
+      } : null,
+      collectionName: Order.collection.name,
+      dbName: mongoose.connection.db.databaseName
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+/**
+ * Tüm siparişleri getir (Admin) - Site açıldığından beri TÜM siparişler
  */
 router.get('/orders', requireAdminRole, async (req, res) => {
   try {
+    console.log('📥 Admin sipariş isteği alındı - TÜM siparişler isteniyor');
     await connectDB();
+    console.log('✅ Veritabanı bağlantısı kontrol edildi');
     
-    // Direkt MongoDB'den ham veriyi al (formatOrder olmadan)
-    const mongoose = await import('mongoose');
-    const OrderCollection = mongoose.default.connection.collection('orders');
-    const rawOrders = await OrderCollection.find({}).sort({ createdAt: -1 }).toArray();
-    console.log(`🔍 MongoDB'den ${rawOrders.length} ham sipariş alındı`);
+    // Direkt MongoDB'den tüm siparişleri çek (HİÇBİR FİLTRE YOK - site açıldığından beri tüm siparişler)
+    const Order = mongoose.models.Order || mongoose.model('Order');
     
-    // Tarih aralığını kontrol et
-    if (rawOrders.length > 0) {
-      const dates = rawOrders.map(o => o.createdAt ? new Date(o.createdAt) : null).filter(d => d);
-      const oldestDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const newestDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
-      console.log(`📅 Sipariş tarih aralığı: ${oldestDate?.toISOString()} - ${newestDate?.toISOString()}`);
-      console.log(`📊 Toplam ${rawOrders.length} sipariş, ${dates.length} tanesinde tarih var`);
-      
-      // İlk 5 siparişin detaylarını göster
-      console.log('🔍 İlk 5 ham sipariş örneği:', rawOrders.slice(0, 5).map(o => ({
-        _id: o._id,
-        createdAt: o.createdAt,
-        isEncrypted: o.isEncrypted,
-        hasCustomerInfo: !!o.customerInfo
-      })));
-    }
+    // Önce ham sayıyı kontrol et
+    const totalCount = await Order.countDocuments({});
+    console.log(`🔍 MongoDB'de toplam sipariş sayısı: ${totalCount}`);
     
-    // Tüm siparişleri formatla (formatOrder ile)
-    const orders = await OrderModel.findAll(true);
+    // TÜM siparişleri çek - HİÇBİR TARİH FİLTRESİ YOK
+    const rawOrders = await Order.find({})
+      .sort({ createdAt: -1 }) // En yeni önce
+      .lean();
     
-    console.log(`✅ Admin siparişleri getirildi: ${orders.length} sipariş formatlandı (${rawOrders.length} ham sipariş)`);
+    console.log(`✅ MongoDB'den ${rawOrders.length} sipariş çekildi (TÜM siparişler, filtre yok)`);
     
-    // Eğer formatlanan sipariş sayısı ham sipariş sayısından azsa, sorun var
-    if (orders.length < rawOrders.length) {
-      console.warn(`⚠️ UYARI: ${rawOrders.length - orders.length} sipariş formatlanırken kayboldu!`);
-    }
-    
-    // Siparişlerin tarihlerini kontrol et
-    if (orders.length > 0) {
-      const sampleDates = orders.slice(0, 10).map(o => ({
-        id: o.id || o._id,
-        createdAt: o.createdAt,
-        dateStr: o.createdAt ? new Date(o.createdAt).toISOString() : 'Tarih yok',
-        hasCustomerInfo: !!o.customerInfo,
-        customerEmail: o.customerInfo?.email || 'Yok'
-      }));
-      console.log('🔍 Örnek sipariş tarihleri (ilk 10):', JSON.stringify(sampleDates, null, 2));
-    }
-    
-    res.status(200).json({
-      success: true,
-      orders,
-      total: orders.length,
-      rawTotal: rawOrders.length // Debug için
+    // Siparişleri formatla ve şifreleri çöz
+    const formattedOrders = rawOrders.map((order) => {
+      try {
+        // Admin için şifreleri çöz
+        const formatted = OrderModel.formatOrder(order, true);
+        
+        // Eksik alanları ekle
+        return {
+          ...formatted,
+          id: formatted.id || formatted._id || order._id?.toString(),
+          _id: formatted._id || order._id?.toString(),
+          createdAt: order.createdAt || formatted.createdAt,
+          updatedAt: order.updatedAt || formatted.updatedAt
+        };
+      } catch (formatError) {
+        console.error(`❌ Sipariş formatlama hatası (ID: ${order._id}):`, formatError);
+        // Hata durumunda en azından temel bilgileri döndür
+        return {
+          id: order._id?.toString(),
+          _id: order._id?.toString(),
+          price: order.price,
+          status: order.status || 'Yeni',
+          paymentStatus: order.paymentStatus || 'pending',
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+          size: order.size,
+          quantity: order.quantity || 1,
+          customerInfo: {
+            email: 'Format hatası',
+            firstName: '',
+            lastName: ''
+          },
+          error: 'Format hatası'
+        };
+      }
     });
+    
+    console.log(`✅ ${formattedOrders.length} sipariş formatlandı`);
+    
+    // İlk 3 siparişin detaylarını logla
+    if (formattedOrders.length > 0) {
+      console.log('📋 İlk 3 sipariş detayı:');
+      formattedOrders.slice(0, 3).forEach((order, index) => {
+        console.log(`  ${index + 1}. Sipariş:`, {
+          id: order.id || order._id,
+          customerEmail: order.customerInfo?.email || 'Email yok',
+          price: order.price,
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : 'Tarih yok'
+        });
+      });
+    }
+    
+    const response = {
+      success: true,
+      orders: formattedOrders,
+      total: formattedOrders.length,
+      rawCount: totalCount
+    };
+    
+    console.log(`📤 Response hazırlandı: ${response.total} sipariş gönderiliyor (Ham: ${totalCount})`);
+    console.log(`📤 Response detayı:`, {
+      success: response.success,
+      ordersLength: response.orders.length,
+      total: response.total,
+      rawCount: response.rawCount,
+      hasOrders: response.orders.length > 0
+    });
+    
+    // Eğer sipariş yoksa, bunu açıkça logla
+    if (totalCount === 0) {
+      console.warn('⚠️ VERİTABANINDA HİÇ SİPARİŞ YOK!');
+      console.warn('⚠️ MongoDB collection boş veya bağlantı sorunu olabilir');
+    } else if (totalCount > 0 && formattedOrders.length === 0) {
+      console.error('❌ KRİTİK: Veritabanında sipariş var ama formatlama başarısız!');
+      console.error(`❌ Ham sipariş sayısı: ${totalCount}, Formatlanan: ${formattedOrders.length}`);
+    }
+    
+    res.status(200).json(response);
   } catch (error) {
     console.error('❌ Siparişleri getirme hatası:', error);
+    console.error('❌ Hata detayı:', error.stack);
     res.status(500).json({
       success: false,
       error: 'Siparişler getirilemedi',
-      message: error.message
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

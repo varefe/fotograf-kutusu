@@ -13,23 +13,40 @@ import { securityLogger, securityHeaders } from './middleware/security.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001; // Port 5000 AirTunes tarafından kullanılıyor, 5001'e değiştir
 const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// OPTIONS isteklerini EN BAŞTA handle et (rate limiting'den önce)
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    console.log('🔍 OPTIONS preflight isteği (erken):', req.path, 'Origin:', origin);
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Session, X-API-Key, Accept, Origin, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400'); // 24 saat
+    return res.status(204).end();
+  }
+  next();
+});
 
 // CORS - EN BAŞTA, HER ŞEYDEN ÖNCE
 // Development modunda tüm origin'lere izin ver (sadece development için!)
 if (NODE_ENV === 'development') {
-  // Development için basit CORS - tüm origin'lere izin ver
-  app.use(cors({
-    origin: true, // Tüm origin'lere izin ver
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Session', 'X-API-Key', 'Accept', 'Origin', 'X-Requested-With'],
-    exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-  }));
-  console.log('🌐 CORS: Development modu - Tüm origin\'lere izin verildi');
+  // Development için manuel CORS middleware - tüm origin'lere izin ver
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    
+    // Normal istekler için CORS header'ları ekle
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Session, X-API-Key, Accept, Origin, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Expose-Headers', 'X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset');
+    next();
+  });
+  console.log('🌐 CORS: Development modu - Tüm origin\'lere izin verildi (manuel)');
 } else {
   // Production için sadece belirli origin'lere izin ver
   const allowedOrigins = [
@@ -96,7 +113,11 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => {
     // Health check ve OPTIONS request'lerini rate limit'ten muaf tut
-    return req.path === '/api/health' || req.method === 'OPTIONS';
+    if (req.method === 'OPTIONS') {
+      console.log('🔍 OPTIONS isteği rate limiting\'den muaf tutuldu:', req.path);
+      return true;
+    }
+    return req.path === '/api/health';
   }
 });
 
@@ -131,8 +152,13 @@ const paymentLimiter = rateLimit({
 app.use(securityLogger);
 app.use(securityHeaders);
 
-// Rate limiting uygula
-app.use('/api/', generalLimiter);
+// Rate limiting uygula (OPTIONS istekleri zaten skip ediliyor)
+// Geçici olarak development'ta devre dışı (CORS sorununu çözmek için)
+if (NODE_ENV !== 'development') {
+  app.use('/api/', generalLimiter);
+} else {
+  console.log('⚠️ Rate limiting development modunda devre dışı (CORS debug için)');
+}
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
