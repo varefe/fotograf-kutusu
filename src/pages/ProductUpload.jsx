@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useCart } from '../context/CartContext'
-import { calculatePrice } from '../utils/priceCalculator'
+import { calculatePrice, getBulkPrice } from '../utils/priceCalculator'
 
 function ProductUpload() {
   const navigate = useNavigate()
@@ -73,9 +73,20 @@ function ProductUpload() {
 
   const handlePhotoSelect = async (e) => {
     const files = Array.from(e.target.files)
-    const imageFiles = files.filter(file => file.type.startsWith('image/'))
+    const imageFiles = files.filter(file => {
+      // Sadece dosya tipi kontrolü (boyut kontrolü yok)
+      if (!file.type.startsWith('image/')) {
+        return false
+      }
+      return true
+    })
     
-    if (imageFiles.length === 0) return
+    if (imageFiles.length === 0) {
+      if (files.length > 0) {
+        alert('Lütfen geçerli resim dosyaları seçin (JPEG, PNG, GIF, WebP)')
+      }
+      return
+    }
     
     // Dosyaları hemen ekle (preview'lar asenkron yüklenecek)
     setPhotos(prev => [...prev, ...imageFiles])
@@ -118,39 +129,49 @@ function ProductUpload() {
       return
     }
 
-    // Toplam fiyatı hesapla (bir kez, tüm fotoğraflar için)
-    const totalPrice = calculatePrice(
-      product.size,
-      quantity * photos.length, // Toplam adet: her fotoğraf için quantity adet
-      'standard',
-      product.customSize
-    )
-    
-    // Birim fiyatı hesapla (kargo hariç)
-    const bulkPrices = {
-      '10x15': { 15: 16, 25: 14, 35: 8, 50: 7.5, 100: 7 },
-      '15x20': { 15: 19, 25: 16, 35: 14, 50: 13, 100: 12 },
-      '20x30': { 15: 26, 25: 22, 35: 20, 50: 19, 100: 18 },
-      '30x40': { 15: 36, 25: 32, 35: 30, 50: 29, 100: 28 }
+    // Her fotoğraf için ayrı ayrı fiyat hesapla (quantity adet için)
+    // ÖNEMLİ: Her fotoğraf için quantity adet için fiyat hesaplanır, toplam adet için değil
+    let basePrice = 0
+    if (product.size === 'custom' && product.customSize) {
+      const area = product.customSize.width * product.customSize.height
+      basePrice = Math.ceil(area / 100) * 0.5
+    } else {
+      // Her fotoğraf için quantity adet için fiyat hesapla
+      const bulkPrice = getBulkPrice(product.size, quantity)
+      if (bulkPrice) {
+        basePrice = bulkPrice
+      } else {
+        // Fallback: 15 adet fiyatı
+        const sizePrices = { '10x15': 16, '15x20': 19, '20x30': 26, '30x40': 36 }
+        basePrice = sizePrices[product.size] || 26
+      }
     }
-    const sizeData = bulkPrices[product.size] || { 15: 26 }
-    let unitPrice = sizeData[15] // Varsayılan 15 adet fiyatı
-    if (quantity >= 100 && sizeData[100]) unitPrice = sizeData[100]
-    else if (quantity >= 50 && sizeData[50]) unitPrice = sizeData[50]
-    else if (quantity >= 35 && sizeData[35]) unitPrice = sizeData[35]
-    else if (quantity >= 25 && sizeData[25]) unitPrice = sizeData[25]
-    else if (quantity >= 15 && sizeData[15]) unitPrice = sizeData[15]
     
-    // Kargo fiyatı (sadece bir kez eklenecek)
-    const subtotal = unitPrice * quantity * photos.length
-    const shippingPrice = subtotal >= 99 ? 0 : 15
+    // Her fotoğraf için fiyat (quantity adet × birim fiyat - kargo hariç)
+    const pricePerPhoto = basePrice * quantity
     
-    // Her fotoğraf için fiyat: (birim fiyat × quantity) + (kargo / fotoğraf sayısı)
-    const pricePerPhoto = (unitPrice * quantity) + (shippingPrice / photos.length)
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProductUpload.jsx:151',message:'Price calculation in ProductUpload',data:{quantity,photosCount:photos.length,basePrice,pricePerPhoto,totalQuantity:quantity*photos.length,calculation:`${basePrice} TL/adet × ${quantity} adet = ${pricePerPhoto} TL/fotoğraf`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
+    console.log('💰 Fiyat Hesaplama (ProductUpload):', {
+      quantity,
+      photosCount: photos.length,
+      basePrice: `${basePrice} TL/adet`,
+      pricePerPhoto: `${pricePerPhoto} TL/fotoğraf`,
+      calculation: `${basePrice} TL/adet × ${quantity} adet = ${pricePerPhoto} TL/fotoğraf`,
+      totalForAllPhotos: `${pricePerPhoto} TL × ${photos.length} fotoğraf = ${pricePerPhoto * photos.length} TL`
+    })
 
     // Fotoğrafları sepete ekle (base64'i storage'a kaydetme, sadece metadata)
     // Base64 ödeme sayfasına geçerken oluşturulacak
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProductUpload.jsx:153',message:'Starting forEach loop',data:{photosCount:photos.length,previewsCount:previews.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     photos.forEach((photo, index) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProductUpload.jsx:154',message:'forEach iteration',data:{index,photoName:photo.name,photosLength:photos.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       const cartItem = {
         product: {
           size: product.size,

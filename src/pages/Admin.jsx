@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { API_URL } from '../config/api'
+import { getBrowserId } from '../utils/browserFingerprint'
 
 function Admin() {
   const navigate = useNavigate()
@@ -18,24 +19,47 @@ function Admin() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  // Admin authentication helper
+  // Admin authentication helper - JWT token kullan
   const getAuthHeaders = () => {
-    const adminUsername = import.meta.env.VITE_ADMIN_USERNAME || 'efe'
-    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || '193123'
-    const authString = btoa(`${adminUsername}:${adminPassword}`)
+    const browserId = getBrowserId()
+    // JWT token'ı sessionStorage'dan al
+    const token = sessionStorage.getItem(`authToken_${browserId}`) || 
+                  localStorage.getItem(`authToken_${browserId}`)
+    
+    if (!token) {
+      console.warn('⚠️ JWT token bulunamadı, admin login sayfasına yönlendiriliyor')
+      navigate('/admin/login')
+      return {
+        'Content-Type': 'application/json'
+      }
+    }
+    
     return {
-      'Authorization': `Basic ${authString}`,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     }
   }
 
   useEffect(() => {
     const checkAuth = () => {
+      const browserId = getBrowserId()
+      // JWT token kontrolü
+      const token = sessionStorage.getItem(`authToken_${browserId}`) || 
+                    localStorage.getItem(`authToken_${browserId}`)
+      
+      // Eski sistem kontrolü (geriye dönük uyumluluk)
       const authenticated = sessionStorage.getItem('adminAuthenticated')
       const loginTime = sessionStorage.getItem('adminLoginTime')
       const adminCodeVerified = sessionStorage.getItem('adminCodeVerified')
       
-      // Admin kodu doğrulanmış mı kontrol et
+      // JWT token varsa ve admin kodu doğrulanmışsa, giriş yapılmış sayılır
+      if (token && adminCodeVerified === 'true') {
+        setIsAuthenticated(true)
+        fetchData()
+        return
+      }
+      
+      // Eski sistem kontrolü (geriye dönük uyumluluk)
       if (adminCodeVerified !== 'true') {
         sessionStorage.removeItem('adminAuthenticated')
         sessionStorage.removeItem('adminLoginTime')

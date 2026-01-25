@@ -4,9 +4,12 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { saveOrderToStorage, getOrdersFromStorage, decryptData } from '../utils/encryption'
 import { calculatePrice } from '../utils/priceCalculator'
+import { useAuth } from '../context/AuthContext'
+import { API_URL } from '../config/api'
 
 function Order() {
   const navigate = useNavigate()
+  const { isAuthenticated, loading: authLoading, getAuthHeaders } = useAuth()
   const [preview, setPreview] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
   const [showCustomSize, setShowCustomSize] = useState(false)
@@ -23,6 +26,19 @@ function Order() {
     address: '',
     phone: ''
   })
+
+  // Kullanıcı giriş kontrolü
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
+      navigate('/login', { 
+        state: { 
+          from: '/order',
+          message: 'Sipariş verebilmek için lütfen giriş yapın veya kayıt olun.'
+        } 
+      })
+    }
+  }, [isAuthenticated, authLoading, navigate])
 
   // Canlı fiyat hesaplama
   const currentPrice = useMemo(() => {
@@ -145,10 +161,39 @@ function Order() {
       alert('Lütfen e-posta ve adres bilgilerini doldurun')
       return
     }
+
+    // Email format kontrolü
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email.trim())) {
+      alert('Geçerli bir e-posta adresi giriniz')
+      return
+    }
+
+    // Adres uzunluk kontrolü
+    if (formData.address.trim().length < 10) {
+      alert('Adres en az 10 karakter olmalıdır')
+      return
+    }
+
+    // Miktar kontrolü (minimum 15)
+    if (parseInt(formData.quantity) < 15) {
+      alert('Minimum 15 adet seçmelisiniz')
+      return
+    }
     
     if (formData.size === 'custom' && (!formData.customWidth || !formData.customHeight)) {
       alert('Özel boyut için genişlik ve yükseklik girmelisiniz')
       return
+    }
+
+    // Özel boyut validasyonu
+    if (formData.size === 'custom') {
+      const width = parseFloat(formData.customWidth)
+      const height = parseFloat(formData.customHeight)
+      if (isNaN(width) || isNaN(height) || width <= 0 || width > 200 || height <= 0 || height > 200) {
+        alert('Özel boyut 0-200 cm arası olmalıdır')
+        return
+      }
     }
     
     setIsSubmitting(true)
@@ -199,47 +244,49 @@ function Order() {
           } : undefined
         )
         
-        // DOĞRU AKIŞ: Önce ödeme, sonra sipariş kaydı
-        // Sadece localStorage'a kaydet, backend'e kaydetme
+        // ÖNEMLİ: Önce ödeme alınacak, sonra backend'e kaydedilecek
+        // Sipariş verisini oluştur ve localStorage'a kaydet
         const orderId = Date.now().toString()
-        const orderToSave = {
-          ...orderData,
+        const orderDataForStorage = {
           id: orderId,
-          price: calculatedPrice,
-          status: 'Yeni',
-          paymentStatus: 'pending',
+          photos: [orderData.photo], // Tek fotoğraf array olarak
+          photo: orderData.photo, // Geriye uyumluluk
+          size: orderData.size,
+          customSize: orderData.customSize,
+          quantity: orderData.quantity,
+          shippingType: orderData.shippingType,
+          email: orderData.email,
+          address: orderData.address,
+          phone: orderData.phone,
+          firstName: orderData.firstName,
+          lastName: orderData.lastName,
           customerInfo: {
-            firstName: orderData.firstName || 'Müşteri',
-            lastName: orderData.lastName || 'Müşteri',
+            firstName: orderData.firstName,
+            lastName: orderData.lastName,
             email: orderData.email,
             phone: orderData.phone || '',
             address: orderData.address
           },
+          price: calculatedPrice,
+          status: 'Yeni',
+          paymentStatus: 'pending', // Ödeme bekleniyor
+          notes: orderData.notes || '',
           createdAt: new Date().toISOString()
         }
         
-        // Şifreleyerek localStorage'a kaydet
-        const saved = saveOrderToStorage(orderToSave)
+        // localStorage'a kaydet (base64 dahil - ödeme sayfasında kullanılacak)
+        saveOrderToStorage(orderDataForStorage)
         
-        if (saved) {
-          console.log('✅ Sipariş localStorage\'a kaydedildi, ödeme sayfasına yönlendiriliyor:', orderId)
-          
-          // Loading state'i kapat
-          setIsSubmitting(false)
-          
-          // Direkt window.location ile yönlendir (kesin çalışsın)
-          const paymentUrl = `/payment?orderId=${orderId}`
-          console.log('🚀 Yönlendirme URL:', paymentUrl)
-          
-          // Kısa bir gecikme sonrası yönlendir
-          setTimeout(() => {
-            window.location.href = paymentUrl
-          }, 300)
-        } else {
-          console.error('❌ localStorage\'a kaydedilemedi')
-          alert('Sipariş kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.')
-          setIsSubmitting(false)
-        }
+        // Ödeme sayfasına yönlendir
+        navigate('/payment', {
+          state: {
+            orderId: orderId,
+            orderData: orderDataForStorage,
+            photoFiles: [selectedFile] // File objesi ödeme sayfasında base64'e çevrilecek
+          }
+        })
+        
+        setIsSubmitting(false)
       }
       
       reader.readAsDataURL(selectedFile)
@@ -249,6 +296,25 @@ function Order() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Eğer kullanıcı giriş yapmamışsa, loading göster veya yönlendirme yapıldıysa boş döndür
+  if (authLoading) {
+    return (
+      <>
+        <Navbar />
+        <main style={{ padding: '4rem 0', textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+          <h2>Yükleniyor...</h2>
+        </main>
+        <Footer />
+      </>
+    )
+  }
+
+  if (!isAuthenticated) {
+    // Yönlendirme yapıldı, boş döndür
+    return null
   }
 
   return (
@@ -274,8 +340,11 @@ function Order() {
                 <p style={{ fontSize: '1.1rem', marginBottom: '1rem', opacity: 0.9 }}>
                   Sipariş No: <strong>#{orderId}</strong>
                 </p>
-                <p style={{ fontSize: '1rem', marginBottom: '2rem', opacity: 0.9 }}>
-                  Siparişiniz şifreli olarak kaydedildi. En kısa sürede sizinle iletişime geçeceğiz.
+                <p style={{ fontSize: '1rem', marginBottom: '1rem', opacity: 0.9 }}>
+                  Siparişiniz backend'e kaydedildi ve admin panelinde görüntülenebilir.
+                </p>
+                <p style={{ fontSize: '0.9rem', marginBottom: '2rem', opacity: 0.8, fontStyle: 'italic' }}>
+                  ⚠️ Test Modu: Ödeme akışı geçici olarak devre dışı bırakıldı.
                 </p>
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <Link to="/" className="btn btn-secondary" style={{
@@ -609,11 +678,11 @@ function Order() {
                   style={{ fontSize: '18px', padding: '15px 40px' }}
                   disabled={isSubmitting || !selectedFile}
                 >
-                  {isSubmitting ? '⏳ Sipariş Oluşturuluyor...' : '📸 Sipariş Ver ve Ödemeye Geç'}
+                  {isSubmitting ? '⏳ Sipariş Oluşturuluyor...' : '📸 Sipariş Ver (Test Modu)'}
                 </button>
                 {isSubmitting && (
                   <p style={{ marginTop: '1rem', color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                    Lütfen bekleyin, ödeme sayfasına yönlendirileceksiniz...
+                    Lütfen bekleyin, siparişiniz kaydediliyor...
                   </p>
                 )}
               </div>

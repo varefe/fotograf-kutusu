@@ -34,6 +34,7 @@ function Profile() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [selectedOrder, setSelectedOrder] = useState(null)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -45,9 +46,15 @@ function Profile() {
         phone: user.phone || '',
         address: user.address || ''
       })
-      loadOrders()
     }
   }, [user, authLoading, navigate])
+
+  // Orders tab'ı aktif olduğunda siparişleri yükle
+  useEffect(() => {
+    if (user && activeTab === 'orders' && orders.length === 0 && !loading) {
+      loadOrders()
+    }
+  }, [activeTab, user])
 
   const loadOrders = async () => {
     try {
@@ -227,7 +234,13 @@ function Profile() {
                 🔒 Şifre
               </button>
               <button
-                onClick={() => setActiveTab('orders')}
+                onClick={() => {
+                  setActiveTab('orders')
+                  // Orders tab'ına geçildiğinde siparişleri yükle
+                  if (orders.length === 0 && !loading) {
+                    loadOrders()
+                  }
+                }}
                 style={{
                   width: window.innerWidth < 768 ? 'auto' : '100%',
                   minWidth: window.innerWidth < 768 ? '120px' : 'auto',
@@ -245,6 +258,26 @@ function Profile() {
                 }}
               >
                 📦 Siparişler
+              </button>
+              <button
+                onClick={() => navigate('/order-tracking')}
+                style={{
+                  width: window.innerWidth < 768 ? 'auto' : '100%',
+                  minWidth: window.innerWidth < 768 ? '120px' : 'auto',
+                  padding: '0.75rem',
+                  marginBottom: window.innerWidth < 768 ? '0' : '0.5rem',
+                  marginRight: window.innerWidth < 768 ? '0.5rem' : '0',
+                  background: '#27ae60',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                🔄 Sipariş Takibi
               </button>
               <button
                 onClick={() => {
@@ -557,6 +590,7 @@ function Profile() {
                             transition: 'all 0.2s',
                             cursor: 'pointer'
                           }}
+                          onClick={() => setSelectedOrder(order)}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.borderColor = '#667eea'
                             e.currentTarget.style.boxShadow = '0 4px 8px rgba(102, 126, 234, 0.2)'
@@ -683,6 +717,181 @@ function Profile() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Sipariş Detay Modal */}
+              {selectedOrder && (
+                <div 
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '2rem'
+                  }}
+                  onClick={() => setSelectedOrder(null)}
+                >
+                  <div 
+                    style={{
+                      background: 'white',
+                      borderRadius: '12px',
+                      padding: '2rem',
+                      maxWidth: '800px',
+                      width: '100%',
+                      maxHeight: '90vh',
+                      overflowY: 'auto',
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                      <h2 style={{ margin: 0, color: '#2c3e50' }}>Sipariş Detayları</h2>
+                      <button
+                        onClick={() => setSelectedOrder(null)}
+                        style={{
+                          background: '#e74c3c',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '40px',
+                          height: '40px',
+                          fontSize: '1.5rem',
+                          cursor: 'pointer',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: '1.5rem' }}>
+                      <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
+                        <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Sipariş Bilgileri</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <div><strong>Sipariş No:</strong> #{selectedOrder._id || selectedOrder.id}</div>
+                          <div><strong>Tarih:</strong> {new Date(selectedOrder.createdAt).toLocaleDateString('tr-TR', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</div>
+                          <div><strong>Boyut:</strong> {
+                            selectedOrder.size === 'custom' && selectedOrder.customSize
+                              ? `${selectedOrder.customSize.width}x${selectedOrder.customSize.height} cm`
+                              : selectedOrder.size || '-'
+                          }</div>
+                          <div><strong>Adet:</strong> {selectedOrder.quantity || 1}</div>
+                          <div><strong>Kargo:</strong> {
+                            selectedOrder.shippingType === 'standard' ? 'Standart' :
+                            selectedOrder.shippingType === 'express' ? 'Express' : '-'
+                          }</div>
+                          <div><strong>Durum:</strong> {selectedOrder.status || 'Yeni'}</div>
+                        </div>
+                        <div style={{ marginTop: '1rem', padding: '1rem', background: '#e8f5e9', borderRadius: '6px' }}>
+                          <strong style={{ fontSize: '1.2rem' }}>Toplam: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(selectedOrder.price || 0)}</strong>
+                        </div>
+                      </div>
+
+                      <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
+                        <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Müşteri Bilgileri</h3>
+                        <div><strong>Ad Soyad:</strong> {selectedOrder.customerInfo?.firstName || 'Müşteri'} {selectedOrder.customerInfo?.lastName || ''}</div>
+                        <div style={{ marginTop: '0.5rem' }}><strong>E-posta:</strong> {selectedOrder.customerInfo?.email || '-'}</div>
+                        {selectedOrder.customerInfo?.phone && (
+                          <div style={{ marginTop: '0.5rem' }}><strong>Telefon:</strong> {selectedOrder.customerInfo.phone}</div>
+                        )}
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <strong>Adres:</strong>
+                          <p style={{ margin: '0.5rem 0 0 0', color: '#666' }}>{selectedOrder.customerInfo?.address || '-'}</p>
+                        </div>
+                      </div>
+
+                      {selectedOrder.photo?.base64 && (
+                        <div style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
+                          <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#2c3e50' }}>📸 Sipariş Fotoğrafı</h3>
+                          <div style={{ 
+                            textAlign: 'center',
+                            background: 'white',
+                            padding: '1rem',
+                            borderRadius: '8px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}>
+                            <img 
+                              src={`data:${selectedOrder.photo.mimetype || 'image/jpeg'};base64,${selectedOrder.photo.base64}`}
+                              alt="Sipariş fotoğrafı"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '500px',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                cursor: 'pointer'
+                              }}
+                              onClick={() => {
+                                const newWindow = window.open();
+                                newWindow.document.write(`
+                                  <html>
+                                    <head>
+                                      <title>Sipariş Fotoğrafı - ${selectedOrder._id || selectedOrder.id}</title>
+                                      <style>
+                                        body {
+                                          margin: 0;
+                                          padding: 20px;
+                                          background: #f5f5f5;
+                                          display: flex;
+                                          justify-content: center;
+                                          align-items: center;
+                                          min-height: 100vh;
+                                        }
+                                        img {
+                                          max-width: 100%;
+                                          max-height: 90vh;
+                                          border-radius: 8px;
+                                          box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+                                        }
+                                      </style>
+                                    </head>
+                                    <body>
+                                      <img src="data:${selectedOrder.photo.mimetype || 'image/jpeg'};base64,${selectedOrder.photo.base64}" alt="Sipariş fotoğrafı" />
+                                    </body>
+                                  </html>
+                                `);
+                              }}
+                              title="Fotoğrafa tıklayarak tam boyutta görüntüleyin"
+                            />
+                            {selectedOrder.photo.originalName && (
+                              <div style={{ marginTop: '0.5rem', color: '#666', fontSize: '0.9rem' }}>
+                                <strong>Dosya Adı:</strong> {selectedOrder.photo.originalName}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => setSelectedOrder(null)}
+                          style={{
+                            padding: '0.75rem 2rem',
+                            background: '#95a5a6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Kapat
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

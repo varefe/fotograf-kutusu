@@ -72,69 +72,103 @@ function PaymentSuccess() {
       const orders = getDecryptedOrders()
       const localOrder = orders.find(o => o.id === orderId || o.id?.toString() === orderId)
       
-      if (localOrder) {
-        console.log('✅ localStorage\'da sipariş bulundu, backend\'e kaydediliyor...')
-        
-        // Backend'e siparişi kaydet (kullanıcı giriş yapmışsa token ile)
-        const headers = {
-          'Content-Type': 'application/json',
-          ...(isAuthenticated ? getAuthHeaders() : {})
-        }
+      if (!localOrder) {
+        console.error('❌ localStorage\'da sipariş bulunamadı, orderId:', orderId)
+        console.error('❌ Mevcut siparişler:', orders.map(o => o.id))
+        setError('Sipariş bilgileri bulunamadı. Lütfen destek ekibiyle iletişime geçin.')
+        setLoading(false)
+        return
+      }
+      
+      console.log('✅ localStorage\'da sipariş bulundu, backend\'e kaydediliyor...', {
+        orderId,
+        email: localOrder.customerInfo?.email || localOrder.email,
+        price: localOrder.price
+      })
+      
+      // Backend'e siparişi kaydet (kullanıcı giriş yapmışsa token ile)
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(isAuthenticated ? getAuthHeaders() : {})
+      }
 
-        // API_URL zaten backend URL'ini içeriyor, /api eklememize gerek yok
-        const ordersEndpoint = API_URL.includes('/api') ? `${API_URL}/orders` : `${API_URL}/api/orders`
-        const createResponse = await fetch(ordersEndpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            photo: localOrder.photo,
-            size: localOrder.size,
-            customSize: localOrder.customSize,
-            quantity: localOrder.quantity,
-            frameType: localOrder.frameType,
-            paperType: localOrder.paperType,
-            colorMode: localOrder.colorMode,
-            shippingType: localOrder.shippingType,
-            email: localOrder.customerInfo?.email || localOrder.email,
-            address: localOrder.customerInfo?.address || localOrder.address,
-            phone: localOrder.customerInfo?.phone || localOrder.phone,
+      // API_URL zaten backend URL'ini içeriyor, /api eklememize gerek yok
+      const ordersEndpoint = API_URL.includes('/api') ? `${API_URL}/orders` : `${API_URL}/api/orders`
+      
+      console.log('📤 Backend\'e sipariş kaydediliyor:', ordersEndpoint)
+      
+      const createResponse = await fetch(ordersEndpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          photos: localOrder.photos || (localOrder.photo ? [localOrder.photo] : []), // Tüm fotoğraflar
+          photo: localOrder.photo || (localOrder.photos && localOrder.photos[0]) || null, // Geriye uyumluluk
+          size: localOrder.size,
+          customSize: localOrder.customSize,
+          quantity: localOrder.quantity,
+          frameType: localOrder.frameType || 'none',
+          paperType: localOrder.paperType || 'glossy',
+          colorMode: localOrder.colorMode || 'color',
+          shippingType: localOrder.shippingType,
+          email: localOrder.customerInfo?.email || localOrder.email,
+          address: localOrder.customerInfo?.address || localOrder.address,
+          phone: localOrder.customerInfo?.phone || localOrder.phone,
+          firstName: localOrder.customerInfo?.firstName || 'Müşteri',
+          lastName: localOrder.customerInfo?.lastName || 'Müşteri',
+          customerInfo: {
             firstName: localOrder.customerInfo?.firstName || 'Müşteri',
             lastName: localOrder.customerInfo?.lastName || 'Müşteri',
-            price: localOrder.price,
-            notes: '',
-            paymentStatus: 'paid', // Ödeme yapıldı
-            status: 'Ödeme Alındı',
-            userId: user ? user.id : null // Kullanıcı giriş yapmışsa userId ekle
-          })
+            email: localOrder.customerInfo?.email || localOrder.email,
+            phone: localOrder.customerInfo?.phone || localOrder.phone || '',
+            address: localOrder.customerInfo?.address || localOrder.address
+          },
+          price: localOrder.price,
+          notes: localOrder.notes || '',
+          paymentStatus: 'paid', // Ödeme yapıldı
+          status: 'Ödeme Alındı',
+          userId: user ? user.id : null // Kullanıcı giriş yapmışsa userId ekle
         })
+      })
+      
+      console.log('📥 Backend yanıtı:', {
+        status: createResponse.status,
+        statusText: createResponse.statusText,
+        ok: createResponse.ok
+      })
+      
+      if (createResponse.ok) {
+        const result = await createResponse.json()
+        console.log('📥 Backend yanıt verisi:', result)
+        const savedOrder = result.order
         
-        if (createResponse.ok) {
-          const result = await createResponse.json()
-          const savedOrder = result.order
+        if (savedOrder) {
+          console.log('✅ Sipariş backend\'e kaydedildi (ödeme durumu ile):', savedOrder._id || savedOrder.id)
           
-          if (savedOrder) {
-            console.log('✅ Sipariş backend\'e kaydedildi (ödeme durumu ile):', savedOrder._id || savedOrder.id)
-            
-            // Ödeme durumunu localStorage'da da güncelle
-            const paymentStatusKey = `payment_status_${orderId}`
-            localStorage.setItem(paymentStatusKey, 'paid')
-            
-            // Sipariş ID'sini backend'den gelen ID ile güncelle
-            if (savedOrder._id || savedOrder.id) {
-              const newOrderId = savedOrder._id || savedOrder.id
-              localStorage.setItem(`payment_status_${newOrderId}`, 'paid')
-            }
-            
-            setOrder(savedOrder)
-            setLoading(false)
-            return
-          } else {
-            console.error('❌ Sipariş kaydedildi ama order objesi dönmedi')
+          // Ödeme durumunu localStorage'da da güncelle
+          const paymentStatusKey = `payment_status_${orderId}`
+          localStorage.setItem(paymentStatusKey, 'paid')
+          
+          // Sipariş ID'sini backend'den gelen ID ile güncelle
+          if (savedOrder._id || savedOrder.id) {
+            const newOrderId = savedOrder._id || savedOrder.id
+            localStorage.setItem(`payment_status_${newOrderId}`, 'paid')
           }
+          
+          setOrder(savedOrder)
+          setLoading(false)
+          return
         } else {
-          const errorText = await createResponse.text()
-          console.error('❌ Sipariş kaydetme hatası:', createResponse.status, errorText)
+          console.error('❌ Sipariş kaydedildi ama order objesi dönmedi. Response:', result)
+          setError('Sipariş kaydedildi ancak detaylar yüklenemedi.')
         }
+      } else {
+        const errorText = await createResponse.text()
+        console.error('❌ Sipariş kaydetme hatası:', {
+          status: createResponse.status,
+          statusText: createResponse.statusText,
+          error: errorText
+        })
+        setError(`Sipariş kaydedilemedi: ${createResponse.status} ${errorText}`)
       }
       
       // Eğer localStorage'da yoksa veya kaydetme başarısız olduysa, backend'den dene

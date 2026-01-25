@@ -5,9 +5,12 @@
 
 // Email format kontrolü
 export const isValidEmail = (email) => {
-  if (!email || typeof email !== 'string') return false;
+  if (!email) return false;
+  // String'e çevir (sanitize edilmiş olabilir)
+  const emailStr = String(email).trim();
+  if (emailStr.length === 0) return false;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email.trim());
+  return emailRegex.test(emailStr);
 };
 
 // Telefon format kontrolü
@@ -82,11 +85,11 @@ export const sanitizeForSQL = (input) => {
 
 // Adres validasyonu
 export const isValidAddress = (address) => {
-  if (!address || typeof address !== 'string') return false;
-  
-  const trimmed = address.trim();
+  if (!address) return false;
+  // String'e çevir (sanitize edilmiş olabilir)
+  const addressStr = String(address).trim();
   // Minimum 10 karakter, maksimum 500 karakter
-  return trimmed.length >= 10 && trimmed.length <= 500;
+  return addressStr.length >= 10 && addressStr.length <= 500;
 };
 
 // İsim validasyonu
@@ -137,18 +140,23 @@ export const isValidNotes = (notes) => {
 export const validateOrderData = (orderData) => {
   const errors = [];
   
-  // Email
-  if (!isValidEmail(orderData.email)) {
+  // Email - hem üst seviyede hem customerInfo içinde kontrol et
+  const emailToValidate = String(orderData.email || orderData.customerInfo?.email || '').trim();
+  console.log('🔍 Email validasyonu:', { emailToValidate, length: emailToValidate.length, isValid: isValidEmail(emailToValidate) });
+  if (!emailToValidate || !isValidEmail(emailToValidate)) {
     errors.push('Geçersiz e-posta adresi');
   }
   
   // Telefon
-  if (orderData.phone && !isValidPhone(orderData.phone)) {
+  const phoneToValidate = orderData.phone || orderData.customerInfo?.phone || '';
+  if (phoneToValidate && !isValidPhone(phoneToValidate)) {
     errors.push('Geçersiz telefon numarası');
   }
   
-  // Adres
-  if (!isValidAddress(orderData.address)) {
+  // Adres - hem üst seviyede hem customerInfo içinde kontrol et
+  const addressToValidate = String(orderData.address || orderData.customerInfo?.address || '').trim();
+  console.log('🔍 Address validasyonu:', { addressToValidate, length: addressToValidate.length, isValid: isValidAddress(addressToValidate) });
+  if (!addressToValidate || !isValidAddress(addressToValidate)) {
     errors.push('Adres en az 10 karakter olmalıdır');
   }
   
@@ -176,24 +184,40 @@ export const validateOrderData = (orderData) => {
     errors.push('Miktar 1-100 arası olmalıdır');
   }
   
-  // Fotoğraf
-  if (!orderData.photo || !orderData.photo.base64) {
+  // Fotoğraf - photos array veya photo objesi kontrolü
+  const hasPhotos = orderData.photos && Array.isArray(orderData.photos) && orderData.photos.length > 0;
+  const hasPhoto = orderData.photo && orderData.photo.base64;
+  
+  if (!hasPhotos && !hasPhoto) {
     errors.push('Fotoğraf gerekli');
   } else {
-    // Dosya boyutu
-    if (!isValidFileSize(orderData.photo.base64, 10)) {
-      errors.push('Fotoğraf boyutu 10MB\'dan küçük olmalıdır');
-    }
+    // photos array varsa onu kullan, yoksa photo objesini kullan
+    const photosToValidate = hasPhotos ? orderData.photos : (orderData.photo ? [orderData.photo] : []);
+    const isTestMode = orderData.paymentStatus === 'test';
     
-    // Dosya tipi
-    if (orderData.photo.mimetype && !isValidImageType(orderData.photo.mimetype)) {
-      errors.push('Sadece JPEG, PNG, GIF veya WebP formatları kabul edilir');
-    }
-    
-    // Dosya adı
-    if (orderData.photo.filename) {
-      orderData.photo.filename = sanitizeFilename(orderData.photo.filename);
-    }
+    photosToValidate.forEach((photo, index) => {
+      if (!photo || !photo.base64) {
+        errors.push(`Fotoğraf ${index + 1} geçersiz`);
+        return;
+      }
+      
+      if (!isTestMode) {
+        // Normal modda dosya boyutu kontrolü yap
+        if (!isValidFileSize(photo.base64, 10)) {
+          errors.push(`Fotoğraf ${index + 1} boyutu 10MB'dan küçük olmalıdır`);
+        }
+      }
+      
+      // Dosya tipi
+      if (photo.mimetype && !isValidImageType(photo.mimetype)) {
+        errors.push(`Fotoğraf ${index + 1}: Sadece JPEG, PNG, GIF veya WebP formatları kabul edilir`);
+      }
+      
+      // Dosya adı
+      if (photo.filename) {
+        photo.filename = sanitizeFilename(photo.filename);
+      }
+    });
   }
   
   // Notlar

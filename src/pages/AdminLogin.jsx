@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { API_URL } from '../config/api'
+import { useAuth } from '../context/AuthContext'
+import { getBrowserId } from '../utils/browserFingerprint'
 
 function AdminLogin() {
   const [username, setUsername] = useState('')
@@ -10,28 +13,67 @@ function AdminLogin() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { login } = useAuth()
 
   // Admin kullanıcı adı, şifre ve özel kod (.env dosyasından alınır)
   const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME || 'efe'
   const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '193123'
   const ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE || 'ADMIN2024SECRET'
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
 
-    // Basit authentication kontrolü - Üç alan da doğru olmalı
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD && adminCode === ADMIN_CODE) {
-      // Session storage'a kaydet
-      sessionStorage.setItem('adminAuthenticated', 'true')
-      sessionStorage.setItem('adminLoginTime', new Date().getTime().toString())
-      sessionStorage.setItem('adminCodeVerified', 'true') // Admin kodu doğrulandı
+    try {
+      // Backend'e admin login isteği gönder
+      // API_URL zaten tam URL (http://localhost:5001) veya /api olabilir
+      let apiUrl = API_URL
+      if (!API_URL.includes('/api') && !API_URL.startsWith('http')) {
+        // Relative path ise /api ekle
+        apiUrl = `${API_URL}/api`
+      } else if (API_URL.startsWith('http') && !API_URL.includes('/api')) {
+        // Tam URL ise /api ekle
+        apiUrl = `${API_URL}/api`
+      } else {
+        apiUrl = API_URL
+      }
       
-      // Admin sayfasına yönlendir
-      navigate('/admin')
-    } else {
-      setError('Kullanıcı adı, şifre veya admin kodu hatalı!')
+      const response = await fetch(`${apiUrl}/user/admin/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username,
+          password,
+          adminCode
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        // JWT token'ı al ve kaydet
+        const browserId = getBrowserId()
+        sessionStorage.setItem(`authToken_${browserId}`, data.token)
+        sessionStorage.setItem(`user_${browserId}`, JSON.stringify({ ...data.user, browserId }))
+        
+        // Session storage'a da kaydet (eski sistem için)
+        sessionStorage.setItem('adminAuthenticated', 'true')
+        sessionStorage.setItem('adminLoginTime', new Date().getTime().toString())
+        sessionStorage.setItem('adminCodeVerified', 'true')
+        
+        // Sayfayı yenileyerek AuthContext'in token'ı yüklemesini sağla
+        // Bu şekilde AdminPanel sayfası token'ı görebilir
+        window.location.href = '/admin'
+      } else {
+        setError(data.message || 'Kullanıcı adı, şifre veya admin kodu hatalı!')
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error('Admin giriş hatası:', err)
+      setError('Giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.')
       setLoading(false)
     }
   }

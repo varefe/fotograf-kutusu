@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -18,6 +18,19 @@ function AdminPanel() {
   const [selectedUser, setSelectedUser] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  
+  // Order Tracking state
+  const [trackingPaymentIds, setTrackingPaymentIds] = useState('')
+  const [trackingPaymentId, setTrackingPaymentId] = useState('')
+  const [trackingConversationId, setTrackingConversationId] = useState('')
+  const [trackingLoading, setTrackingLoading] = useState(false)
+  const [trackingError, setTrackingError] = useState('')
+  const [trackingSuccess, setTrackingSuccess] = useState('')
+  const [trackingSearchResult, setTrackingSearchResult] = useState(null)
+  const [trackingSyncResult, setTrackingSyncResult] = useState(null)
+  
+  // Silme işlemleri için state
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // { type: 'order' | 'user', id: string, name: string }
 
   useEffect(() => {
     // Admin kontrolü
@@ -184,9 +197,73 @@ function AdminPanel() {
     }).format(date)
   }
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
+  // Silme fonksiyonları
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+
+    try {
+      const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+      const headers = getAuthHeaders()
+      
+      let endpoint;
+      if (deleteConfirm.type === 'order') {
+        endpoint = `${apiUrl}/admin/orders/${deleteConfirm.id}`
+      } else if (deleteConfirm.type === 'user') {
+        endpoint = `${apiUrl}/admin/users/${deleteConfirm.id}`
+      } else {
+        return;
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+        headers
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        // Başarılı - listeyi yenile
+        await fetchData()
+        setDeleteConfirm(null)
+        setError(null)
+      } else {
+        setError(data.message || data.error || 'Silme işlemi başarısız oldu')
+        setDeleteConfirm(null)
+      }
+    } catch (err) {
+      console.error('Silme hatası:', err)
+      setError('Silme işlemi sırasında bir hata oluştu')
+      setDeleteConfirm(null)
+    }
+  }
+
+  // Siparişleri orderGroupId'ye göre grupla
+  const groupedOrders = orders.reduce((acc, order) => {
+    const groupId = order.orderGroupId || 'ungrouped';
+    if (!acc[groupId]) {
+      acc[groupId] = [];
+    }
+    acc[groupId].push(order);
+    return acc;
+  }, {});
+
+  // Grupları düzleştir ve sırala (en yeni grup önce)
+  const flattenedOrders = Object.values(groupedOrders)
+    .flat()
+    .sort((a, b) => {
+      // Önce orderGroupId'ye göre grupla, sonra tarihe göre sırala
+      if (a.orderGroupId && b.orderGroupId && a.orderGroupId === b.orderGroupId) {
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      }
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+
+  const filteredOrders = flattenedOrders.filter(order => {
+    const matchesSearch = searchTerm === '' ||
       (order._id || order.id || '').toString().includes(searchTerm) ||
+      (order.orderGroupId || '').toString().includes(searchTerm) ||
+      (order.customerInfo?.firstName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.customerInfo?.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (order.customerInfo?.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (order.customerInfo?.phone || '').includes(searchTerm) ||
       (order.size || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -306,6 +383,22 @@ function AdminPanel() {
           >
             📊 İstatistikler
           </button>
+          <button
+            onClick={() => setActiveTab('tracking')}
+            style={{
+              padding: '1rem 2rem',
+              background: activeTab === 'tracking' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'tracking' ? '#000000' : '#666',
+              border: 'none',
+              borderBottom: activeTab === 'tracking' ? '3px solid #000000' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            🔄 Sipariş Takibi
+          </button>
         </div>
 
         {error && (
@@ -358,6 +451,8 @@ function AdminPanel() {
                 <option value="all">Tüm Durumlar</option>
                 <option value="paid">Ödenen</option>
                 <option value="pending">Bekleyen</option>
+                <option value="failed">Başarısız</option>
+                <option value="cancelled">İptal Edilen</option>
                 <option value="Yeni">Yeni</option>
                 <option value="Baskıda">Baskıda</option>
                 <option value="Tamamlandı">Tamamlandı</option>
@@ -413,6 +508,7 @@ function AdminPanel() {
                   <thead>
                     <tr style={{ background: '#2c3e50', color: 'white' }}>
                       <th style={{ padding: '1rem', textAlign: 'left' }}>Sipariş No</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Fotoğraf</th>
                       <th style={{ padding: '1rem', textAlign: 'left' }}>Müşteri</th>
                       <th style={{ padding: '1rem', textAlign: 'left' }}>İletişim</th>
                       <th style={{ padding: '1rem', textAlign: 'left' }}>Detaylar</th>
@@ -423,16 +519,119 @@ function AdminPanel() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOrders.map((order) => (
-                      <tr 
-                        key={order._id || order.id} 
-                        style={{ borderBottom: '1px solid #eee' }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                      >
-                        <td style={{ padding: '1rem', fontWeight: 'bold', color: '#3498db' }}>
-                          #{order._id || order.id}
-                        </td>
+                    {filteredOrders.map((order, index) => {
+                      // Aynı orderGroupId'ye sahip önceki sipariş var mı kontrol et
+                      const prevOrder = index > 0 ? filteredOrders[index - 1] : null;
+                      const isGroupStart = !prevOrder || prevOrder.orderGroupId !== order.orderGroupId;
+                      const isGrouped = order.orderGroupId && order.orderGroupId !== 'ungrouped';
+                      
+                      return (
+                        <React.Fragment key={order._id || order.id}>
+                          {isGroupStart && isGrouped && (
+                            <tr style={{ background: '#e8f4f8', borderTop: '2px solid #3498db' }}>
+                              <td colSpan="9" style={{ padding: '0.75rem 1rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                                🔗 Sipariş Grubu: {order.orderGroupId} 
+                                {(() => {
+                                  const groupOrders = filteredOrders.filter(o => o.orderGroupId === order.orderGroupId);
+                                  return ` (${groupOrders.length} sipariş)`;
+                                })()}
+                              </td>
+                            </tr>
+                          )}
+                          <tr 
+                            style={{ 
+                              borderBottom: '1px solid #eee',
+                              background: isGrouped && !isGroupStart ? '#f8f9fa' : 'white'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f0f7ff'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = (isGrouped && !isGroupStart ? '#f8f9fa' : 'white')}
+                          >
+                            <td style={{ padding: '1rem', fontWeight: 'bold', color: '#3498db' }}>
+                              #{order._id || order.id}
+                              {isGrouped && (
+                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                                  🔗 {order.orderGroupId?.substring(0, 12)}...
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '1rem' }}>
+                              {/* Birden fazla fotoğraf varsa göster */}
+                              {order.photos && order.photos.length > 0 ? (
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                  {order.photos.slice(0, 3).map((photo, idx) => (
+                                    photo?.base64 ? (
+                                      <img 
+                                        key={idx}
+                                        src={`data:${photo.mimetype || 'image/jpeg'};base64,${photo.base64}`}
+                                        alt={`Fotoğraf ${idx + 1}`}
+                                        style={{
+                                          width: '60px',
+                                          height: '60px',
+                                          objectFit: 'cover',
+                                          borderRadius: '6px',
+                                          border: '2px solid #ddd',
+                                          cursor: 'pointer',
+                                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                        }}
+                                        onClick={() => setSelectedOrder(order)}
+                                        title={`${order.photos.length} fotoğraf - Tıklayarak detayları görüntüleyin`}
+                                      />
+                                    ) : null
+                                  ))}
+                                  {order.photos.length > 3 && (
+                                    <div style={{
+                                      width: '60px',
+                                      height: '60px',
+                                      background: '#667eea',
+                                      color: 'white',
+                                      borderRadius: '6px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontWeight: 'bold',
+                                      fontSize: '0.75rem',
+                                      cursor: 'pointer'
+                                    }}
+                                    onClick={() => setSelectedOrder(order)}
+                                    title={`+${order.photos.length - 3} daha fazla fotoğraf`}
+                                    >
+                                      +{order.photos.length - 3}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : order.photo?.base64 ? (
+                                <img 
+                                  src={`data:${order.photo.mimetype || 'image/jpeg'};base64,${order.photo.base64}`}
+                                  alt="Sipariş fotoğrafı"
+                                  style={{
+                                    width: '80px',
+                                    height: '80px',
+                                    objectFit: 'cover',
+                                    borderRadius: '8px',
+                                    border: '2px solid #ddd',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                  }}
+                                  onClick={() => setSelectedOrder(order)}
+                                  title="Fotoğrafa tıklayarak detayları görüntüleyin"
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '80px',
+                                  height: '80px',
+                                  background: '#f5f5f5',
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#999',
+                                  fontSize: '0.75rem',
+                                  border: '2px dashed #ddd'
+                                }}>
+                                  Fotoğraf Yok
+                                </div>
+                              )}
+                            </td>
                         <td style={{ padding: '1rem' }}>
                           {order.customerInfo?.firstName || 'Müşteri'} {order.customerInfo?.lastName || ''}
                         </td>
@@ -478,11 +677,22 @@ function AdminPanel() {
                               padding: '0.25rem 0.6rem',
                               borderRadius: '4px',
                               fontSize: '0.75rem',
-                              background: order.paymentStatus === 'paid' ? '#d4edda' : '#fff3cd',
-                              color: order.paymentStatus === 'paid' ? '#155724' : '#856404',
+                              background: 
+                                order.paymentStatus === 'paid' ? '#d4edda' :
+                                order.paymentStatus === 'failed' ? '#f8d7da' :
+                                order.paymentStatus === 'cancelled' ? '#f8d7da' :
+                                '#fff3cd',
+                              color: 
+                                order.paymentStatus === 'paid' ? '#155724' :
+                                order.paymentStatus === 'failed' ? '#721c24' :
+                                order.paymentStatus === 'cancelled' ? '#721c24' :
+                                '#856404',
                               display: 'inline-block'
                             }}>
-                              {order.paymentStatus === 'paid' ? '✅ Ödendi' : '⏳ Bekliyor'}
+                              {order.paymentStatus === 'paid' ? '✅ Ödendi' : 
+                               order.paymentStatus === 'failed' ? '❌ Başarısız' :
+                               order.paymentStatus === 'cancelled' ? '🚫 İptal Edildi' :
+                               '⏳ Bekliyor'}
                             </span>
                           </div>
                         </td>
@@ -490,24 +700,47 @@ function AdminPanel() {
                           {formatDate(order.createdAt)}
                         </td>
                         <td style={{ padding: '1rem' }}>
-                          <button
-                            onClick={() => setSelectedOrder(order)}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              background: '#3498db',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '0.85rem',
-                              fontWeight: 'bold'
-                            }}
-                          >
-                            👁️ Detay
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              onClick={() => setSelectedOrder(order)}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                background: '#3498db',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              👁️ Detay
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirm({
+                                type: 'order',
+                                id: order._id || order.id,
+                                name: `Sipariş #${order._id || order.id}`
+                              })}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                background: '#e74c3c',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              🗑️ Sil
+                            </button>
+                          </div>
                         </td>
                       </tr>
-                    ))}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -566,6 +799,7 @@ function AdminPanel() {
                       <th style={{ padding: '1rem', textAlign: 'left' }}>Sipariş Sayısı</th>
                       <th style={{ padding: '1rem', textAlign: 'left' }}>Kayıt Tarihi</th>
                       <th style={{ padding: '1rem', textAlign: 'left' }}>Rol</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>İşlem</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -610,12 +844,365 @@ function AdminPanel() {
                             {userItem.role === 'admin' ? '🛡️ Admin' : '👤 Kullanıcı'}
                           </span>
                         </td>
+                        <td style={{ padding: '1rem' }}>
+                          {userItem.role !== 'admin' && (
+                            <button
+                              onClick={() => setDeleteConfirm({
+                                type: 'user',
+                                id: userItem._id || userItem.id,
+                                name: `${userItem.firstName} ${userItem.lastName} (${userItem.email})`
+                              })}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                background: '#e74c3c',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              🗑️ Sil
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
+          </>
+        )}
+
+        {/* Order Tracking Tab */}
+        {activeTab === 'tracking' && (
+          <>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '2rem',
+              marginBottom: '2rem'
+            }}>
+              {/* Ödeme Arama */}
+              <div style={{
+                background: 'white',
+                padding: '2rem',
+                borderRadius: '12px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50' }}>🔍 Iyzico Ödeme Ara</h2>
+                {trackingError && (
+                  <div style={{
+                    background: '#fee',
+                    color: '#c33',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    marginBottom: '1rem'
+                  }}>
+                    {trackingError}
+                  </div>
+                )}
+                {trackingSuccess && (
+                  <div style={{
+                    background: '#efe',
+                    color: '#3c3',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    marginBottom: '1rem'
+                  }}>
+                    {trackingSuccess}
+                  </div>
+                )}
+                <form onSubmit={async (e) => {
+                  e.preventDefault()
+                  setTrackingError('')
+                  setTrackingSuccess('')
+                  setTrackingSearchResult(null)
+                  setTrackingLoading(true)
+
+                  try {
+                    const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                    const headers = getAuthHeaders()
+                    
+                    const response = await fetch(`${apiUrl}/order-tracking/search`, {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify({
+                        conversationId: trackingConversationId || undefined,
+                        paymentId: trackingPaymentId || undefined
+                      })
+                    })
+
+                    const data = await response.json()
+
+                    if (response.ok && data.success) {
+                      setTrackingSearchResult(data.payment)
+                      setTrackingSuccess('Ödeme bilgisi başarıyla bulundu')
+                    } else {
+                      setTrackingError(data.message || 'Ödeme bulunamadı')
+                    }
+                  } catch (err) {
+                    console.error('Arama hatası:', err)
+                    setTrackingError('Arama yapılırken bir hata oluştu')
+                  } finally {
+                    setTrackingLoading(false)
+                  }
+                }}>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                      Payment ID
+                    </label>
+                    <input
+                      type="text"
+                      value={trackingPaymentId}
+                      onChange={(e) => setTrackingPaymentId(e.target.value)}
+                      placeholder="Örn: 12345678"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px'
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                      Conversation ID
+                    </label>
+                    <input
+                      type="text"
+                      value={trackingConversationId}
+                      onChange={(e) => setTrackingConversationId(e.target.value)}
+                      placeholder="Örn: ORDER-1234567890"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px'
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={trackingLoading || (!trackingPaymentId && !trackingConversationId)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      background: trackingLoading || (!trackingPaymentId && !trackingConversationId) ? '#ccc' : '#667eea',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      cursor: trackingLoading || (!trackingPaymentId && !trackingConversationId) ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {trackingLoading ? 'Aranıyor...' : '🔍 Ara'}
+                  </button>
+                </form>
+
+                {trackingSearchResult && (
+                  <div style={{
+                    marginTop: '1.5rem',
+                    padding: '1rem',
+                    background: '#f9fafb',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Ödeme Bilgileri</h3>
+                    <div style={{ fontSize: '0.9rem', lineHeight: '1.8' }}>
+                      <div><strong>Payment ID:</strong> {trackingSearchResult.paymentId}</div>
+                      <div><strong>Conversation ID:</strong> {trackingSearchResult.conversationId}</div>
+                      <div><strong>Durum:</strong> {trackingSearchResult.paymentStatus}</div>
+                      <div><strong>Fiyat:</strong> {trackingSearchResult.paidPrice || trackingSearchResult.price} ₺</div>
+                      <div><strong>Tarih:</strong> {trackingSearchResult.createdDate ? new Date(trackingSearchResult.createdDate).toLocaleString('tr-TR') : '-'}</div>
+                      {trackingSearchResult.buyer && (
+                        <>
+                          <div><strong>Müşteri:</strong> {trackingSearchResult.buyer.name} {trackingSearchResult.buyer.surname}</div>
+                          <div><strong>E-posta:</strong> {trackingSearchResult.buyer.email}</div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sipariş Senkronizasyonu */}
+              <div style={{
+                background: 'white',
+                padding: '2rem',
+                borderRadius: '12px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50' }}>🔄 Sipariş Senkronize Et</h2>
+                {trackingError && (
+                  <div style={{
+                    background: '#fee',
+                    color: '#c33',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    marginBottom: '1rem'
+                  }}>
+                    {trackingError}
+                  </div>
+                )}
+                {trackingSuccess && (
+                  <div style={{
+                    background: '#efe',
+                    color: '#3c3',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    marginBottom: '1rem'
+                  }}>
+                    {trackingSuccess}
+                  </div>
+                )}
+                <form onSubmit={async (e) => {
+                  e.preventDefault()
+                  setTrackingError('')
+                  setTrackingSuccess('')
+                  setTrackingSyncResult(null)
+                  setTrackingLoading(true)
+
+                  try {
+                    const paymentIdsArray = trackingPaymentIds
+                      .split(',')
+                      .map(id => id.trim())
+                      .filter(id => id.length > 0)
+
+                    if (paymentIdsArray.length === 0) {
+                      setTrackingError('Lütfen en az bir Payment ID girin')
+                      setTrackingLoading(false)
+                      return
+                    }
+
+                    const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                    const headers = getAuthHeaders()
+                    
+                    const response = await fetch(`${apiUrl}/order-tracking/sync`, {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify({
+                        paymentIds: paymentIdsArray
+                      })
+                    })
+
+                    const data = await response.json()
+
+                    if (response.ok && data.success) {
+                      setTrackingSyncResult(data)
+                      setTrackingSuccess(`Başarıyla ${data.summary.synced} sipariş senkronize edildi`)
+                      // Siparişleri yeniden yükle
+                      setTimeout(() => {
+                        if (activeTab === 'orders') {
+                          fetchData()
+                        }
+                      }, 1000)
+                    } else {
+                      setTrackingError(data.message || 'Senkronizasyon başarısız')
+                    }
+                  } catch (err) {
+                    console.error('Senkronizasyon hatası:', err)
+                    setTrackingError('Senkronizasyon yapılırken bir hata oluştu')
+                  } finally {
+                    setTrackingLoading(false)
+                  }
+                }}>
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                      Payment ID'ler (virgülle ayırın)
+                    </label>
+                    <textarea
+                      value={trackingPaymentIds}
+                      onChange={(e) => setTrackingPaymentIds(e.target.value)}
+                      placeholder="Örn: 12345678, 87654321, 11223344"
+                      rows="6"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        resize: 'vertical',
+                        fontFamily: 'monospace'
+                      }}
+                    />
+                    <small style={{ color: '#666', fontSize: '0.85rem' }}>
+                      Iyzico panelinden aldığınız Payment ID'leri buraya girin (virgülle ayırın)
+                    </small>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={trackingLoading || !trackingPaymentIds.trim()}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      background: trackingLoading || !trackingPaymentIds.trim() ? '#ccc' : '#27ae60',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      cursor: trackingLoading || !trackingPaymentIds.trim() ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {trackingLoading ? 'Senkronize ediliyor...' : '🔄 Senkronize Et'}
+                  </button>
+                </form>
+
+                {trackingSyncResult && (
+                  <div style={{
+                    marginTop: '1.5rem',
+                    padding: '1rem',
+                    background: '#f9fafb',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Senkronizasyon Sonucu</h3>
+                    <div style={{ fontSize: '0.9rem', lineHeight: '1.8' }}>
+                      <div><strong>Toplam:</strong> {trackingSyncResult.summary.total}</div>
+                      <div><strong>Senkronize Edilen:</strong> {trackingSyncResult.summary.synced}</div>
+                      <div><strong>Atlanan:</strong> {trackingSyncResult.summary.skipped || 0}</div>
+                      <div><strong>Hatalar:</strong> {trackingSyncResult.summary.errors}</div>
+                      {trackingSyncResult.syncedOrders && trackingSyncResult.syncedOrders.length > 0 && (
+                        <div style={{ marginTop: '1rem' }}>
+                          <strong>Senkronize Edilen Siparişler:</strong>
+                          <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                            {trackingSyncResult.syncedOrders.map((order, index) => (
+                              <li key={index} style={{ marginBottom: '0.25rem' }}>
+                                Payment: {order.paymentId} - {order.action === 'created' ? '✅ Oluşturuldu' : '🔄 Güncellendi'}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Bilgilendirme */}
+            <div style={{
+              background: '#fff3cd',
+              padding: '1.5rem',
+              borderRadius: '12px',
+              border: '1px solid #ffc107',
+              marginTop: '2rem'
+            }}>
+              <h3 style={{ marginTop: 0, color: '#856404' }}>ℹ️ Nasıl Kullanılır?</h3>
+              <ol style={{ color: '#856404', lineHeight: '1.8', paddingLeft: '1.5rem' }}>
+                <li><strong>Payment ID Bulma:</strong> Iyzico panelinden veya e-posta bildirimlerinden Payment ID'lerinizi alın</li>
+                <li><strong>Ödeme Arama:</strong> Payment ID veya Conversation ID ile Iyzico'dan ödeme bilgilerini arayın</li>
+                <li><strong>Senkronizasyon:</strong> Payment ID'leri girerek siparişlerinizi veritabanına senkronize edin</li>
+                <li><strong>Siparişlerinizi Görüntüleme:</strong> Senkronizasyon sonrası "Siparişler" tab'ından siparişlerinizi görebilirsiniz</li>
+              </ol>
+              <p style={{ color: '#856404', marginTop: '1rem', marginBottom: 0 }}>
+                <strong>Not:</strong> Iyzico API'si tüm ödemeleri otomatik listelemeyi desteklemediği için, 
+                Payment ID'leri manuel olarak Iyzico panelinden almanız gerekmektedir.
+              </p>
+            </div>
           </>
         )}
 
@@ -769,6 +1356,11 @@ function AdminPanel() {
                   <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Sipariş Bilgileri</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div><strong>Sipariş No:</strong> #{selectedOrder._id || selectedOrder.id}</div>
+                    {selectedOrder.orderGroupId && (
+                      <div style={{ marginTop: '0.5rem', color: '#667eea', fontSize: '0.9rem' }}>
+                        <strong>🔗 Sipariş Grubu:</strong> {selectedOrder.orderGroupId}
+                      </div>
+                    )}
                     <div><strong>Tarih:</strong> {formatDate(selectedOrder.createdAt)}</div>
                     <div><strong>Boyut:</strong> {
                       selectedOrder.size === 'custom' && selectedOrder.customSize
@@ -799,19 +1391,134 @@ function AdminPanel() {
                   </div>
                 </div>
 
-                {selectedOrder.photo?.base64 && (
-                  <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                    <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Fotoğraf</h3>
-                    <img 
-                      src={`data:${selectedOrder.photo.mimetype || 'image/jpeg'};base64,${selectedOrder.photo.base64}`}
-                      alt="Sipariş fotoğrafı"
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '400px',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
-                      }}
-                    />
+                {/* Birden fazla fotoğraf varsa göster */}
+                {selectedOrder.photos && selectedOrder.photos.length > 0 ? (
+                  <div>
+                    <h3 style={{ marginBottom: '1rem', color: '#2c3e50' }}>
+                      Fotoğraflar ({selectedOrder.photos.length} adet)
+                    </h3>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                      gap: '1rem',
+                      marginBottom: '1rem'
+                    }}>
+                      {selectedOrder.photos.map((photo, idx) => (
+                        photo?.base64 ? (
+                          <div key={idx} style={{ position: 'relative' }}>
+                            <img 
+                              src={`data:${photo.mimetype || 'image/jpeg'};base64,${photo.base64}`}
+                              alt={`Fotoğraf ${idx + 1}`}
+                              style={{
+                                width: '100%',
+                                height: '150px',
+                                objectFit: 'cover',
+                                borderRadius: '8px',
+                                border: '2px solid #ddd',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                              }}
+                              onClick={() => {
+                                const newWindow = window.open();
+                                if (newWindow) {
+                                  newWindow.document.write(`
+                                    <html>
+                                      <head><title>Fotoğraf ${idx + 1} - Sipariş #${selectedOrder._id || selectedOrder.id}</title></head>
+                                      <body style="margin:0;padding:20px;background:#f5f5f5;text-align:center;">
+                                        <h2>Sipariş #${selectedOrder._id || selectedOrder.id} - Fotoğraf ${idx + 1}</h2>
+                                        <img src="data:${photo.mimetype || 'image/jpeg'};base64,${photo.base64}" 
+                                             alt="Sipariş fotoğrafı" 
+                                             style="max-width:90%;max-height:80vh;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);" />
+                                        ${photo.originalName ? `<p><strong>Dosya Adı:</strong> ${photo.originalName}</p>` : ''}
+                                      </body>
+                                    </html>
+                                  `);
+                                }
+                              }}
+                              title="Fotoğrafa tıklayarak büyük görüntüleyin"
+                            />
+                            {photo.originalName && (
+                              <div style={{
+                                marginTop: '0.25rem',
+                                fontSize: '0.75rem',
+                                color: '#666',
+                                textAlign: 'center',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {photo.originalName}
+                              </div>
+                            )}
+                          </div>
+                        ) : null
+                      ))}
+                    </div>
+                  </div>
+                ) : selectedOrder.photo?.base64 && (
+                  <div style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
+                    <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#2c3e50' }}>📸 Sipariş Fotoğrafı</h3>
+                    <div style={{ 
+                      textAlign: 'center',
+                      background: 'white',
+                      padding: '1rem',
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}>
+                      <img 
+                        src={`data:${selectedOrder.photo.mimetype || 'image/jpeg'};base64,${selectedOrder.photo.base64}`}
+                        alt="Sipariş fotoğrafı"
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '500px',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => {
+                          // Fotoğrafa tıklanınca büyük görüntüle
+                          const newWindow = window.open();
+                          newWindow.document.write(`
+                            <html>
+                              <head>
+                                <title>Sipariş Fotoğrafı - ${selectedOrder._id || selectedOrder.id}</title>
+                                <style>
+                                  body {
+                                    margin: 0;
+                                    padding: 20px;
+                                    background: #f5f5f5;
+                                    display: flex;
+                                    justify-content: center;
+                                    align-items: center;
+                                    min-height: 100vh;
+                                  }
+                                  img {
+                                    max-width: 100%;
+                                    max-height: 90vh;
+                                    border-radius: 8px;
+                                    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+                                  }
+                                </style>
+                              </head>
+                              <body>
+                                <img src="data:${selectedOrder.photo.mimetype || 'image/jpeg'};base64,${selectedOrder.photo.base64}" alt="Sipariş fotoğrafı" />
+                              </body>
+                            </html>
+                          `);
+                        }}
+                        title="Fotoğrafa tıklayarak tam boyutta görüntüleyin"
+                      />
+                      {selectedOrder.photo.originalName && (
+                        <div style={{ marginTop: '0.5rem', color: '#666', fontSize: '0.9rem' }}>
+                          <strong>Dosya Adı:</strong> {selectedOrder.photo.originalName}
+                        </div>
+                      )}
+                      {selectedOrder.photo.size && (
+                        <div style={{ marginTop: '0.25rem', color: '#666', fontSize: '0.9rem' }}>
+                          <strong>Boyut:</strong> {(selectedOrder.photo.size / 1024).toFixed(2)} KB
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -831,6 +1538,102 @@ function AdminPanel() {
                     Kapat
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Silme Onay Dialogu */}
+        {deleteConfirm && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10000
+          }}
+          onClick={() => setDeleteConfirm(null)}
+          >
+            <div style={{
+              background: 'white',
+              padding: '2rem',
+              borderRadius: '12px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{
+                fontSize: '3rem',
+                textAlign: 'center',
+                marginBottom: '1rem'
+              }}>
+                ⚠️
+              </div>
+              <h2 style={{
+                textAlign: 'center',
+                marginBottom: '1rem',
+                color: '#2c3e50'
+              }}>
+                Silme İşlemini Onayla
+              </h2>
+              <p style={{
+                textAlign: 'center',
+                marginBottom: '2rem',
+                color: '#666',
+                lineHeight: '1.6'
+              }}>
+                {deleteConfirm.type === 'order' 
+                  ? `Bu siparişi silmek istediğinizden emin misiniz?`
+                  : `Bu kullanıcıyı silmek istediğinizden emin misiniz?`}
+                <br />
+                <strong style={{ color: '#e74c3c' }}>{deleteConfirm.name}</strong>
+                <br />
+                <span style={{ fontSize: '0.9rem', color: '#999' }}>
+                  Bu işlem geri alınamaz!
+                </span>
+              </p>
+              <div style={{
+                display: 'flex',
+                gap: '1rem',
+                justifyContent: 'center'
+              }}>
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    background: '#95a5a6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleDelete}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    background: '#e74c3c',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}
+                >
+                  🗑️ Sil
+                </button>
               </div>
             </div>
           </div>

@@ -2,15 +2,30 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import PaymentForm from '../components/PaymentForm'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import { calculatePrice } from '../utils/priceCalculator'
+import { API_URL } from '../config/api'
+import { saveOrderToStorage } from '../utils/encryption'
 
 function Cart() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { cartItems, removeFromCart, clearCart, getCartTotal } = useCart()
+  const { cartItems, removeFromCart, clearCart, getCartTotal, updateCartItemPhoto, addToCart } = useCart()
   const { user, isAuthenticated, getAuthHeaders } = useAuth()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [orderId, setOrderId] = useState(null)
+  const [selectedItemGroup, setSelectedItemGroup] = useState(null) // Seçilen ürün grubu (tüm fotoğrafları içeren)
+  const [showPaymentForm, setShowPaymentForm] = useState(false) // Ödeme formunu göster/gizle
+  const [preparedOrderData, setPreparedOrderData] = useState(null) // Hazırlanan sipariş verisi
+  const [paymentError, setPaymentError] = useState(null) // Ödeme hatası
+  const [show3DSecure, setShow3DSecure] = useState(false) // 3D Secure göster
+  const [threeDSecureHtml, setThreeDSecureHtml] = useState(null) // 3D Secure HTML içeriği
+  const [photoRotationIndex, setPhotoRotationIndex] = useState({})
+  const [photoNextIndex, setPhotoNextIndex] = useState({})
+  const [photoTransition, setPhotoTransition] = useState({})
   // ProductUpload'dan gelen File objelerini memory'de tut
   // Önce location.state'ten al, yoksa cartItems içindeki file objelerini topla
   const [photoFiles, setPhotoFiles] = useState(() => {
@@ -39,6 +54,16 @@ function Cart() {
     firstName: '',
     lastName: ''
   })
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  // Responsive kontrolü
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Kullanıcı giriş yapmışsa bilgilerini otomatik doldur
   useEffect(() => {
@@ -54,6 +79,18 @@ function Cart() {
   }, [isAuthenticated, user])
 
   const handleCheckout = async () => {
+    // Kullanıcı giriş kontrolü
+    if (!isAuthenticated) {
+      alert('Sipariş verebilmek için lütfen giriş yapın veya kayıt olun')
+      navigate('/login', { 
+        state: { 
+          from: '/cart',
+          message: 'Sipariş verebilmek için lütfen giriş yapın veya kayıt olun.'
+        } 
+      })
+      return
+    }
+
     if (cartItems.length === 0) {
       alert('Sepetiniz boş')
       return
@@ -64,115 +101,557 @@ function Cart() {
       return
     }
 
-    // Ödeme sayfasına yönlendir (tüm sepet öğeleri için)
+    // Adres uzunluk kontrolü
+    if (customerInfo.address.trim().length < 10) {
+      alert('Adres en az 10 karakter olmalıdır')
+      return
+    }
+
+    // Email format kontrolü
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(customerInfo.email.trim())) {
+      alert('Geçerli bir e-posta adresi giriniz')
+      return
+    }
+
+    // Miktar kontrolü (minimum 15)
+    const firstItem = cartItems[0]
+    if (firstItem.quantity < 15) {
+      alert('Minimum 15 adet seçmelisiniz')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    // ÖNEMLİ: Önce ödeme alınacak, sonra backend'e kaydedilecek
     try {
-      // OrderId oluştur
-      const orderId = Date.now().toString()
-      
       const firstItem = cartItems[0]
-      const calculatedPrice = calculatePrice(
-        firstItem.product.size,
-        firstItem.quantity,
-        shippingType,
-        firstItem.product.customSize
-      )
-
-      // Photo'dan base64 ve file'ı kaldır (localStorage quota için)
-      // Base64 ödeme sayfasına geçerken oluşturulacak
-      const photoData = firstItem.photo ? {
-        ...firstItem.photo,
-        base64: undefined, // Base64'i kaldır (ödeme sayfasında oluşturulacak)
-        file: undefined, // File objesi serialize edilemez
-        preview: firstItem.photo.preview // Preview'ı tut
-      } : undefined
-
-      const orderData = {
-        id: orderId,
-        photo: photoData,
-        size: firstItem.product.size,
-        customSize: firstItem.product.customSize,
-        quantity: firstItem.quantity,
-        shippingType,
-        email: customerInfo.email,
-        address: customerInfo.address,
-        phone: customerInfo.phone || '',
-        firstName: customerInfo.firstName || 'Müşteri',
-        lastName: customerInfo.lastName || 'Müşteri',
-        notes: '',
-        frameType: 'none',
-        paperType: 'glossy',
-        colorMode: 'color',
-        price: calculatedPrice,
-        status: 'Yeni',
-        paymentStatus: 'pending',
-        createdAt: new Date().toISOString()
+      
+      // Miktar kontrolü
+      if (firstItem.quantity < 15) {
+        alert('Minimum 15 adet seçmelisiniz')
+        setIsSubmitting(false)
+        return
       }
+      
+      // Sepet öğelerini grupla (aynı size, quantity, product.name olanları)
+      const groupedCartItems = cartItems.reduce((groups, item) => {
+        const key = `${item.product?.size || 'unknown'}-${item.quantity || 0}-${item.product?.name || 'unknown'}`
+        if (!groups[key]) {
+          groups[key] = {
+            id: key,
+            size: item.product?.size,
+            quantity: item.quantity,
+            productName: item.product?.name,
+            customSize: item.product?.customSize,
+            items: [],
+            totalPrice: 0
+          }
+        }
+        groups[key].items.push(item)
+        // Grup fiyatını doğru hesapla: TOPLAM ADET için bulk fiyat kullan
+        // Toplam adet = fotoğraf sayısı (her fotoğraf için 1 adet)
+        // Fotoğraf sayısı arttıkça toplam adet artar, bulk fiyat düşer
+        const totalQuantity = groups[key].items.length
+        const sizePrices = {
+          '10x15': 16,
+          '15x20': 19,
+          '20x30': 26,
+          '30x40': 36
+        }
+        const unitPrice = sizePrices[item.product?.size] || 26
+        // Grup fiyatı: toplam adet × bulk birim fiyat
+        groups[key].totalPrice = totalQuantity * unitPrice
+        return groups
+      }, {})
+      
+      const groupedItemsArray = Object.values(groupedCartItems)
+      
+      // Sepet toplamını hesapla (tüm grupların fiyatlarını topla)
+      const totalPrice = groupedItemsArray.reduce((sum, group) => sum + (group.totalPrice || 0), 0)
+      
+      // Kargo fiyatı (99 TL üzeri ücretsiz)
+      const shippingPrice = shippingType === 'standard' ? 15 : 35
+      const finalTotal = totalPrice >= 99 ? totalPrice : totalPrice + shippingPrice
+      
+      // Toplam fiyatı kullan (tüm grupların toplamı)
+      const calculatedPrice = finalTotal
 
-      // Siparişi localStorage'a kaydet (Payment sayfasında kullanılacak)
-      // Async import yerine direkt import kullan (daha hızlı)
-      try {
-        const { saveOrderToStorage } = await import('../utils/encryption')
-        const saved = saveOrderToStorage(orderData)
-        if (saved) {
-          console.log('✅ Sipariş localStorage\'a kaydedildi, orderId:', orderId)
-          // File objelerini Payment sayfasına gönder (base64'e çevirmek için)
-          // Önce location.state'ten al, sonra photoFiles state'inden, son olarak cartItems içindeki file objelerini topla
-          let filesToSend = []
-          
-          // 1. Önce location.state'ten al (ProductUpload'dan direkt geliyorsa)
-          if (location.state?.photos && location.state.photos.length > 0) {
-            filesToSend = location.state.photos
-            console.log('📤 location.state.photos bulundu:', filesToSend.length, 'adet')
-          }
-          // 2. Sonra photoFiles state'inden al
-          else if (photoFiles && photoFiles.length > 0) {
-            filesToSend = photoFiles
-            console.log('📤 photoFiles state\'inden alındı:', filesToSend.length, 'adet')
-          }
-          // 3. Son olarak cartItems içindeki file objelerini topla (genellikle boş olur çünkü CartContext'te file: undefined)
-          else {
-            filesToSend = cartItems
-              .map(item => item.photo?.file)
-              .filter(file => file instanceof File)
-            console.log('📤 cartItems içinden file objeleri toplandı:', filesToSend.length, 'adet')
-          }
-          
-          console.log('📤 Cart -> Payment: photoFiles gönderiliyor:', filesToSend.length, 'adet')
-          if (filesToSend.length > 0) {
-            console.log('📤 photoFiles detayları:', filesToSend.map(f => ({ name: f.name, size: f.size, type: f.type })))
-          } else {
-            console.warn('⚠️ photoFiles boş! location.state:', location.state)
-          }
-          
-          navigate(`/payment?orderId=${orderId}`, {
-            state: {
-              orderData,
-              remainingItems: cartItems.slice(1),
-              cartItems: cartItems, // Tüm sepet öğeleri
-              photoFiles: filesToSend // File objelerini Payment'a gönder
+      // Tüm fotoğrafları base64'e çevir ve localStorage'a kaydet, sonra ödeme sayfasına yönlendir
+      const prepareOrderForPayment = async () => {
+
+        const photosArray = []
+        
+        // Önce location.state'ten fotoğrafları al
+        let photoFilesToProcess = []
+        if (location.state?.photos && location.state.photos.length > 0) {
+          photoFilesToProcess = location.state.photos
+        } else if (photoFiles && photoFiles.length > 0) {
+          photoFilesToProcess = photoFiles
+        } else {
+          // CartItems'tan file objelerini topla
+          photoFilesToProcess = cartItems
+            .map(item => item.photo?.file)
+            .filter(file => file instanceof File)
+        }
+
+        // Eğer File objesi yoksa, cartItems'tan preview'ları kullan
+        if (photoFilesToProcess.length === 0) {
+          photoFilesToProcess = cartItems.map(item => ({
+            preview: item.photo?.preview,
+            name: item.photo?.filename || `photo-${cartItems.indexOf(item)}.jpg`
+          }))
+        }
+
+        if (photoFilesToProcess.length === 0) {
+          alert('Fotoğraf bulunamadı. Lütfen tekrar deneyin.')
+          setIsSubmitting(false)
+          return
+        }
+
+        // Her fotoğrafı base64'e çevir
+        const convertPhoto = (photoFile, index) => {
+          return new Promise((resolve, reject) => {
+            if (photoFile instanceof File) {
+              // File objesi varsa
+              const reader = new FileReader()
+              reader.onloadend = () => {
+                const base64String = reader.result.split(',')[1]
+                resolve({
+                  filename: photoFile.name || `photo-${index}.jpg`,
+                  originalName: photoFile.name || `photo-${index}.jpg`,
+                  base64: base64String,
+                  mimetype: photoFile.type || 'image/jpeg',
+                  size: photoFile.size || 0
+                })
+              }
+              reader.onerror = reject
+              reader.readAsDataURL(photoFile)
+            } else if (photoFile.preview) {
+              // Preview varsa
+              const preview = photoFile.preview
+              if (preview.startsWith('data:image/')) {
+                // Data URL ise
+                const base64String = preview.split(',')[1]
+                const mimetype = preview.match(/data:image\/([^;]+)/)?.[1] || 'jpeg'
+                resolve({
+                  filename: photoFile.name || `photo-${index}.jpg`,
+                  originalName: photoFile.name || `photo-${index}.jpg`,
+                  base64: base64String,
+                  mimetype: `image/${mimetype}`,
+                  size: 0
+                })
+              } else {
+                // Blob URL ise
+                fetch(preview)
+                  .then(response => response.blob())
+                  .then(blob => {
+                    const reader = new FileReader()
+                    reader.onloadend = () => {
+                      const base64String = reader.result.split(',')[1]
+                      resolve({
+                        filename: photoFile.name || `photo-${index}.jpg`,
+                        originalName: photoFile.name || `photo-${index}.jpg`,
+                        base64: base64String,
+                        mimetype: blob.type || 'image/jpeg',
+                        size: blob.size || 0
+                      })
+                    }
+                    reader.onerror = reject
+                    reader.readAsDataURL(blob)
+                  })
+                  .catch(reject)
+              }
+            } else {
+              reject(new Error(`Fotoğraf ${index} işlenemedi`))
             }
           })
-        } else {
-          console.error('❌ Sipariş kaydedilemedi')
-          alert('Sipariş kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.')
         }
-      } catch (err) {
-        console.error('❌ localStorage\'a kaydetme hatası:', err)
-        alert('Sipariş kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.')
+
+        try {
+          // Tüm fotoğrafları paralel olarak işle
+          const photoPromises = photoFilesToProcess.map((photoFile, index) => 
+            convertPhoto(photoFile, index)
+          )
+          const convertedPhotos = await Promise.all(photoPromises)
+          photosArray.push(...convertedPhotos)
+          
+          // Sipariş verisini oluştur
+          const orderId = Date.now().toString()
+          const orderData = {
+            id: orderId,
+            photos: photosArray, // Tüm fotoğraflar
+            photo: photosArray[0] || null, // Geriye uyumluluk için ilk fotoğraf
+            size: firstItem.product.size,
+            customSize: firstItem.product.customSize,
+            quantity: firstItem.quantity,
+            shippingType: shippingType,
+            email: customerInfo.email,
+            address: customerInfo.address,
+            phone: customerInfo.phone || '',
+            firstName: customerInfo.firstName || 'Müşteri',
+            lastName: customerInfo.lastName || 'Müşteri',
+            customerInfo: {
+              firstName: customerInfo.firstName || 'Müşteri',
+              lastName: customerInfo.lastName || 'Müşteri',
+              email: customerInfo.email,
+              phone: customerInfo.phone || '',
+              address: customerInfo.address
+            },
+            price: calculatedPrice,
+            status: 'Yeni',
+            paymentStatus: 'pending', // Ödeme bekleniyor
+            notes: `${photosArray.length} fotoğraf`,
+            createdAt: new Date().toISOString()
+          }
+          
+          // localStorage'a kaydet (base64'ler dahil - ödeme sayfasında kullanılacak)
+          saveOrderToStorage(orderData)
+          
+          // Sipariş verisini state'e kaydet ve ödeme formunu göster
+          setPreparedOrderData(orderData)
+          setOrderId(orderId)
+          setShowPaymentForm(true)
+          setIsSubmitting(false)
+          
+          // Sayfayı ödeme formuna kaydır
+          setTimeout(() => {
+            const paymentSection = document.getElementById('payment-section')
+            if (paymentSection) {
+              paymentSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+          }, 100)
+        } catch (error) {
+          console.error('Fotoğrafları base64\'e çevirme hatası:', error)
+          alert('Fotoğraflar yüklenirken bir hata oluştu. Lütfen tekrar deneyin.')
+          setIsSubmitting(false)
+        }
       }
+
+      // Fotoğrafları işlemeye başla
+      await prepareOrderForPayment()
     } catch (error) {
       console.error('Sipariş oluşturma hatası:', error)
       alert('Sipariş oluşturulurken bir hata oluştu')
+      setIsSubmitting(false)
     }
   }
 
-  // Sepet toplamını hesapla (her öğenin fiyatını topla)
-  const totalPrice = cartItems.reduce((sum, item) => {
-    return sum + (item.price || 0)
-  }, 0)
+  // Sepet öğelerini grupla (aynı size, quantity, product.name olanları)
+  const groupedCartItems = cartItems.reduce((groups, item) => {
+    const key = `${item.product?.size || 'unknown'}-${item.quantity || 0}-${item.product?.name || 'unknown'}`
+    if (!groups[key]) {
+      groups[key] = {
+        id: key,
+        size: item.product?.size,
+        quantity: item.quantity,
+        productName: item.product?.name,
+        customSize: item.product?.customSize,
+        items: [],
+        totalPrice: 0
+      }
+    }
+    groups[key].items.push(item)
+    return groups
+  }, {})
   
+  // Grup fiyatlarını hesapla (tüm item'lar eklendikten sonra)
+  Object.values(groupedCartItems).forEach((group) => {
+    // Toplam adet = fotoğraf sayısı (her fotoğraf için 1 adet)
+    // Örnek: 1 fotoğraf → 1 adet
+    // Örnek: 51 fotoğraf → 51 adet
+    // Fotoğraf sayısı arttıkça toplam adet artar, bulk fiyat düşer
+    const totalQuantity = group.items.length
+    const sizePrices = {
+      '10x15': 16,
+      '15x20': 19,
+      '20x30': 26,
+      '30x40': 36
+    }
+    const unitPrice = sizePrices[group.size] || 26
+    // Grup fiyatı: toplam adet × bulk birim fiyat
+    group.totalPrice = totalQuantity * unitPrice
+  })
+  
+  // Debug: Grup fiyatlarını logla
+  Object.values(groupedCartItems).forEach((group, idx) => {
+    // Toplam adet için bulk fiyat hesapla
+    // Toplam adet = fotoğraf sayısı (her fotoğraf için 1 adet)
+    const totalQuantity = group.items.length
+    const sizePrices = {
+      '10x15': 16,
+      '15x20': 19,
+      '20x30': 26,
+      '30x40': 36
+    }
+    const unitPrice = sizePrices[group.size] || 26
+    // Beklenen toplam: toplam adet × bulk birim fiyat
+    const expectedTotal = totalQuantity * unitPrice
+    const actualTotal = group.totalPrice
+    const isCorrect = Math.abs(actualTotal - expectedTotal) < 0.01
+    const difference = actualTotal - expectedTotal
+    
+    console.log(`💰 Grup ${idx + 1} Fiyat Detayı:`)
+    console.log(`  Boyut: ${group.size}`)
+    console.log(`  Adet/Fotoğraf: ${group.quantity}`)
+    console.log(`  Fotoğraf Sayısı: ${group.items.length}`)
+    console.log(`  Toplam Adet: ${totalQuantity} (${group.items.length} fotoğraf, her biri 1 adet = ${totalQuantity} adet)`)
+    console.log(`  Bulk Birim Fiyat: ${unitPrice} TL/adet (${totalQuantity} adet için)`)
+    console.log(`  Beklenen Toplam: ${expectedTotal} TL (${totalQuantity} adet × ${unitPrice} TL/adet)`)
+    console.log(`  Gerçek Grup Fiyatı: ${actualTotal} TL`)
+    console.log(`  Doğru mu?: ${isCorrect ? '✅ EVET' : '❌ HAYIR'}`)
+    console.log(`  Fark: ${difference} TL`)
+  })
+
+  const groupedItemsArray = Object.values(groupedCartItems)
+  const rotationKey = groupedItemsArray
+    .map((group) => `${group.id}:${group.items.length}`)
+    .join('|')
+
+  useEffect(() => {
+    if (groupedItemsArray.length === 0) return
+    let timeoutId
+    const interval = setInterval(() => {
+      setPhotoNextIndex((prev) => {
+        const next = { ...prev }
+        groupedItemsArray.forEach((group) => {
+          const count = group.items.length
+          if (count === 0) return
+          const current = photoRotationIndex[group.id] ?? 0
+          next[group.id] = (current + 1) % count
+        })
+        return next
+      })
+      setPhotoTransition((prev) => {
+        const next = { ...prev }
+        groupedItemsArray.forEach((group) => {
+          if (group.items.length === 0) return
+          next[group.id] = true
+        })
+        return next
+      })
+      timeoutId = setTimeout(() => {
+        setPhotoRotationIndex((prev) => {
+          const next = { ...prev }
+          groupedItemsArray.forEach((group) => {
+            const count = group.items.length
+            if (count === 0) return
+            const current = prev[group.id] ?? 0
+            next[group.id] = (current + 1) % count
+          })
+          return next
+        })
+        setPhotoTransition((prev) => {
+          const next = { ...prev }
+          groupedItemsArray.forEach((group) => {
+            if (group.items.length === 0) return
+            next[group.id] = false
+          })
+          return next
+        })
+      }, 600)
+    }, 4500)
+    return () => {
+      clearInterval(interval)
+      clearTimeout(timeoutId)
+    }
+  }, [rotationKey, photoRotationIndex])
+
+  // Ödeme formu submit handler
+  const handlePaymentSubmit = async (cardData) => {
+    try {
+      setIsSubmitting(true)
+      setPaymentError(null)
+
+      if (!orderId || !preparedOrderData) {
+        setPaymentError('Sipariş bilgileri bulunamadı')
+        setIsSubmitting(false)
+        return
+      }
+
+      // API endpoint
+      let apiEndpoint
+      if (API_URL === '/api' || API_URL.startsWith('/api')) {
+        apiEndpoint = '/api/payment/direct'
+      } else if (API_URL.includes('://')) {
+        apiEndpoint = `${API_URL}/api/payment/direct`
+      } else {
+        apiEndpoint = '/api/payment/direct'
+      }
+
+      console.log('💳 Ödeme gönderiliyor:', apiEndpoint)
+
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          orderId,
+          orderData: preparedOrderData,
+          ...cardData
+        })
+      })
+
+      // Response kontrolü
+      if (!response.ok) {
+        const errorText = await response.text()
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { error: 'Sunucu hatası', message: errorText || `HTTP ${response.status}` }
+        }
+        setPaymentError(errorData.error || errorData.message || 'Ödeme başlatılamadı')
+        setIsSubmitting(false)
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        // 3D Secure HTML içeriği geldi
+        if (data.htmlContent) {
+          setThreeDSecureHtml(data.htmlContent)
+          setShow3DSecure(true)
+        } else {
+          // 3D Secure gerekmiyorsa direkt başarılı
+          navigate(`/payment/success?orderId=${orderId}`)
+        }
+      } else {
+        setPaymentError(data.error || data.message || 'Ödeme başlatılamadı')
+      }
+    } catch (err) {
+      console.error('❌ Ödeme hatası:', err)
+      setPaymentError('Ödeme işlemi sırasında bir hata oluştu')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // 3D Secure HTML yüklendiğinde iframe'de göster
+  useEffect(() => {
+    if (!show3DSecure || !threeDSecureHtml) return;
+    
+    console.log('✅ 3D Secure HTML yüklendi, işleniyor...');
+    
+    // HTML içeriğinin Base64 kodlu olup olmadığını kontrol et
+    let htmlContent = threeDSecureHtml.trim();
+    
+    // Eğer Base64 kodlu ise decode et
+    if (htmlContent.match(/^[A-Za-z0-9+/=\s]+$/) && htmlContent.length > 100) {
+      try {
+        const decoded = atob(htmlContent.replace(/\s/g, ''));
+        if (decoded.includes('<html') || decoded.includes('<form') || decoded.includes('<!DOCTYPE')) {
+          console.log('✅ Base64 kodlu HTML decode edildi');
+          htmlContent = decoded;
+        }
+      } catch (e) {
+        console.log('⚠️ Base64 decode başarısız, normal HTML olarak işleniyor:', e.message);
+      }
+    }
+    
+    // HTML içeriğini blob URL olarak oluştur ve iframe'de göster
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+    
+    const iframe = document.createElement('iframe');
+    iframe.id = 'threeds-iframe';
+    iframe.src = blobUrl;
+    iframe.style.width = '100%';
+    iframe.style.minHeight = '600px';
+    iframe.style.border = 'none';
+    iframe.style.borderRadius = '12px';
+    iframe.style.background = 'white';
+    
+    const container = document.getElementById('threeds-container');
+    if (container) {
+      container.innerHTML = '';
+      container.appendChild(iframe);
+      
+      // Iframe yüklendiğinde formu otomatik submit et
+      iframe.onload = () => {
+        console.log('✅ 3D Secure iframe yüklendi');
+        
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          const form = iframeDoc.querySelector('form') || 
+                       iframeDoc.querySelector('#iyzipay-form') ||
+                       iframeDoc.querySelector('form[action*="iyzipay"]');
+          
+          if (form) {
+            console.log('🔍 3D Secure formu bulundu, submit ediliyor...');
+            setTimeout(() => {
+              try {
+                form.submit();
+                console.log('✅ Form submit edildi');
+              } catch (e) {
+                console.error('❌ Form submit hatası:', e);
+                const submitButton = form.querySelector('input[type="submit"]') || 
+                                   form.querySelector('button[type="submit"]') ||
+                                   form.querySelector('button');
+                if (submitButton) {
+                  submitButton.click();
+                }
+              }
+            }, 500);
+          }
+        } catch (e) {
+          console.error('❌ Iframe içeriğine erişim hatası (CORS):', e.message);
+          container.innerHTML = htmlContent;
+          setTimeout(() => {
+            const form = container.querySelector('form');
+            if (form) {
+              console.log('🔍 Form bulundu (CORS fallback), submit ediliyor...');
+              form.submit();
+            }
+          }, 500);
+        }
+      };
+      
+      return () => {
+        URL.revokeObjectURL(blobUrl);
+      };
+    }
+  }, [show3DSecure, threeDSecureHtml])
+
+  // Sepet toplamını hesapla (tüm grupların fiyatlarını topla)
+  // Her grup tek bir ürün olarak gösteriliyor, tüm grupların toplamını al
+  const totalPrice = groupedItemsArray.reduce((sum, group) => sum + (group.totalPrice || 0), 0)
+  
+  // Kargo fiyatı (99 TL üzeri ücretsiz)
   const shippingPrice = shippingType === 'standard' ? 15 : 35
   const finalTotal = totalPrice >= 99 ? totalPrice : totalPrice + shippingPrice
+  
+  // Beklenen toplam fiyat (tüm grupların fiyatlarını topla)
+  const expectedTotalPrice = groupedItemsArray.reduce((sum, group) => {
+    // Toplam adet = fotoğraf sayısı (her fotoğraf için 1 adet)
+    const totalQuantity = group.items.length
+    const sizePrices = {
+      '10x15': 16,
+      '15x20': 19,
+      '20x30': 26,
+      '30x40': 36
+    }
+    const unitPrice = sizePrices[group.size] || 26
+    // Grup fiyatı: toplam adet × bulk birim fiyat
+    const groupPrice = totalQuantity * unitPrice
+    return sum + groupPrice
+  }, 0)
+  
+  console.log('💰 Cart Fiyat Hesaplama:')
+  console.log(`  Sepet Item Sayısı: ${cartItems.length}`)
+  console.log(`  Grup Sayısı: ${groupedItemsArray.length}`)
+  console.log(`  Her Grubun Fiyatı:`, groupedItemsArray.map(g => `${g.totalPrice} TL`).join(', '))
+  console.log(`  Beklenen Toplam Fiyat: ${expectedTotalPrice} TL`)
+  console.log(`  Gerçek Toplam Fiyat: ${totalPrice} TL`)
+  const isPriceCorrect = Math.abs(totalPrice - expectedTotalPrice) < 0.01
+  const priceDifference = totalPrice - expectedTotalPrice
+  console.log(`  Doğru mu?: ${isPriceCorrect ? '✅ EVET' : '❌ HAYIR'}`)
+  console.log(`  Fark: ${priceDifference} TL`)
+  console.log(`  Kargo Fiyatı: ${shippingPrice} TL`)
+  console.log(`  Final Toplam: ${finalTotal} TL`)
+  console.log(`  Ücretsiz Kargo?: ${totalPrice >= 99 ? '✅ EVET' : '❌ HAYIR'}`)
 
   if (cartItems.length === 0) {
     return (
@@ -204,67 +683,189 @@ function Cart() {
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '2fr 1fr',
+            gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr',
             gap: '2rem'
           }}>
-            {/* Sepet Öğeleri */}
+            {/* Sepet Öğeleri - Gruplanmış */}
             <div>
-              {cartItems.map((item, index) => (
+              {groupedItemsArray.map((group, groupIndex) => {
+                const rotationIndex = photoRotationIndex[group.id] ?? 0
+                const nextIndex = photoNextIndex[group.id]
+                const isTransitioning = !!photoTransition[group.id]
+                const rotatingItem = group.items[rotationIndex] || group.items[0]
+                const nextItem = typeof nextIndex === 'number'
+                  ? (group.items[nextIndex] || rotatingItem)
+                  : rotatingItem
+                return (
                 <div
-                  key={item.id}
+                  key={group.id}
                   style={{
-                    background: 'white',
-                    padding: '1.5rem',
-                    borderRadius: '12px',
-                    marginBottom: '1rem',
-                    border: '1px solid #e5e7eb',
-                    display: 'flex',
-                    gap: '1.5rem'
+                    background: '#ffffff',
+                    padding: isMobile ? '1rem' : '1.5rem',
+                    borderRadius: '16px',
+                    marginBottom: '1.25rem',
+                    border: '1px solid #eef2f7',
+                    boxShadow: '0 6px 20px rgba(15, 23, 42, 0.06)',
+                    transition: 'none',
+                    cursor: 'pointer'
                   }}
+                  onClick={() => setSelectedItemGroup(group)}
                 >
-                  <img
-                    src={item.photo.preview}
-                    alt={item.product.name}
-                    style={{
-                      width: '120px',
-                      height: '120px',
-                      objectFit: 'cover',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
-                      {item.product.name}
-                    </h3>
-                    <p style={{ color: '#666', marginBottom: '0.5rem' }}>
-                      {item.product.description}
-                    </p>
-                    <div style={{ marginBottom: '0.5rem' }}>
-                      <strong>Adet:</strong> {item.quantity}
+                  {/* Ürün Başlığı */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    gap: '1rem',
+                    marginBottom: '1rem',
+                    paddingBottom: '1rem',
+                    borderBottom: '1px solid #edf2f7'
+                  }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.25rem', marginBottom: '0.35rem', color: '#1f2937', fontWeight: 700 }}>
+                        {group.productName || 'Fotoğraf Baskı'}
+                      </h3>
+                      <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                        Ürün detayları
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        flexWrap: 'wrap', 
+                        gap: '0.5rem',
+                        fontSize: '0.85rem'
+                      }}>
+                        <span style={{
+                          padding: '0.35rem 0.75rem',
+                          background: '#f1f5f9',
+                          color: '#0f172a',
+                          borderRadius: '999px',
+                          border: '1px solid #e2e8f0',
+                          fontWeight: 600
+                        }}>
+                          Boyut: {group.size === 'custom' && group.customSize
+                            ? `${group.customSize.width}x${group.customSize.height} cm`
+                            : group.size || '20x30'}
+                        </span>
+                        <span style={{
+                          padding: '0.35rem 0.75rem',
+                          background: '#fef3c7',
+                          color: '#92400e',
+                          borderRadius: '999px',
+                          border: '1px solid #fde68a',
+                          fontWeight: 600
+                        }}>
+                          Adet: 1
+                        </span>
+                        <span style={{
+                          padding: '0.35rem 0.75rem',
+                          background: '#ede9fe',
+                          color: '#5b21b6',
+                          borderRadius: '999px',
+                          border: '1px solid #ddd6fe',
+                          fontWeight: 600
+                        }}>
+                          Fotoğraf: 1
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#667eea' }}>
-                      ₺{item.price.toFixed(2)}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-end',
+                      gap: '0.6rem'
+                    }}>
+                      <div style={{
+                        width: isMobile ? '96px' : '120px',
+                        aspectRatio: '1',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        border: '1px solid #e5e7eb',
+                        boxShadow: '0 4px 10px rgba(15, 23, 42, 0.08)',
+                        position: 'relative'
+                      }}>
+                        <img
+                          src={rotatingItem?.photo?.preview || rotatingItem?.photo?.url || '/placeholder.jpg'}
+                          alt="Seçili fotoğraf"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            position: 'absolute',
+                            inset: 0,
+                            opacity: isTransitioning ? 0 : 1,
+                            transition: 'opacity 0.6s ease'
+                          }}
+                          onError={(e) => {
+                            e.target.src = '/placeholder.jpg'
+                          }}
+                        />
+                        <img
+                          src={nextItem?.photo?.preview || nextItem?.photo?.url || '/placeholder.jpg'}
+                          alt="Seçili fotoğraf"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            position: 'absolute',
+                            inset: 0,
+                            opacity: isTransitioning ? 1 : 0,
+                            transition: 'opacity 0.6s ease'
+                          }}
+                          onError={(e) => {
+                            e.target.src = '/placeholder.jpg'
+                          }}
+                        />
+                      </div>
+                      <div style={{
+                        textAlign: 'right',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        padding: '0.65rem 0.9rem',
+                        minWidth: isMobile ? 'auto' : '150px'
+                      }}>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Toplam</div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#4f46e5' }}>
+                          ₺{group.totalPrice.toFixed(2)}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => removeFromCart(item.id)}
-                    style={{
-                      background: '#ef4444',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '0.5rem 1rem',
-                      cursor: 'pointer',
-                      height: 'fit-content'
-                    }}
-                  >
-                    Kaldır
-                  </button>
+
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end'
+                  }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedItemGroup(group)
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: isMobile ? '0.7rem 1rem' : '0.85rem 1.25rem',
+                        cursor: 'pointer',
+                        fontSize: '0.95rem',
+                        fontWeight: '600',
+                        transition: 'none',
+                        boxShadow: '0 2px 6px rgba(102, 126, 234, 0.25)'
+                      }}
+                    >
+                      Tüm Fotoğrafları Gör ({group.items.length})
+                    </button>
+                  </div>
                 </div>
-              ))}
+              )})}
 
               <button
-                onClick={clearCart}
+                onClick={() => {
+                  if (window.confirm('Sepetinizdeki tüm ürünleri kaldırmak istediğinizden emin misiniz?')) {
+                    clearCart()
+                  }
+                }}
                 style={{
                   background: '#f3f4f6',
                   color: '#666',
@@ -272,10 +873,24 @@ function Cart() {
                   borderRadius: '8px',
                   padding: '0.75rem 1.5rem',
                   cursor: 'pointer',
-                  fontSize: '0.9rem'
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb'
+                  e.currentTarget.style.borderColor = '#d1d5db'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6'
+                  e.currentTarget.style.borderColor = '#e5e7eb'
                 }}
               >
-                Sepeti Temizle
+                🧹 Sepeti Temizle
               </button>
             </div>
 
@@ -286,8 +901,9 @@ function Cart() {
                 padding: '1.5rem',
                 borderRadius: '12px',
                 border: '1px solid #e5e7eb',
-                position: 'sticky',
-                top: '2rem'
+                position: isMobile ? 'relative' : 'sticky',
+                top: isMobile ? '0' : '2rem',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
               }}>
                 <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Sipariş Özeti</h2>
 
@@ -351,84 +967,782 @@ function Cart() {
                   </select>
                 </div>
 
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>İletişim Bilgileri</h3>
-                  <input
-                    type="email"
-                    placeholder="E-posta *"
-                    value={customerInfo.email}
-                    onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      marginBottom: '0.75rem',
-                      border: '1px solid #ddd',
-                      borderRadius: '8px',
-                      fontSize: '1rem'
-                    }}
-                  />
-                  <textarea
-                    placeholder="Adres *"
-                    value={customerInfo.address}
-                    onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                    required
-                    rows="3"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      marginBottom: '0.75rem',
-                      border: '1px solid #ddd',
-                      borderRadius: '8px',
-                      fontSize: '1rem',
-                      resize: 'vertical'
-                    }}
-                  />
-                  <input
-                    type="tel"
-                    placeholder="Telefon (Opsiyonel)"
-                    value={customerInfo.phone}
-                    onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      marginBottom: '0.75rem',
-                      border: '1px solid #ddd',
-                      borderRadius: '8px',
-                      fontSize: '1rem'
-                    }}
-                  />
-                </div>
-
-                <button
-                  onClick={handleCheckout}
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    fontSize: '1.1rem',
-                    fontWeight: 'bold',
-                    background: '#667eea',
+                {/* Kullanıcı giriş yapmamışsa kayıt ol/giriş yap bölümü */}
+                {!isAuthenticated ? (
+                  <div style={{
+                    marginBottom: '1.5rem',
+                    padding: '1.5rem',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: '12px',
                     color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#5568d3'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#667eea'
-                  }}
-                >
-                  Ödemeye Geç
-                </button>
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🔐</div>
+                    <h3 style={{ fontSize: '1.2rem', marginBottom: '0.75rem', color: 'white' }}>
+                      Siparişi Tamamlamak İçin
+                    </h3>
+                    <p style={{ 
+                      fontSize: '0.95rem', 
+                      marginBottom: '1.5rem', 
+                      opacity: 0.95,
+                      lineHeight: '1.6'
+                    }}>
+                      Hızlı ve güvenli sipariş vermek için lütfen giriş yapın veya kayıt olun
+                    </p>
+                    <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+                      <Link
+                        to="/login"
+                        state={{ from: '/cart', message: 'Sipariş verebilmek için lütfen giriş yapın veya kayıt olun.' }}
+                        style={{
+                          display: 'block',
+                          padding: '0.875rem 1.5rem',
+                          background: 'white',
+                          color: '#667eea',
+                          textDecoration: 'none',
+                          borderRadius: '8px',
+                          fontWeight: 'bold',
+                          fontSize: '1rem',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.transform = 'translateY(-2px)'
+                          e.target.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.transform = 'translateY(0)'
+                          e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+                        }}
+                      >
+                        🔑 Giriş Yap
+                      </Link>
+                      <Link
+                        to="/register"
+                        state={{ from: '/cart', message: 'Sipariş verebilmek için lütfen kayıt olun.' }}
+                        style={{
+                          display: 'block',
+                          padding: '0.875rem 1.5rem',
+                          background: 'rgba(255,255,255,0.2)',
+                          color: 'white',
+                          textDecoration: 'none',
+                          borderRadius: '8px',
+                          fontWeight: 'bold',
+                          fontSize: '1rem',
+                          border: '2px solid white',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = 'rgba(255,255,255,0.3)'
+                          e.target.style.transform = 'translateY(-2px)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = 'rgba(255,255,255,0.2)'
+                          e.target.style.transform = 'translateY(0)'
+                        }}
+                      >
+                        ✨ Kayıt Ol
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>İletişim Bilgileri</h3>
+                    <div style={{
+                      padding: '0.75rem',
+                      marginBottom: '1rem',
+                      background: '#e8f5e9',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem',
+                      color: '#2e7d32',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <span>✅</span>
+                      <span>Giriş yaptınız: <strong>{user?.email || user?.firstName || 'Kullanıcı'}</strong></span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Ad *"
+                      value={customerInfo.firstName}
+                      onChange={(e) => setCustomerInfo({ ...customerInfo, firstName: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        marginBottom: '0.75rem',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Soyad *"
+                      value={customerInfo.lastName}
+                      onChange={(e) => setCustomerInfo({ ...customerInfo, lastName: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        marginBottom: '0.75rem',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                    <input
+                      type="email"
+                      placeholder="E-posta *"
+                      value={customerInfo.email}
+                      onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        marginBottom: '0.75rem',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                    <textarea
+                      placeholder="Adres *"
+                      value={customerInfo.address}
+                      onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
+                      required
+                      rows="3"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        marginBottom: '0.75rem',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        resize: 'vertical'
+                      }}
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Telefon (Opsiyonel)"
+                      value={customerInfo.phone}
+                      onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        marginBottom: '0.75rem',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+                )}
+
+                {submitSuccess ? (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    padding: '2rem',
+                    borderRadius: '12px',
+                    textAlign: 'center',
+                    color: 'white',
+                    marginTop: '1rem'
+                  }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+                    <h3 style={{ marginBottom: '0.5rem' }}>Sipariş Başarıyla Oluşturuldu!</h3>
+                    <p style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '1rem' }}>
+                      Sipariş No: <strong>#{orderId}</strong>
+                    </p>
+                    <Link
+                      to="/"
+                      style={{
+                        display: 'inline-block',
+                        marginTop: '1rem',
+                        padding: '0.75rem 2rem',
+                        background: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        textDecoration: 'none',
+                        borderRadius: '6px',
+                        fontWeight: 'bold',
+                        border: '2px solid white'
+                      }}
+                    >
+                      Ana Sayfaya Dön
+                    </Link>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleCheckout}
+                    disabled={isSubmitting || !isAuthenticated || showPaymentForm}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      fontSize: '1.1rem',
+                      fontWeight: 'bold',
+                      background: (isSubmitting || !isAuthenticated || showPaymentForm) ? '#ccc' : '#667eea',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: (isSubmitting || !isAuthenticated || showPaymentForm) ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.3s',
+                      opacity: (isSubmitting || !isAuthenticated || showPaymentForm) ? 0.6 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSubmitting && isAuthenticated) {
+                        e.currentTarget.style.background = '#5568d3'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSubmitting && isAuthenticated) {
+                        e.currentTarget.style.background = '#667eea'
+                      }
+                    }}
+                    title={!isAuthenticated ? 'Sipariş verebilmek için lütfen giriş yapın' : ''}
+                  >
+                    {isSubmitting ? '⏳ Sipariş Oluşturuluyor...' : 
+                     !isAuthenticated ? '🔐 Giriş Yaparak Devam Et' : 
+                     showPaymentForm ? '💳 Ödeme Formu Açık' : 
+                     '💳 Sipariş Ver ve Ödeme Yap'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Ödeme Formu Bölümü */}
+          {showPaymentForm && preparedOrderData && (
+            <div id="payment-section" style={{
+              marginTop: '2rem',
+              background: 'white',
+              padding: '2rem',
+              borderRadius: '12px',
+              border: '1px solid #e5e7eb',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.5rem',
+                paddingBottom: '1rem',
+                borderBottom: '2px solid #e5e7eb'
+              }}>
+                <h2 style={{ 
+                  fontSize: '1.5rem', 
+                  margin: 0, 
+                  color: '#2c3e50',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  💳 Güvenli Ödeme
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowPaymentForm(false)
+                    setPreparedOrderData(null)
+                    setPaymentError(null)
+                    setShow3DSecure(false)
+                    setThreeDSecureHtml(null)
+                  }}
+                  style={{
+                    background: '#f3f4f6',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.5rem 1rem',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    color: '#666',
+                    fontWeight: '600'
+                  }}
+                >
+                  ✕ Kapat
+                </button>
+              </div>
+
+              {show3DSecure && threeDSecureHtml ? (
+                <div style={{ 
+                  width: '100%', 
+                  minHeight: '600px',
+                  border: '1px solid #e9ecef',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}>
+                  <div style={{
+                    padding: '1.5rem',
+                    textAlign: 'center',
+                    background: '#f8f9fa',
+                    borderBottom: '1px solid #e9ecef'
+                  }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔐</div>
+                    <h3 style={{ margin: 0, color: '#2c3e50' }}>3D Secure Doğrulama</h3>
+                    <p style={{ margin: '0.5rem 0 0 0', color: '#6c757d', fontSize: '0.9rem' }}>
+                      Güvenli ödeme için bankanızın doğrulama sayfasına yönlendiriliyorsunuz...
+                    </p>
+                  </div>
+                  <div 
+                    id="threeds-container"
+                    style={{ 
+                      width: '100%', 
+                      minHeight: '600px',
+                      padding: '0',
+                      background: 'white',
+                      borderRadius: '12px',
+                      overflow: 'hidden'
+                    }}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <div style={{ 
+                    marginBottom: '1.5rem', 
+                    padding: '1rem',
+                    background: '#f8f9fa',
+                    borderRadius: '8px',
+                    textAlign: 'center'
+                  }}>
+                    <p style={{ 
+                      margin: 0, 
+                      color: '#2c3e50', 
+                      fontSize: '1.1rem', 
+                      fontWeight: 'bold' 
+                    }}>
+                      Toplam: {new Intl.NumberFormat('tr-TR', { 
+                        style: 'currency', 
+                        currency: 'TRY' 
+                      }).format(preparedOrderData.price || 0)}
+                    </p>
+                    <p style={{ 
+                      margin: '0.5rem 0 0 0', 
+                      color: '#6c757d', 
+                      fontSize: '0.9rem' 
+                    }}>
+                      Sipariş No: <strong>{orderId}</strong>
+                    </p>
+                  </div>
+                  
+                  {paymentError && (
+                    <div style={{
+                      marginBottom: '1rem',
+                      padding: '1rem',
+                      background: '#fee',
+                      border: '1px solid #fcc',
+                      borderRadius: '8px',
+                      color: '#c33'
+                    }}>
+                      {paymentError}
+                    </div>
+                  )}
+
+                  <PaymentForm 
+                    onSubmit={handlePaymentSubmit}
+                    loading={isSubmitting}
+                    error={paymentError}
+                  />
+
+                  {/* Güvenlik Bilgisi */}
+                  <div style={{
+                    marginTop: '1.5rem',
+                    padding: '1rem',
+                    background: '#f0f9ff',
+                    borderRadius: '8px',
+                    border: '1px solid #bae6fd',
+                    textAlign: 'center',
+                    fontSize: '0.85rem',
+                    color: '#0369a1'
+                  }}>
+                    🔒 Ödemeleriniz 256-bit SSL sertifikası ile korunmaktadır. Kart bilgileriniz hiçbir şekilde saklanmaz.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
       <Footer />
+
+      {/* Fotoğraf Yönetim Modal */}
+      {selectedItemGroup && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '2rem'
+        }}
+        onClick={() => setSelectedItemGroup(null)}
+        >
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '2rem',
+            maxWidth: '900px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              paddingBottom: '1rem',
+              borderBottom: '2px solid #e5e7eb'
+            }}>
+              <div>
+                <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#2c3e50' }}>
+                  {selectedItemGroup.productName || 'Fotoğraf Baskı'}
+                </h2>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <span style={{
+                    padding: '0.35rem 0.75rem',
+                    background: '#e3f2fd',
+                    color: '#1976d2',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600'
+                  }}>
+                    Boyut: {selectedItemGroup.size === 'custom' && selectedItemGroup.customSize
+                      ? `${selectedItemGroup.customSize.width}x${selectedItemGroup.customSize.height} cm`
+                      : selectedItemGroup.size}
+                  </span>
+                  <span style={{
+                    padding: '0.35rem 0.75rem',
+                    background: '#fff3e0',
+                    color: '#f57c00',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600'
+                  }}>
+                    Adet: {selectedItemGroup.quantity}
+                  </span>
+                  <span style={{
+                    padding: '0.35rem 0.75rem',
+                    background: '#f3e5f5',
+                    color: '#7b1fa2',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600'
+                  }}>
+                    Fotoğraf: {selectedItemGroup.items.length}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedItemGroup(null)}
+                style={{
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  cursor: 'pointer',
+                  fontSize: '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb'
+                  e.currentTarget.style.transform = 'rotate(90deg)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6'
+                  e.currentTarget.style.transform = 'rotate(0deg)'
+                }}
+                title="Kapat"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Fotoğraflar Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+              gap: '1rem',
+              marginBottom: '1.5rem'
+            }}>
+              {selectedItemGroup.items.map((item, itemIndex) => (
+                <div
+                  key={item.id}
+                  style={{
+                    position: 'relative',
+                    aspectRatio: '1',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    border: '3px solid #e5e7eb',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#667eea'
+                    e.currentTarget.style.transform = 'scale(1.05)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#e5e7eb'
+                    e.currentTarget.style.transform = 'scale(1)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <img
+                    src={item.photo?.preview || item.photo?.url || '/placeholder.jpg'}
+                    alt={`Fotoğraf ${itemIndex + 1}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                    onError={(e) => {
+                      e.target.src = '/placeholder.jpg'
+                    }}
+                  />
+                  {/* Fotoğraf numarası */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '8px',
+                    background: 'rgba(102, 126, 234, 0.9)',
+                    color: 'white',
+                    fontSize: '0.85rem',
+                    padding: '0.35rem 0.6rem',
+                    borderRadius: '6px',
+                    fontWeight: 'bold',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }}>
+                    #{itemIndex + 1}
+                  </div>
+                  {/* Sil butonu */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (selectedItemGroup.items.length <= 1) {
+                        alert('En az 1 fotoğraf olmalıdır. Tüm ürünü silmek için ürün kartındaki "Kaldır" butonunu kullanın.')
+                        return
+                      }
+                      if (window.confirm('Bu fotoğrafı kaldırmak istediğinizden emin misiniz?')) {
+                        removeFromCart(item.id)
+                        // Eğer son fotoğraf kaldırıldıysa modal'ı kapat
+                        if (selectedItemGroup.items.length === 1) {
+                          setSelectedItemGroup(null)
+                        }
+                      }
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      background: 'rgba(239, 68, 68, 0.9)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      opacity: 0,
+                      transition: 'opacity 0.3s ease',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '1'
+                      e.currentTarget.style.background = 'rgba(220, 38, 38, 1)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '0'
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.9)'
+                    }}
+                    title="Fotoğrafı kaldır"
+                  >
+                    ✕
+                  </button>
+                  {/* Değiştir butonu */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const input = document.createElement('input')
+                      input.type = 'file'
+                      input.accept = 'image/*'
+                      input.style.display = 'none'
+                      input.onchange = (e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          if (!file.type.startsWith('image/')) {
+                            alert('Lütfen bir resim dosyası seçin')
+                            document.body.removeChild(input)
+                            return
+                          }
+                          if (file.size > 10 * 1024 * 1024) {
+                            alert('Dosya boyutu çok büyük. Lütfen 10MB\'dan küçük bir dosya seçin.')
+                            document.body.removeChild(input)
+                            return
+                          }
+                          const reader = new FileReader()
+                          reader.onloadend = () => {
+                            updateCartItemPhoto(item.id, {
+                              ...file,
+                              preview: reader.result
+                            })
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                        document.body.removeChild(input)
+                      }
+                      document.body.appendChild(input)
+                      input.click()
+                    }}
+                    style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      background: 'rgba(102, 126, 234, 0.9)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '0.4rem 0.7rem',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      opacity: 0,
+                      transition: 'opacity 0.3s ease',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '1'
+                      e.currentTarget.style.background = 'rgba(102, 126, 234, 1)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '0'
+                      e.currentTarget.style.background = 'rgba(102, 126, 234, 0.9)'
+                    }}
+                    title="Fotoğrafı değiştir"
+                  >
+                    📷 Değiştir
+                  </button>
+                </div>
+              ))}
+              {/* Yeni fotoğraf ekle */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const input = document.createElement('input')
+                  input.type = 'file'
+                  input.accept = 'image/*'
+                  input.multiple = false
+                  input.style.display = 'none'
+                  input.onchange = (e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      if (!file.type.startsWith('image/')) {
+                        alert('Lütfen bir resim dosyası seçin')
+                        document.body.removeChild(input)
+                        return
+                      }
+                      if (file.size > 10 * 1024 * 1024) {
+                        alert('Dosya boyutu çok büyük. Lütfen 10MB\'dan küçük bir dosya seçin.')
+                        document.body.removeChild(input)
+                        return
+                      }
+                      const reader = new FileReader()
+                      reader.onloadend = () => {
+                        const newCartItem = {
+                          product: {
+                            size: selectedItemGroup.size,
+                            name: selectedItemGroup.productName,
+                            description: '',
+                            customSize: selectedItemGroup.customSize
+                          },
+                          photo: {
+                            preview: reader.result,
+                            filename: file.name,
+                            mimetype: file.type,
+                            size: file.size
+                          },
+                          quantity: selectedItemGroup.quantity,
+                          price: selectedItemGroup.items[0]?.price || 0,
+                          shippingType: 'standard'
+                        }
+                        addToCart(newCartItem)
+                      }
+                      reader.readAsDataURL(file)
+                    }
+                    document.body.removeChild(input)
+                  }
+                  document.body.appendChild(input)
+                  input.click()
+                }}
+                style={{
+                  aspectRatio: '1',
+                  borderRadius: '12px',
+                  border: '3px dashed #cbd5e1',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  background: '#f8fafc',
+                  transition: 'all 0.3s ease',
+                  color: '#64748b'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#667eea'
+                  e.currentTarget.style.background = '#f0f4ff'
+                  e.currentTarget.style.color = '#667eea'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#cbd5e1'
+                  e.currentTarget.style.background = '#f8fafc'
+                  e.currentTarget.style.color = '#64748b'
+                }}
+                title="Yeni fotoğraf ekle"
+              >
+                <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>➕</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>Yeni Fotoğraf Ekle</div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem',
+              paddingTop: '1rem',
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <button
+                onClick={() => setSelectedItemGroup(null)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#f3f4f6',
+                  color: '#666',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.95rem'
+                }}
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

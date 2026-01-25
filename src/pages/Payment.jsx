@@ -5,6 +5,7 @@ import Footer from '../components/Footer'
 import PaymentForm from '../components/PaymentForm'
 import { getDecryptedOrders, saveOrderToStorage } from '../utils/encryption'
 import { API_URL } from '../config/api'
+import { useAuth } from '../context/AuthContext'
 
 // Global font yükleme engelleme - sayfa yüklenmeden önce
 if (typeof window !== 'undefined') {
@@ -51,6 +52,7 @@ function Payment() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const { isAuthenticated, loading: authLoading } = useAuth()
   // OrderId'yi önce query parametresinden, yoksa state'ten al
   const [orderId, setOrderId] = useState(
     searchParams.get('orderId') || location.state?.orderData?.id || null
@@ -62,7 +64,26 @@ function Payment() {
   const [threeDSecureHtml, setThreeDSecureHtml] = useState(null)
 
 
+  // Kullanıcı giriş kontrolü
   useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
+      navigate('/login', { 
+        state: { 
+          from: location.pathname + location.search,
+          message: 'Ödeme yapabilmek için lütfen giriş yapın veya kayıt olun.'
+        } 
+      })
+      return
+    }
+  }, [isAuthenticated, authLoading, navigate, location])
+
+  useEffect(() => {
+    // Giriş kontrolü yapıldıktan sonra devam et
+    if (authLoading || !isAuthenticated) {
+      return
+    }
+
     console.log('🔍 Payment sayfası yüklendi, orderId:', orderId)
     
     if (!orderId) {
@@ -108,7 +129,7 @@ function Payment() {
       setOrderData(orderDataWithBase64)
       setLoading(false)
     }
-  }, [orderId, navigate, location.state])
+  }, [orderId, navigate, location.state, authLoading, isAuthenticated])
 
   // 3D Secure HTML yüklendiğinde iframe'de göster ve formu otomatik submit et
   useEffect(() => {
@@ -278,6 +299,25 @@ function Payment() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Eğer kullanıcı giriş yapmamışsa, loading göster veya yönlendirme yapıldıysa boş döndür
+  if (authLoading) {
+    return (
+      <>
+        <Navbar />
+        <main style={{ padding: '4rem 0', textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+          <h2>Yükleniyor...</h2>
+        </main>
+        <Footer />
+      </>
+    )
+  }
+
+  if (!isAuthenticated) {
+    // Yönlendirme yapıldı, boş döndür
+    return null
   }
 
   if (loading && !orderData) {

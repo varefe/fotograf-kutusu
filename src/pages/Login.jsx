@@ -1,12 +1,14 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
 
 function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
+  const [redirectMessage, setRedirectMessage] = useState('')
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -15,6 +17,13 @@ function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+
+  // Yönlendirme mesajını kontrol et
+  useEffect(() => {
+    if (location.state?.message) {
+      setRedirectMessage(location.state.message)
+    }
+  }, [location.state])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -30,9 +39,14 @@ function Login() {
     const result = await login(formData.email, formData.password, formData.rememberMe)
 
     if (result.success) {
-      // Admin ise admin paneline, değilse profile yönlendir
+      // Yönlendirme varsa oraya git, yoksa admin ise admin paneline, değilse profile yönlendir
       const { user } = result
-      if (user?.role === 'admin') {
+      const from = location.state?.from || null
+      
+      if (from) {
+        // Yönlendirilen sayfaya geri dön
+        navigate(from, { replace: true })
+      } else if (user?.role === 'admin') {
         navigate('/admin-panel')
       } else {
         navigate('/profile')
@@ -67,6 +81,20 @@ function Login() {
             <h1 style={{ textAlign: 'center', marginBottom: '2rem', fontSize: '2rem' }}>
               Giriş Yap
             </h1>
+
+            {redirectMessage && (
+              <div style={{
+                background: '#fff3cd',
+                color: '#856404',
+                padding: '1rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                textAlign: 'center',
+                border: '1px solid #ffc107'
+              }}>
+                <strong>⚠️</strong> {redirectMessage}
+              </div>
+            )}
 
             {error && (
               <div style={{
