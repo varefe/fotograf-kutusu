@@ -459,11 +459,11 @@ function Payment() {
       }}>
         <div className="container">
           <div style={{
-            maxWidth: '900px',
+            maxWidth: '600px',
             margin: '0 auto',
             background: 'white',
             padding: '0',
-            borderRadius: '16px',
+            borderRadius: '12px',
             boxShadow: 'var(--shadow-lg)',
             border: '1px solid var(--border-color)',
             overflow: 'hidden'
@@ -471,7 +471,7 @@ function Payment() {
             {/* Modern Header */}
             <div style={{
               background: 'var(--bg-color)',
-              padding: '2.5rem 2rem',
+              padding: '1.25rem 1.5rem',
               textAlign: 'center',
               color: 'var(--text-color)',
               position: 'relative',
@@ -479,18 +479,18 @@ function Payment() {
               borderBottom: '1px solid var(--border-color)'
             }}>
               <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
-                  <Icon name="lock" size={28} />
+                <div style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>
+                  <Icon name="lock" size={20} />
                 </div>
                 <h1 style={{
                   margin: '0',
-                  fontSize: '2rem',
+                  fontSize: '1.5rem',
                   fontWeight: '700',
-                  letterSpacing: '0.5px'
+                  letterSpacing: '0.3px'
                 }}>Güvenli Ödeme</h1>
                 <p style={{
-                  margin: '0.5rem 0 0 0',
-                  fontSize: '1rem',
+                  margin: '0.4rem 0 0 0',
+                  fontSize: '0.875rem',
                   color: 'var(--text-light)',
                   fontWeight: '400'
                 }}>Siparişinizi tamamlamak için ödeme bilgilerinizi girin</p>
@@ -500,62 +500,62 @@ function Payment() {
             {/* Sipariş Bilgisi Kartı */}
             {orderId && (
               <div style={{
-                padding: '1.5rem 2rem',
-                background: '#f8f9fa',
-                borderBottom: '1px solid #e9ecef',
+                padding: '1rem 1.5rem',
+                background: 'var(--bg-light)',
+                borderBottom: '1px solid var(--border-color)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
-                gap: '1rem'
+                gap: '0.75rem'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <div style={{
-                    width: '40px',
-                    height: '40px',
+                    width: '32px',
+                    height: '32px',
                     borderRadius: '50%',
                     background: 'var(--bg-gray)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'var(--text-color)',
-                    fontSize: '1.2rem',
+                    fontSize: '0.95rem',
                     fontWeight: 'bold'
                   }}>#</div>
                   <div>
                     <div style={{ 
-                      fontSize: '0.85rem', 
-                      color: '#6c757d',
+                      fontSize: '0.75rem', 
+                      color: 'var(--text-light)',
                       fontWeight: '500',
                       textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      letterSpacing: '0.3px'
                     }}>Sipariş No</div>
                     <div style={{ 
-                      fontSize: '1.1rem', 
-                      color: '#2c3e50',
+                      fontSize: '0.95rem', 
+                      color: 'var(--text-color)',
                       fontWeight: '600',
                       fontFamily: 'monospace'
                     }}>{orderId}</div>
                   </div>
                 </div>
                 <div style={{
-                  padding: '0.5rem 1rem',
+                  padding: '0.4rem 0.75rem',
                   background: 'white',
-                  borderRadius: '8px',
-                  border: '1px solid #e9ecef',
-                  fontSize: '0.9rem',
-                  color: '#475569',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color)',
+                  fontSize: '0.8rem',
+                  color: 'var(--text-light)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.4rem'
                 }}>
-                  <Icon name="lock" size={14} />
+                  <Icon name="lock" size={12} />
                   <span>SSL ile Korunuyor</span>
                 </div>
               </div>
             )}
 
-            <div style={{ padding: '2rem' }}>
+            <div style={{ padding: '1.5rem' }}>
             
             {show3DSecure && threeDSecureHtml ? (
               <div style={{ 
@@ -611,9 +611,9 @@ function Payment() {
               </div>
             ) : orderData ? (
               <div>
-                <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-                  <h2 style={{ marginBottom: '0.5rem', color: '#2c3e50' }}>Ödeme Bilgileri</h2>
-                  <p style={{ color: '#666', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                <div style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
+                  <h2 style={{ marginBottom: '0.4rem', color: 'var(--text-color)', fontSize: '1.25rem', fontWeight: '600' }}>Ödeme Bilgileri</h2>
+                  <p style={{ color: 'var(--text-light)', fontSize: '0.95rem', fontWeight: '600' }}>
                     Toplam: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(orderData.price || 0)}
                   </p>
                 </div>
@@ -656,10 +656,10 @@ function Payment() {
 
             {/* Güvenlik Bölümü */}
             <div style={{
-              marginTop: '2rem',
-              padding: '2rem',
+              marginTop: '1.5rem',
+              padding: '1.25rem',
               background: 'var(--bg-light)',
-              borderRadius: '12px',
+              borderRadius: '8px',
               border: '1px solid var(--border-color)',
               textAlign: 'center'
             }}>
@@ -668,33 +668,32 @@ function Payment() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.5rem',
-                marginBottom: '1rem'
+                marginBottom: '0.75rem'
               }}>
                 <div style={{
-                  width: '50px',
-                  height: '50px',
+                  width: '36px',
+                  height: '36px',
                   borderRadius: '50%',
                   background: 'var(--bg-gray)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '1.5rem',
                   boxShadow: 'var(--shadow)'
                 }}>
-                  <Icon name="lock" size={18} />
+                  <Icon name="lock" size={14} />
                 </div>
                 <h3 style={{
                   margin: '0',
-                  color: '#0f172a',
-                  fontSize: '1.25rem',
+                  color: 'var(--text-color)',
+                  fontSize: '1rem',
                   fontWeight: '600'
                 }}>Güvenli Ödeme</h3>
               </div>
               <p style={{
-                color: '#64748b',
-                marginBottom: '1.5rem',
-                fontSize: '0.95rem',
-                lineHeight: '1.6'
+                color: 'var(--text-light)',
+                marginBottom: '1rem',
+                fontSize: '0.8rem',
+                lineHeight: '1.5'
               }}>
                 Ödemeleriniz 256-bit SSL sertifikası ile korunmaktadır. 
                 Kart bilgileriniz hiçbir şekilde saklanmaz.
@@ -705,19 +704,19 @@ function Payment() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '1.5rem',
+                gap: '1rem',
                 flexWrap: 'wrap',
-                marginBottom: '1.5rem',
-                padding: '1rem',
+                marginBottom: '0.75rem',
+                padding: '0.75rem',
                 background: 'white',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 border: '1px solid var(--border-color)'
               }}>
                 <img 
                   src="/logos/visa.png" 
                   alt="Visa" 
                   style={{
-                    height: '30px',
+                    height: '24px',
                     objectFit: 'contain',
                     filter: 'grayscale(0%)',
                     opacity: 0.8
@@ -730,7 +729,7 @@ function Payment() {
                   src="/logos/mastercard.png" 
                   alt="MasterCard" 
                   style={{
-                    height: '30px',
+                    height: '24px',
                     objectFit: 'contain',
                     filter: 'grayscale(0%)',
                     opacity: 0.8
@@ -743,7 +742,7 @@ function Payment() {
                   src="/logos/iyzico-ile-ode-horizontal.png" 
                   alt="iyzico ile Öde" 
                   style={{
-                    height: '35px',
+                    height: '28px',
                     objectFit: 'contain',
                     filter: 'grayscale(0%)',
                     opacity: 0.9
@@ -758,18 +757,18 @@ function Payment() {
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem 1.5rem',
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
                 background: 'white',
                 borderRadius: '999px',
                 border: '1px solid var(--border-color)',
                 boxShadow: 'var(--shadow)'
               }}>
-                <Icon name="lock" size={16} />
+                <Icon name="lock" size={12} />
                 <span style={{
                   color: 'var(--text-color)',
                   fontWeight: '600',
-                  fontSize: '0.9rem'
+                  fontSize: '0.8rem'
                 }}>SSL Sertifikası ile Güvenli Alışveriş</span>
               </div>
             </div>

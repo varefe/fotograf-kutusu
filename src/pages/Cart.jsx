@@ -1156,30 +1156,31 @@ function Cart() {
           {/* Ödeme Formu Bölümü */}
           {showPaymentForm && preparedOrderData && (
             <div id="payment-section" style={{
-              marginTop: '2rem',
+              marginTop: '1.5rem',
               background: 'white',
-              padding: '2rem',
-              borderRadius: '12px',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              padding: '1.25rem',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow)'
             }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '1.5rem',
-                paddingBottom: '1rem',
-                borderBottom: '2px solid #e5e7eb'
+                marginBottom: '1rem',
+                paddingBottom: '0.75rem',
+                borderBottom: '1px solid var(--border-color)'
               }}>
                 <h2 style={{ 
-                  fontSize: '1.5rem', 
+                  fontSize: '1.25rem', 
                   margin: 0, 
-                  color: '#2c3e50',
+                  color: 'var(--text-color)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.4rem',
+                  fontWeight: '600'
                 }}>
-                  <Icon name="lock" size={18} /> Güvenli Ödeme
+                  <Icon name="lock" size={16} /> Güvenli Ödeme
                 </h2>
                 <button
                   onClick={() => {
@@ -1190,40 +1191,40 @@ function Cart() {
                     setThreeDSecureHtml(null)
                   }}
                   style={{
-                    background: '#f3f4f6',
-                    border: 'none',
+                    background: 'var(--bg-gray)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '6px',
-                    padding: '0.5rem 1rem',
+                    padding: '0.4rem 0.75rem',
                     cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    color: '#666',
-                    fontWeight: '600'
+                    fontSize: '0.85rem',
+                    color: 'var(--text-light)',
+                    fontWeight: '500'
                   }}
                 >
-                  ✕ Kapat
+                  Kapat
                 </button>
               </div>
 
               {show3DSecure && threeDSecureHtml ? (
                 <div style={{ 
                   width: '100%', 
-                  minHeight: '600px',
-                  border: '1px solid #e9ecef',
-                  borderRadius: '12px',
+                  minHeight: '500px',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
                   overflow: 'hidden',
                   position: 'relative'
                 }}>
                   <div style={{
-                    padding: '1.5rem',
+                    padding: '1rem',
                     textAlign: 'center',
-                    background: '#f8f9fa',
-                    borderBottom: '1px solid #e9ecef'
+                    background: 'var(--bg-light)',
+                    borderBottom: '1px solid var(--border-color)'
                   }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
-                      <Icon name="lock" size={24} />
+                    <div style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>
+                      <Icon name="lock" size={20} />
                     </div>
-                    <h3 style={{ margin: 0, color: '#2c3e50' }}>3D Secure Doğrulama</h3>
-                    <p style={{ margin: '0.5rem 0 0 0', color: '#6c757d', fontSize: '0.9rem' }}>
+                    <h3 style={{ margin: 0, color: 'var(--text-color)', fontSize: '1.1rem', fontWeight: '600' }}>3D Secure Doğrulama</h3>
+                    <p style={{ margin: '0.4rem 0 0 0', color: 'var(--text-light)', fontSize: '0.8rem' }}>
                       Güvenli ödeme için bankanızın doğrulama sayfasına yönlendiriliyorsunuz...
                     </p>
                   </div>
@@ -1231,10 +1232,10 @@ function Cart() {
                     id="threeds-container"
                     style={{ 
                       width: '100%', 
-                      minHeight: '600px',
+                      minHeight: '500px',
                       padding: '0',
                       background: 'white',
-                      borderRadius: '12px',
+                      borderRadius: '8px',
                       overflow: 'hidden'
                     }}
                   />
@@ -1242,17 +1243,18 @@ function Cart() {
               ) : (
                 <div>
                   <div style={{ 
-                    marginBottom: '1.5rem', 
-                    padding: '1rem',
-                    background: '#f8f9fa',
-                    borderRadius: '8px',
-                    textAlign: 'center'
+                    marginBottom: '1rem', 
+                    padding: '0.75rem',
+                    background: 'var(--bg-light)',
+                    borderRadius: '6px',
+                    textAlign: 'center',
+                    border: '1px solid var(--border-color)'
                   }}>
                     <p style={{ 
                       margin: 0, 
-                      color: '#2c3e50', 
-                      fontSize: '1.1rem', 
-                      fontWeight: 'bold' 
+                      color: 'var(--text-color)', 
+                      fontSize: '0.95rem', 
+                      fontWeight: '600' 
                     }}>
                       Toplam: {new Intl.NumberFormat('tr-TR', { 
                         style: 'currency', 
@@ -1260,9 +1262,9 @@ function Cart() {
                       }).format(preparedOrderData.price || 0)}
                     </p>
                     <p style={{ 
-                      margin: '0.5rem 0 0 0', 
-                      color: '#6c757d', 
-                      fontSize: '0.9rem' 
+                      margin: '0.4rem 0 0 0', 
+                      color: 'var(--text-light)', 
+                      fontSize: '0.8rem' 
                     }}>
                       Sipariş No: <strong>{orderId}</strong>
                     </p>
@@ -1289,20 +1291,21 @@ function Cart() {
 
                   {/* Güvenlik Bilgisi */}
                   <div style={{
-                    marginTop: '1.5rem',
-                    padding: '1rem',
+                    marginTop: '1rem',
+                    padding: '0.75rem',
                     background: 'var(--bg-gray)',
-                    borderRadius: '8px',
+                    borderRadius: '6px',
                     border: '1px solid var(--border-color)',
                     textAlign: 'center',
-                    fontSize: '0.85rem',
+                    fontSize: '0.75rem',
                     color: 'var(--text-light)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '0.5rem'
+                    gap: '0.4rem',
+                    lineHeight: '1.4'
                   }}>
-                    <Icon name="lock" size={14} />
+                    <Icon name="lock" size={12} />
                     <span>Ödemeleriniz 256-bit SSL sertifikası ile korunmaktadır. Kart bilgileriniz hiçbir şekilde saklanmaz.</span>
                   </div>
                 </div>
