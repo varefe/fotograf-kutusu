@@ -12,10 +12,10 @@ const getApiUrl = () => {
   
   // Production ortamında (localhost değilse)
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    // Railway backend URL'i - /api eklemeyin, çünkü route'larda zaten /api var
-    const railwayUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app'
-    console.log('🌐 Production API URL:', railwayUrl)
-    return railwayUrl
+    // Render backend URL'i
+    const renderUrl = 'https://fotograf-kutusu.onrender.com'
+    console.log('🌐 Production API URL:', renderUrl)
+    return renderUrl
     
     // Eğer backend aynı sunucudaysa (mod_proxy ile):
     // return '/api'
