@@ -2,11 +2,15 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { saveOrderToStorage, getOrdersFromStorage, decryptData } from '../utils/encryption'
 import { calculatePrice } from '../utils/priceCalculator'
+import { useAuth } from '../context/AuthContext'
+import { API_URL } from '../config/api'
 
 function Order() {
   const navigate = useNavigate()
+  const { isAuthenticated, loading: authLoading, getAuthHeaders } = useAuth()
   const [preview, setPreview] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
   const [showCustomSize, setShowCustomSize] = useState(false)
@@ -23,6 +27,19 @@ function Order() {
     address: '',
     phone: ''
   })
+
+  // Kullanıcı giriş kontrolü
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
+      navigate('/login', { 
+        state: { 
+          from: '/order',
+          message: 'Sipariş verebilmek için lütfen giriş yapın veya kayıt olun.'
+        } 
+      })
+    }
+  }, [isAuthenticated, authLoading, navigate])
 
   // Canlı fiyat hesaplama
   const currentPrice = useMemo(() => {
@@ -145,10 +162,39 @@ function Order() {
       alert('Lütfen e-posta ve adres bilgilerini doldurun')
       return
     }
+
+    // Email format kontrolü
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email.trim())) {
+      alert('Geçerli bir e-posta adresi giriniz')
+      return
+    }
+
+    // Adres uzunluk kontrolü
+    if (formData.address.trim().length < 10) {
+      alert('Adres en az 10 karakter olmalıdır')
+      return
+    }
+
+    // Miktar kontrolü (minimum 15)
+    if (parseInt(formData.quantity) < 15) {
+      alert('Minimum 15 adet seçmelisiniz')
+      return
+    }
     
     if (formData.size === 'custom' && (!formData.customWidth || !formData.customHeight)) {
       alert('Özel boyut için genişlik ve yükseklik girmelisiniz')
       return
+    }
+
+    // Özel boyut validasyonu
+    if (formData.size === 'custom') {
+      const width = parseFloat(formData.customWidth)
+      const height = parseFloat(formData.customHeight)
+      if (isNaN(width) || isNaN(height) || width <= 0 || width > 200 || height <= 0 || height > 200) {
+        alert('Özel boyut 0-200 cm arası olmalıdır')
+        return
+      }
     }
     
     setIsSubmitting(true)
@@ -199,47 +245,49 @@ function Order() {
           } : undefined
         )
         
-        // DOĞRU AKIŞ: Önce ödeme, sonra sipariş kaydı
-        // Sadece localStorage'a kaydet, backend'e kaydetme
+        // ÖNEMLİ: Önce ödeme alınacak, sonra backend'e kaydedilecek
+        // Sipariş verisini oluştur ve localStorage'a kaydet
         const orderId = Date.now().toString()
-        const orderToSave = {
-          ...orderData,
+        const orderDataForStorage = {
           id: orderId,
-          price: calculatedPrice,
-          status: 'Yeni',
-          paymentStatus: 'pending',
+          photos: [orderData.photo], // Tek fotoğraf array olarak
+          photo: orderData.photo, // Geriye uyumluluk
+          size: orderData.size,
+          customSize: orderData.customSize,
+          quantity: orderData.quantity,
+          shippingType: orderData.shippingType,
+          email: orderData.email,
+          address: orderData.address,
+          phone: orderData.phone,
+          firstName: orderData.firstName,
+          lastName: orderData.lastName,
           customerInfo: {
-            firstName: orderData.firstName || 'Müşteri',
-            lastName: orderData.lastName || 'Müşteri',
+            firstName: orderData.firstName,
+            lastName: orderData.lastName,
             email: orderData.email,
             phone: orderData.phone || '',
             address: orderData.address
           },
+          price: calculatedPrice,
+          status: 'Yeni',
+          paymentStatus: 'pending', // Ödeme bekleniyor
+          notes: orderData.notes || '',
           createdAt: new Date().toISOString()
         }
         
-        // Şifreleyerek localStorage'a kaydet
-        const saved = saveOrderToStorage(orderToSave)
+        // localStorage'a kaydet (base64 dahil - ödeme sayfasında kullanılacak)
+        saveOrderToStorage(orderDataForStorage)
         
-        if (saved) {
-          console.log('✅ Sipariş localStorage\'a kaydedildi, ödeme sayfasına yönlendiriliyor:', orderId)
-          
-          // Loading state'i kapat
-          setIsSubmitting(false)
-          
-          // Direkt window.location ile yönlendir (kesin çalışsın)
-          const paymentUrl = `/payment?orderId=${orderId}`
-          console.log('🚀 Yönlendirme URL:', paymentUrl)
-          
-          // Kısa bir gecikme sonrası yönlendir
-          setTimeout(() => {
-            window.location.href = paymentUrl
-          }, 300)
-        } else {
-          console.error('❌ localStorage\'a kaydedilemedi')
-          alert('Sipariş kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.')
-          setIsSubmitting(false)
-        }
+        // Ödeme sayfasına yönlendir
+        navigate('/payment', {
+          state: {
+            orderId: orderId,
+            orderData: orderDataForStorage,
+            photoFiles: [selectedFile] // File objesi ödeme sayfasında base64'e çevrilecek
+          }
+        })
+        
+        setIsSubmitting(false)
       }
       
       reader.readAsDataURL(selectedFile)
@@ -249,6 +297,27 @@ function Order() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Eğer kullanıcı giriş yapmamışsa, loading göster veya yönlendirme yapıldıysa boş döndür
+  if (authLoading) {
+    return (
+      <>
+        <Navbar />
+        <main style={{ padding: '4rem 0', textAlign: 'center' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+            <Icon name="clock" size={32} />
+          </div>
+          <h2>Yükleniyor...</h2>
+        </main>
+        <Footer />
+      </>
+    )
+  }
+
+  if (!isAuthenticated) {
+    // Yönlendirme yapıldı, boş döndür
+    return null
   }
 
   return (
@@ -261,33 +330,30 @@ function Order() {
             
             {submitSuccess ? (
               <div className="success-message" style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'var(--bg-color)',
                 padding: '3rem',
                 borderRadius: '12px',
                 textAlign: 'center',
-                color: 'white',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                color: 'var(--text-color)',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-lg)',
                 marginTop: '2rem'
               }}>
-                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✅</div>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
+                  <Icon name="check" size={28} />
+                </div>
                 <h2 style={{ marginBottom: '1rem', fontSize: '2rem' }}>Siparişiniz Başarıyla Oluşturuldu!</h2>
-                <p style={{ fontSize: '1.1rem', marginBottom: '1rem', opacity: 0.9 }}>
+                <p style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-light)' }}>
                   Sipariş No: <strong>#{orderId}</strong>
                 </p>
-                <p style={{ fontSize: '1rem', marginBottom: '2rem', opacity: 0.9 }}>
-                  Siparişiniz şifreli olarak kaydedildi. En kısa sürede sizinle iletişime geçeceğiz.
+                <p style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-light)' }}>
+                  Siparişiniz backend'e kaydedildi ve admin panelinde görüntülenebilir.
+                </p>
+                <p style={{ fontSize: '0.9rem', marginBottom: '2rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
+                  Test Modu: Ödeme akışı geçici olarak devre dışı bırakıldı.
                 </p>
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <Link to="/" className="btn btn-secondary" style={{
-                    padding: '0.75rem 2rem',
-                    background: 'rgba(255,255,255,0.2)',
-                    color: 'white',
-                    textDecoration: 'none',
-                    borderRadius: '6px',
-                    fontWeight: 'bold',
-                    border: '2px solid white',
-                    transition: 'all 0.3s'
-                  }}>
+                  <Link to="/" className="btn btn-secondary">
                     Ana Sayfaya Dön
                   </Link>
                   <button
@@ -310,13 +376,12 @@ function Order() {
                     }}
                     style={{
                       padding: '0.75rem 2rem',
-                      background: 'white',
-                      color: '#667eea',
+                      background: 'var(--primary-color)',
+                      color: '#ffffff',
                       border: 'none',
                       borderRadius: '6px',
                       fontWeight: 'bold',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s'
+                      cursor: 'pointer'
                     }}
                   >
                     Yeni Sipariş Ver
@@ -331,12 +396,11 @@ function Order() {
                   className="upload-area" 
                   style={{
                     minHeight: '250px',
-                    border: '3px dashed #4f46e5',
+                    border: '2px dashed var(--primary-color)',
                     borderRadius: '12px',
                     padding: '40px',
-                    background: '#f9fafb',
+                    background: 'var(--bg-gray)',
                     cursor: 'pointer',
-                    transition: 'all 0.3s',
                     textAlign: 'center'
                   }}
                   onClick={() => document.getElementById('photoInput').click()}
@@ -352,7 +416,9 @@ function Order() {
                   />
                   {!preview ? (
                     <div className="upload-placeholder">
-                      <span className="upload-icon" style={{ fontSize: '64px', display: 'block', marginBottom: '20px' }}>📷</span>
+                      <span className="upload-icon" style={{ fontSize: '64px', display: 'block', marginBottom: '20px' }}>
+                        <Icon name="camera" size={48} />
+                      </span>
                       <p style={{ fontSize: '18px', color: '#4f46e5', fontWeight: '600', marginBottom: '10px' }}>
                         Fotoğrafınızı buraya sürükleyin
                       </p>
@@ -524,15 +590,16 @@ function Order() {
               {/* Fiyat Özeti */}
               {currentPrice && selectedFile && (
                 <div className="form-section" style={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'var(--bg-color)',
                   borderRadius: '12px',
                   padding: '2rem',
                   marginTop: '2rem',
-                  color: 'white',
-                  boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)'
+                  color: 'var(--text-color)',
+                  border: '1px solid var(--border-color)',
+                  boxShadow: 'var(--shadow)'
                 }}>
-                  <h2 style={{ color: 'white', marginBottom: '1.5rem', fontSize: '1.5rem' }}>
-                    💰 Fiyat Özeti
+                  <h2 style={{ color: 'var(--text-color)', marginBottom: '1.5rem', fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Icon name="cart" size={18} /> Fiyat Özeti
                   </h2>
                   <div style={{
                     display: 'grid',
@@ -540,46 +607,46 @@ function Order() {
                     gap: '1rem',
                     marginBottom: '1.5rem'
                   }}>
-                    <div style={{ background: 'rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Birim Fiyat</div>
+                    <div style={{ background: 'var(--bg-light)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Birim Fiyat</div>
                       <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
                         ₺{priceDetails ? (priceDetails.subtotal / priceDetails.quantity).toFixed(2) : '0.00'}
                       </div>
                       {priceDetails?.isBulkPrice && (
-                        <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
-                          🎁 Toplu Fiyat
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginTop: '0.25rem' }}>
+                          Toplu Fiyat
                         </div>
                       )}
                     </div>
-                    <div style={{ background: 'rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Adet</div>
+                    <div style={{ background: 'var(--bg-light)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Adet</div>
                       <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{formData.quantity} adet</div>
                     </div>
-                    <div style={{ background: 'rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Kargo</div>
+                    <div style={{ background: 'var(--bg-light)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Kargo</div>
                       <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                        {priceDetails && priceDetails.shippingPrice === 0 ? 'ÜCRETSİZ 🎉' : `₺${priceDetails?.shippingPrice || (formData.shippingType === 'standard' ? '15' : '35')}`}
+                        {priceDetails && priceDetails.shippingPrice === 0 ? 'ÜCRETSİZ' : `₺${priceDetails?.shippingPrice || (formData.shippingType === 'standard' ? '15' : '35')}`}
                       </div>
                     </div>
                   </div>
                   <div style={{
-                    borderTop: '2px solid rgba(255,255,255,0.3)',
+                    borderTop: '1px solid var(--border-color)',
                     paddingTop: '1.5rem',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center'
                   }}>
                     <div>
-                      <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Toplam Tutar</div>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Toplam Tutar</div>
                       {priceDetails?.isBulkPrice ? (
-                        <div style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: '0.25rem' }}>
-                          🎁 Toplu fiyat uygulandı! (25+ adet)
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', marginTop: '0.25rem' }}>
+                          Toplu fiyat uygulandı! (25+ adet)
                         </div>
                       ) : parseInt(formData.quantity) >= 3 && (
-                        <div style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: '0.25rem' }}>
-                          {parseInt(formData.quantity) >= 10 ? '🎁 %15 indirim uygulandı!' :
-                           parseInt(formData.quantity) >= 5 ? '🎁 %10 indirim uygulandı!' :
-                           '🎁 %5 indirim uygulandı!'}
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', marginTop: '0.25rem' }}>
+                          {parseInt(formData.quantity) >= 10 ? '%15 indirim uygulandı!' :
+                           parseInt(formData.quantity) >= 5 ? '%10 indirim uygulandı!' :
+                           '%5 indirim uygulandı!'}
                         </div>
                       )}
                     </div>
@@ -591,12 +658,14 @@ function Order() {
                     <div style={{
                       marginTop: '1rem',
                       padding: '0.75rem',
-                      background: 'rgba(255,255,255,0.2)',
+                      background: 'var(--bg-light)',
                       borderRadius: '6px',
                       fontSize: '0.9rem',
-                      textAlign: 'center'
+                      textAlign: 'center',
+                      color: 'var(--text-light)',
+                      border: '1px solid var(--border-color)'
                     }}>
-                      🚚 ₺{(99 - priceDetails.subtotal).toFixed(2)} daha ekleyin, kargo ücretsiz olsun!
+                      ₺{(99 - priceDetails.subtotal).toFixed(2)} daha ekleyin, kargo ücretsiz olsun!
                     </div>
                   )}
                 </div>
@@ -609,11 +678,11 @@ function Order() {
                   style={{ fontSize: '18px', padding: '15px 40px' }}
                   disabled={isSubmitting || !selectedFile}
                 >
-                  {isSubmitting ? '⏳ Sipariş Oluşturuluyor...' : '📸 Sipariş Ver ve Ödemeye Geç'}
+                  {isSubmitting ? 'Sipariş Oluşturuluyor...' : 'Sipariş Ver (Test Modu)'}
                 </button>
                 {isSubmitting && (
                   <p style={{ marginTop: '1rem', color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                    Lütfen bekleyin, ödeme sayfasına yönlendirileceksiniz...
+                    Lütfen bekleyin, siparişiniz kaydediliyor...
                   </p>
                 )}
               </div>

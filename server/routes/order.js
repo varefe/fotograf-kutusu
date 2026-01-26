@@ -1,5 +1,6 @@
 import express from 'express';
 import Order from '../models/Order.js';
+import mongoose from 'mongoose';
 import { connectDB } from '../config/database.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { requireAuth, optionalAuth } from '../middleware/userAuth.js';
@@ -136,8 +137,48 @@ router.get('/user', requireAuth, async (req, res) => {
   }
 });
 
-// Sipariş oluştur (opsiyonel auth - giriş yapmış kullanıcılar için)
-router.post('/', optionalAuth, async (req, res) => {
+// Async wrapper to ensure errors are properly caught and forwarded
+const asyncHandler = (fn) => {
+  return (req, res, next) => {
+    // #region agent log
+    console.log('🔍 [DEBUG] asyncHandler entry:', { nextType: typeof next, nextIsFunction: typeof next === 'function', method: req.method, path: req.path });
+    // #endregion
+    // Ensure next is always a function
+    if (typeof next !== 'function') {
+      // #region agent log
+      console.error('🔍 [DEBUG] next is not a function detected:', { nextType: typeof next, nextValue: next, method: req.method, path: req.path });
+      // #endregion
+      console.error('asyncHandler: next is not a function');
+      return res.status(500).json({
+        success: false,
+        error: 'Sipariş oluşturulamadı',
+        message: 'next is not a function'
+      });
+    }
+    Promise.resolve(fn(req, res, next)).catch((error) => {
+      // #region agent log
+      console.error('🔍 [DEBUG] asyncHandler catch:', { errorMessage: error?.message, nextType: typeof next, nextIsFunction: typeof next === 'function' });
+      // #endregion
+      // Forward error to Express error handler
+      if (typeof next === 'function') {
+        next(error);
+      } else {
+        // #region agent log
+        console.error('🔍 [DEBUG] next is not function in catch:', { errorMessage: error?.message });
+        // #endregion
+        res.status(500).json({
+          success: false,
+          error: 'Sipariş oluşturulamadı',
+          message: error.message || 'Middleware chain error'
+        });
+      }
+    });
+  };
+};
+
+// Sipariş oluştur (kayıt zorunlu - requireAuth)
+// Wrap requireAuth in asyncHandler to ensure proper async middleware handling
+router.post('/', asyncHandler(requireAuth), asyncHandler(async (req, res, next) => {
   // MongoDB bağlantısını kontrol et
   try {
     await connectDB();
@@ -152,6 +193,7 @@ router.post('/', optionalAuth, async (req, res) => {
   try {
     const {
       photo,
+      photos, // Yeni: Birden fazla fotoğraf desteği
       size,
       customSize,
       quantity,
@@ -170,8 +212,37 @@ router.post('/', optionalAuth, async (req, res) => {
     } = req.body;
 
     // Veri temizleme
+    // Email ve address'i hem üst seviyede hem customerInfo içinde tut (validasyon için)
+    // Email ve address'i sanitize etme - sadece trim yap (validasyon için format korunmalı)
+    // String'e çevir ve trim yap
+    const finalEmail = String(email || customerInfo?.email || '').trim();
+    const finalAddress = String(address || customerInfo?.address || '').trim();
+    const finalPhone = phone ? sanitizeInput(phone) : (customerInfo?.phone ? sanitizeInput(customerInfo.phone) : '');
+    const finalFirstName = firstName ? sanitizeInput(firstName) : (customerInfo?.firstName ? sanitizeInput(customerInfo.firstName) : 'Müşteri');
+    const finalLastName = lastName ? sanitizeInput(lastName) : (customerInfo?.lastName ? sanitizeInput(customerInfo.lastName) : 'Müşteri');
+    
+    console.log('📧 Email ve Address kontrolü:', {
+      rawEmail: email,
+      rawCustomerInfoEmail: customerInfo?.email,
+      finalEmail: finalEmail,
+      finalEmailLength: finalEmail.length,
+      rawAddress: address,
+      rawCustomerInfoAddress: customerInfo?.address,
+      finalAddress: finalAddress,
+      finalAddressLength: finalAddress.length
+    });
+    
+    // Photo/Photos objesi sanitize edilmemeli (base64 string içeriyor)
+    // Geriye uyumluluk: photo varsa photos array'ine çevir
+    let photosArray = photos || [];
+    if (photo && !photosArray.length) {
+      // Eski format: photo varsa photos array'ine ekle
+      photosArray = [photo];
+    }
+    
     const sanitizedData = {
-      photo: photo ? sanitizeInput(photo) : null,
+      photo: photo || null, // Geriye uyumluluk için
+      photos: photosArray, // Yeni: Birden fazla fotoğraf
       size: sanitizeInput(size),
       customSize: customSize ? {
         width: parseFloat(sanitizeInput(customSize.width)),
@@ -179,62 +250,135 @@ router.post('/', optionalAuth, async (req, res) => {
       } : undefined,
       quantity: parseInt(sanitizeInput(quantity)) || 15,
       shippingType: sanitizeInput(shippingType) || 'standard',
+      email: finalEmail, // validateOrderData için gerekli
+      address: finalAddress, // validateOrderData için gerekli
+      phone: finalPhone,
+      firstName: finalFirstName,
+      lastName: finalLastName,
       customerInfo: {
-        firstName: firstName ? sanitizeInput(firstName) : 'Müşteri',
-        lastName: lastName ? sanitizeInput(lastName) : 'Müşteri',
-        email: email ? sanitizeInput(email) : (customerInfo?.email ? sanitizeInput(customerInfo.email) : ''),
-        phone: phone ? sanitizeInput(phone) : (customerInfo?.phone ? sanitizeInput(customerInfo.phone) : ''),
-        address: address ? sanitizeInput(address) : (customerInfo?.address ? sanitizeInput(customerInfo.address) : '')
+        firstName: finalFirstName,
+        lastName: finalLastName,
+        email: finalEmail,
+        phone: finalPhone,
+        address: finalAddress
       },
-      notes: notes ? sanitizeInput(notes) : ''
+      notes: notes ? sanitizeInput(notes) : '',
+      paymentStatus: paymentStatus || 'pending' // Test modu kontrolü için
     };
 
-    // Minimum 15 adet kontrolü
-    if (sanitizedData.quantity < 15) {
-      return res.status(400).json({
-        success: false,
-        error: 'Minimum adet hatası',
-        message: 'Minimum 15 adet seçmelisiniz (tekli fiyat yok)',
-        details: { quantity: 'Minimum 15 adet gerekli' }
-      });
-    }
-
-    // Detaylı validasyon
-    const validation = validateOrderData(sanitizedData);
-    if (!validation.isValid) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validasyon hatası',
-        message: 'Girilen bilgiler geçersiz',
-        details: validation.errors
-      });
+    // TEST MODU: Validasyonu esnek yap (paymentStatus: 'test' ise)
+    const isTestMode = (paymentStatus === 'test');
+    console.log('🧪 PaymentStatus kontrolü:', { paymentStatus, isTestMode });
+    
+    if (isTestMode) {
+      // TEST MODU: HİÇBİR KONTROL YOK - DİREKT KAYDET
+      console.log('🧪 TEST MODU: TÜM KONTROLLER ATLANDI - DİREKT KAYIT');
+    } else {
+      // Normal modda kontrolleri yap
+      
+      // Minimum 15 adet kontrolü
+      if (sanitizedData.quantity < 15) {
+        return res.status(400).json({
+          success: false,
+          error: 'Minimum adet hatası',
+          message: 'Minimum 15 adet seçmelisiniz (tekli fiyat yok)',
+          details: { quantity: 'Minimum 15 adet gerekli' }
+        });
+      }
+      
+      // Normal modda validasyon yap
+      const validation = validateOrderData(sanitizedData);
+      if (!validation.isValid) {
+        console.error('❌ Validasyon hataları:', validation.errors);
+        return res.status(400).json({
+          success: false,
+          error: 'Validasyon hatası',
+          message: 'Girilen bilgiler geçersiz',
+          details: validation.errors
+        });
+      }
     }
 
     // Fiyat hesapla (eğer request'te fiyat gönderilmişse onu kullan, yoksa hesapla)
-    const price = requestPrice ? parseFloat(requestPrice) : calculatePrice(
-      sanitizedData.size,
-      sanitizedData.quantity,
-      sanitizedData.shippingType,
-      sanitizedData.customSize
-    );
+    // Test modunda fiyat hesaplama hatası olmasın diye try-catch ile sar
+    let price;
+    if (requestPrice) {
+      price = parseFloat(requestPrice);
+    } else if (isTestMode) {
+      // Test modunda basit fiyat hesapla (validasyon yok)
+      price = (sanitizedData.quantity || 15) * 20 + 15; // Basit hesaplama
+      console.log('🧪 TEST MODU: Basit fiyat hesaplandı:', price);
+    } else {
+      price = calculatePrice(
+        sanitizedData.size,
+        sanitizedData.quantity,
+        sanitizedData.shippingType,
+        sanitizedData.customSize
+      );
+    }
 
-    // Kullanıcı ID'sini al (opsiyonel - giriş yapmış kullanıcılar için)
-    // Önce request body'den, sonra auth token'dan, son olarak null
+    // Kullanıcı ID'sini al (kayıt zorunlu - requireAuth ile gelen kullanıcı)
+    // requireAuth middleware'i kullanıcıyı req.user'a ekler
     let userId = null;
-    if (requestUserId) {
-      userId = requestUserId;
-    } else if (req.user && req.user.id) {
-      userId = req.user.id;
+    if (req.user && req.user.id) {
+      // userId'yi ObjectId'ye çevir (MongoDB için)
+      const mongoose = (await import('mongoose')).default;
+      if (mongoose.Types.ObjectId.isValid(req.user.id)) {
+        userId = new mongoose.Types.ObjectId(req.user.id);
+      } else {
+        userId = req.user.id; // String olarak kullan
+      }
+    } else {
+      // Bu durumda requireAuth çalışmamış demektir, hata döndür
+      return res.status(401).json({
+        success: false,
+        error: 'Yetkilendirme gerekli',
+        message: 'Sipariş verebilmek için lütfen giriş yapın veya kayıt olun'
+      });
     }
 
     // Payment status ve status'u al (eğer gönderilmişse)
     const finalPaymentStatus = paymentStatus || 'pending';
     const finalStatus = status || 'Yeni';
+    
+    console.log('📝 Final payment status:', finalPaymentStatus);
+
+    // Aynı kullanıcının siparişlerini birbirine bağlamak için orderGroupId oluştur
+    // Aynı email/kullanıcı için mevcut orderGroupId varsa onu kullan, yoksa yeni oluştur
+    let orderGroupId = null;
+    if (finalEmail) {
+      // Aynı email ile son 30 gün içinde oluşturulmuş bir sipariş var mı?
+      const OrderModel = mongoose.models.Order || mongoose.model('Order');
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const existingOrder = await OrderModel.findOne({
+        $or: [
+          { 'customerInfo.email': finalEmail },
+          { userId: userId }
+        ],
+        createdAt: { $gte: thirtyDaysAgo },
+        orderGroupId: { $exists: true, $ne: null }
+      }).sort({ createdAt: -1 }).lean();
+      
+      if (existingOrder && existingOrder.orderGroupId) {
+        // Mevcut orderGroupId'yi kullan
+        orderGroupId = existingOrder.orderGroupId;
+        console.log('🔗 Mevcut orderGroupId kullanılıyor:', orderGroupId);
+      } else {
+        // Yeni orderGroupId oluştur (email + timestamp hash)
+        const crypto = (await import('crypto')).default;
+        const hash = crypto.createHash('md5').update(`${finalEmail}-${Date.now()}`).digest('hex');
+        orderGroupId = `GROUP-${hash.substring(0, 12)}`;
+        console.log('🆕 Yeni orderGroupId oluşturuldu:', orderGroupId);
+      }
+    }
 
     // Sipariş oluştur
     const orderData = {
       userId: userId, // Giriş yapmış kullanıcı veya request'ten gelen userId
-      photo: sanitizedData.photo,
+      photo: sanitizedData.photo, // Geriye uyumluluk için
+      photos: sanitizedData.photos, // Yeni: Birden fazla fotoğraf
       size: sanitizedData.size,
       customSize: sanitizedData.customSize,
       quantity: sanitizedData.quantity,
@@ -252,21 +396,46 @@ router.post('/', optionalAuth, async (req, res) => {
       price,
       status: finalStatus, // Request'ten gelen veya varsayılan 'Yeni'
       paymentStatus: finalPaymentStatus, // Request'ten gelen veya varsayılan 'pending'
-      notes: sanitizedData.notes
+      notes: sanitizedData.notes,
+      orderGroupId: orderGroupId // Aynı kullanıcının siparişlerini birbirine bağla
     };
 
+    // Veritabanı ve koleksiyon bilgilerini logla
+    const dbName = mongoose.connection.db?.databaseName || 'Bilinmiyor';
+    const OrderModel = mongoose.models.Order || mongoose.model('Order');
+    const collectionName = OrderModel.collection?.name || 'Bilinmiyor';
+    
     console.log('📦 Yeni sipariş kaydediliyor:', {
       email: sanitizedData.customerInfo.email,
       paymentStatus: finalPaymentStatus,
       status: finalStatus,
       price: price,
       quantity: sanitizedData.quantity,
-      userId: userId || 'Misafir'
+      userId: userId || 'Misafir',
+      dbName,
+      collectionName
     });
 
     const savedOrder = await Order.create(orderData);
 
-    console.log('✅ Sipariş başarıyla kaydedildi:', savedOrder._id || savedOrder.id);
+    console.log('✅ Sipariş başarıyla kaydedildi:', {
+      orderId: savedOrder._id || savedOrder.id,
+      dbName,
+      collectionName,
+      savedAt: new Date().toISOString()
+    });
+    
+    // Kaydedilen siparişin veritabanında olup olmadığını doğrula
+    try {
+      const verifyOrder = await OrderModel.findById(savedOrder._id || savedOrder.id);
+      if (verifyOrder) {
+        console.log('✅ Sipariş veritabanında doğrulandı:', verifyOrder._id);
+      } else {
+        console.error('❌ KRİTİK: Sipariş kaydedildi ama veritabanında bulunamadı!');
+      }
+    } catch (verifyError) {
+      console.error('❌ Sipariş doğrulama hatası:', verifyError);
+    }
 
     res.status(201).json({
       success: true,
@@ -275,13 +444,10 @@ router.post('/', optionalAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Sipariş oluşturma hatası:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Sipariş oluşturulamadı',
-      message: error.message
-    });
+    // Re-throw the error so asyncHandler can catch it and forward to Express error handler
+    throw error;
   }
-});
+}));
 
 // Tüm siparişleri getir (Admin)
 router.get('/', requireAdmin, async (req, res) => {

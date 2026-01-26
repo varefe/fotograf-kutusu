@@ -1,12 +1,14 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
 
 function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
+  const [redirectMessage, setRedirectMessage] = useState('')
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -15,6 +17,13 @@ function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+
+  // Yönlendirme mesajını kontrol et
+  useEffect(() => {
+    if (location.state?.message) {
+      setRedirectMessage(location.state.message)
+    }
+  }, [location.state])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -30,9 +39,14 @@ function Login() {
     const result = await login(formData.email, formData.password, formData.rememberMe)
 
     if (result.success) {
-      // Admin ise admin paneline, değilse profile yönlendir
+      // Yönlendirme varsa oraya git, yoksa admin ise admin paneline, değilse profile yönlendir
       const { user } = result
-      if (user?.role === 'admin') {
+      const from = location.state?.from || null
+      
+      if (from) {
+        // Yönlendirilen sayfaya geri dön
+        navigate(from, { replace: true })
+      } else if (user?.role === 'admin') {
         navigate('/admin-panel')
       } else {
         navigate('/profile')
@@ -67,6 +81,20 @@ function Login() {
             <h1 style={{ textAlign: 'center', marginBottom: '2rem', fontSize: '2rem' }}>
               Giriş Yap
             </h1>
+
+            {redirectMessage && (
+              <div style={{
+                background: '#fff3cd',
+                color: '#856404',
+                padding: '1rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                textAlign: 'center',
+                border: '1px solid #ffc107'
+              }}>
+                <strong>Uyarı:</strong> {redirectMessage}
+              </div>
+            )}
 
             {error && (
               <div style={{
@@ -146,7 +174,7 @@ function Login() {
                     }}
                     title={showPassword ? 'Şifreyi Gizle' : 'Şifreyi Göster'}
                   >
-                    {showPassword ? '🙈' : '👁️'}
+                    {showPassword ? 'Gizle' : 'Göster'}
                   </button>
                 </div>
               </div>
@@ -186,7 +214,7 @@ function Login() {
                 <Link 
                   to="/forgot-password" 
                   style={{ 
-                    color: '#667eea', 
+                    color: 'var(--primary-color)', 
                     fontWeight: '600',
                     fontSize: '0.95rem',
                     textDecoration: 'none'
@@ -202,28 +230,16 @@ function Login() {
                 style={{
                   width: '100%',
                   padding: '0.75rem',
-                  background: loading ? '#ccc' : 'var(--primary-color)',
-                  color: loading ? '#666' : '#000000',
+                  background: loading ? '#e2e8f0' : 'var(--primary-color)',
+                  color: loading ? '#64748b' : '#ffffff',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '1.1rem',
                   fontWeight: 'bold',
                   cursor: loading ? 'not-allowed' : 'pointer',
                   marginBottom: '1rem',
-                  boxShadow: loading ? 'none' : '0 2px 8px rgba(212, 175, 55, 0.3)',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  if (!loading) {
-                    e.target.style.background = 'var(--primary-gold)'
-                    e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.4)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!loading) {
-                    e.target.style.background = 'var(--primary-color)'
-                    e.target.style.boxShadow = '0 2px 8px rgba(212, 175, 55, 0.3)'
-                  }
+                  boxShadow: loading ? 'none' : 'var(--shadow)',
+                  transition: 'color 0.2s, background-color 0.2s, box-shadow 0.2s'
                 }}
               >
                 {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}

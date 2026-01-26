@@ -3,6 +3,9 @@
  * API endpoint'lerine admin kontrolü ekler
  */
 
+import { verifyToken } from '../utils/jwt.js';
+import User from '../models/UserSchema.js';
+
 // Admin kullanıcı adı ve şifre (environment variable'dan)
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'efe';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '193123';
@@ -116,6 +119,76 @@ export const requireApiKey = (req, res, next) => {
       success: false,
       error: 'API Key hatası',
       message: 'API key kontrolü sırasında bir hata oluştu'
+    });
+  }
+};
+
+/**
+ * Admin role kontrolü - JWT token ile
+ */
+export const requireAdminRole = async (req, res, next) => {
+  try {
+    // Dynamic import to avoid circular dependency
+    const { verifyToken } = await import('../utils/jwt.js');
+    const User = (await import('../models/UserSchema.js')).default;
+    
+    // Token'ı header'dan al
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        error: 'Yetkilendirme gerekli',
+        message: 'Giriş yapmanız gerekiyor'
+      });
+    }
+
+    // Token'ı doğrula ve kullanıcıyı al
+    const token = authHeader.split(' ')[1];
+    const decoded = verifyToken(token);
+    
+    if (!decoded) {
+      return res.status(401).json({
+        success: false,
+        error: 'Geçersiz token',
+        message: 'Token geçersiz veya süresi dolmuş'
+      });
+    }
+
+    // Kullanıcıyı veritabanından bul
+    const user = await User.findById(decoded.userId);
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Kullanıcı bulunamadı',
+        message: 'Kullanıcı hesabı bulunamadı'
+      });
+    }
+
+    // Admin kontrolü
+    if (user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Yetkisiz erişim',
+        message: 'Bu işlem için admin yetkisi gereklidir'
+      });
+    }
+
+    // Kullanıcı bilgilerini request'e ekle
+    req.user = {
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role
+    };
+    
+    next();
+  } catch (error) {
+    console.error('Admin role kontrolü hatası:', error);
+    return res.status(401).json({
+      success: false,
+      error: 'Yetkilendirme hatası',
+      message: 'Kimlik doğrulama sırasında bir hata oluştu'
     });
   }
 };

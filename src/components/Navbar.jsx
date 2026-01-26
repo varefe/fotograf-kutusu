@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
+import Icon from './Icon'
 
 function Navbar() {
   const { getCartCount } = useCart()
@@ -18,7 +19,7 @@ function Navbar() {
             <Link to="/delivery-returns">Teslimat ve İade</Link>
           </div>
           <div style={{ fontSize: '0.875rem' }}>
-            📞 Destek: <strong>0 (506) 708 76 84</strong>
+            <Icon name="phone" size={14} /> Destek: <strong>0 (506) 708 76 84</strong>
           </div>
         </div>
       </div>
@@ -45,52 +46,30 @@ function Navbar() {
                 {isAdmin && (
                   <Link 
                     to="/admin-panel" 
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: 'var(--primary-color)',
-                      color: '#000000',
-                      borderRadius: '8px',
-                      fontWeight: '700',
-                      textDecoration: 'none',
-                      marginRight: '1rem',
-                      boxShadow: '0 2px 8px var(--primary-shadow)',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = 'var(--primary-gold)'
-                      e.target.style.transform = 'translateY(-2px)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = 'var(--primary-color)'
-                      e.target.style.transform = 'translateY(0)'
-                    }}
+                    className="btn btn-primary btn-small"
+                    style={{ marginRight: '1rem' }}
                   >
-                    🛡️ Admin Panel
+                    <Icon name="shield" size={14} /> Admin Panel
                   </Link>
                 )}
                 <Link to="/profile" className="nav-user">
-                  <span>👤</span>
+                  <Icon name="user" size={16} />
                   <span>{user?.firstName || 'Profil'}</span>
                 </Link>
               </>
             ) : (
               <>
                 <Link to="/login">Giriş Yap</Link>
-                <Link to="/register" style={{ 
-                  background: 'var(--primary-color)', 
-                  color: '#000000', 
-                  padding: '0.5rem 1rem', 
-                  borderRadius: '8px',
-                  fontWeight: '700',
-                  boxShadow: '0 2px 8px rgba(212, 175, 55, 0.3)'
-                }}>
+                <Link to="/register" className="btn btn-primary btn-small">
                   Kayıt Ol
                 </Link>
               </>
             )}
             
             <Link to="/cart" className="nav-cart">
-              <span>🛒 Sepet</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Icon name="cart" size={16} /> Sepet
+              </span>
               {cartCount > 0 && (
                 <span className="nav-cart-badge">{cartCount}</span>
               )}

@@ -8,13 +8,22 @@ const orderSchema = new mongoose.Schema({
     ref: 'User',
     default: null // Opsiyonel - misafir siparişleri için null olabilir
   },
+  // Geriye uyumluluk için photo'yu da tutuyoruz
   photo: {
+    filename: { type: String },
+    originalName: { type: String },
+    base64: { type: String }, // Şifrelenmiş
+    mimetype: { type: String },
+    size: { type: Number }
+  },
+  // Yeni: Birden fazla fotoğraf desteği
+  photos: [{
     filename: { type: String, required: true },
     originalName: { type: String, required: true },
     base64: { type: String }, // Şifrelenmiş
     mimetype: { type: String },
     size: { type: Number }
-  },
+  }],
   size: { type: String, required: true },
   customSize: {
     width: { type: Number },
@@ -37,6 +46,8 @@ const orderSchema = new mongoose.Schema({
   paymentStatus: { type: String, default: 'pending' },
   notes: { type: String }, // Şifrelenmiş
   isEncrypted: { type: Boolean, default: true },
+  // Aynı kullanıcının siparişlerini birbirine bağlamak için
+  orderGroupId: { type: String, index: true }, // Aynı email/kullanıcı için aynı orderGroupId
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 }, {
@@ -44,12 +55,15 @@ const orderSchema = new mongoose.Schema({
 });
 
 // Pre-save hook: Hassas bilgileri şifrele (sadece yeni kayıt veya değişiklik varsa)
-orderSchema.pre('save', function(next) {
+// Mongoose 9+ supports async functions directly without next parameter
+orderSchema.pre('save', async function() {
   // Eğer zaten şifrelenmişse ve değişiklik yoksa, tekrar şifreleme
-  if (!this.isEncrypted || this.isModified('customerInfo') || this.isModified('photo.base64') || this.isModified('notes')) {
+  const hasPhotoChanges = this.isModified('photo.base64') || (this.photos && this.photos.length > 0 && this.isModified('photos'));
+  if (!this.isEncrypted || this.isModified('customerInfo') || hasPhotoChanges || this.isModified('notes')) {
     // Hassas bilgileri şifrele
     const orderData = {
       photo: this.photo,
+      photos: this.photos,
       customerInfo: this.customerInfo,
       notes: this.notes
     };
@@ -59,6 +73,9 @@ orderSchema.pre('save', function(next) {
     // Şifrelenmiş verileri güncelle
     if (encryptedData.photo) {
       this.photo = { ...this.photo, ...encryptedData.photo };
+    }
+    if (encryptedData.photos) {
+      this.photos = encryptedData.photos;
     }
     if (encryptedData.customerInfo) {
       this.customerInfo = encryptedData.customerInfo;
@@ -71,7 +88,6 @@ orderSchema.pre('save', function(next) {
   }
   
   this.updatedAt = new Date();
-  next();
 });
 
 // Model oluştur
@@ -160,7 +176,20 @@ const OrderModel = {
 
   // Kullanıcının siparişlerini getir
   findByUserId: async (userId, isAdmin = false) => {
-    const orders = await Order.find({ userId }).sort({ createdAt: -1 });
+    // userId'yi string veya ObjectId olarak kabul et
+    const mongoose = (await import('mongoose')).default;
+    let query = {};
+    
+    // ObjectId formatında mı kontrol et
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      query = { userId: new mongoose.Types.ObjectId(userId) };
+    } else {
+      // String olarak ara
+      query = { userId: userId };
+    }
+    
+    const orders = await Order.find(query).sort({ createdAt: -1 });
+    console.log(`🔍 Kullanıcı ${userId} için ${orders.length} sipariş bulundu`);
     return orders.map(order => OrderModel.formatOrder(order.toObject(), isAdmin));
   },
 
@@ -201,6 +230,10 @@ const OrderModel = {
             ...order.photo,
             base64: null
           },
+          photos: order.photos ? order.photos.map(photo => ({
+            ...photo,
+            base64: null // Base64'i gizle
+          })) : undefined,
           notes: null
         };
       }

@@ -120,10 +120,7 @@ function PaymentFailed() {
             borderRadius: '12px',
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
           }}>
-            <div style={{
-              fontSize: '4rem',
-              marginBottom: '1rem'
-            }}>❌</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '1rem', color: '#ef4444' }}>×</div>
             <h1 style={{
               color: '#e74c3c',
               marginBottom: '1rem'

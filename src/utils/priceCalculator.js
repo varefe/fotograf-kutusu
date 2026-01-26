@@ -2,7 +2,7 @@
 // Sosyopix.com toplu fiyatlarına göre güncellenmiştir
 
 // Toplu fiyat tablosu (minimum 15 adet, tekli fiyat yok)
-const getBulkPrice = (size, quantity) => {
+export const getBulkPrice = (size, quantity) => {
   // Toplu fiyat tablosu (15+ adet)
   const bulkPrices = {
     '10x15': {
@@ -25,7 +25,7 @@ const getBulkPrice = (size, quantity) => {
     },
     '20x30': {
       bulk: {
-        15: 26,   // 15 adet: minimum fiyat
+        15: 26,   // 15 adet: minimum fiyat (26 TL/adet)
         25: 22,
         35: 20,
         50: 19,

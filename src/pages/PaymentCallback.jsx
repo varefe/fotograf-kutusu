@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+import Icon from '../components/Icon'
 
 /**
  * PaymentCallback - Iyzico callback'ini backend'e yönlendirir
@@ -19,7 +20,7 @@ function PaymentCallback() {
         return 'https://heartfelt-embrace-production-3c74.up.railway.app'
       }
       // Development'da localhost
-      return 'http://localhost:5000'
+      return 'http://localhost:5001'
     }
 
     const backendUrl = getBackendUrl()
@@ -46,7 +47,9 @@ function PaymentCallback() {
       <div style={{
         fontSize: '2rem',
         marginBottom: '1rem'
-      }}>⏳</div>
+      }}>
+        <Icon name="clock" size={28} />
+      </div>
       <p>Ödeme işlemi kontrol ediliyor...</p>
       <p style={{ fontSize: '0.9rem', color: '#666' }}>Yönlendiriliyor...</p>
     </div>

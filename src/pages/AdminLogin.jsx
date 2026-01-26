@@ -2,6 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
+import { API_URL } from '../config/api'
+import { useAuth } from '../context/AuthContext'
+import { getBrowserId } from '../utils/browserFingerprint'
 
 function AdminLogin() {
   const [username, setUsername] = useState('')
@@ -10,28 +14,67 @@ function AdminLogin() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { login } = useAuth()
 
   // Admin kullanıcı adı, şifre ve özel kod (.env dosyasından alınır)
   const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME || 'efe'
   const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '193123'
   const ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE || 'ADMIN2024SECRET'
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
 
-    // Basit authentication kontrolü - Üç alan da doğru olmalı
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD && adminCode === ADMIN_CODE) {
-      // Session storage'a kaydet
-      sessionStorage.setItem('adminAuthenticated', 'true')
-      sessionStorage.setItem('adminLoginTime', new Date().getTime().toString())
-      sessionStorage.setItem('adminCodeVerified', 'true') // Admin kodu doğrulandı
+    try {
+      // Backend'e admin login isteği gönder
+      // API_URL zaten tam URL (http://localhost:5001) veya /api olabilir
+      let apiUrl = API_URL
+      if (!API_URL.includes('/api') && !API_URL.startsWith('http')) {
+        // Relative path ise /api ekle
+        apiUrl = `${API_URL}/api`
+      } else if (API_URL.startsWith('http') && !API_URL.includes('/api')) {
+        // Tam URL ise /api ekle
+        apiUrl = `${API_URL}/api`
+      } else {
+        apiUrl = API_URL
+      }
       
-      // Admin sayfasına yönlendir
-      navigate('/admin')
-    } else {
-      setError('Kullanıcı adı, şifre veya admin kodu hatalı!')
+      const response = await fetch(`${apiUrl}/user/admin/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username,
+          password,
+          adminCode
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        // JWT token'ı al ve kaydet
+        const browserId = getBrowserId()
+        sessionStorage.setItem(`authToken_${browserId}`, data.token)
+        sessionStorage.setItem(`user_${browserId}`, JSON.stringify({ ...data.user, browserId }))
+        
+        // Session storage'a da kaydet (eski sistem için)
+        sessionStorage.setItem('adminAuthenticated', 'true')
+        sessionStorage.setItem('adminLoginTime', new Date().getTime().toString())
+        sessionStorage.setItem('adminCodeVerified', 'true')
+        
+        // Sayfayı yenileyerek AuthContext'in token'ı yüklemesini sağla
+        // Bu şekilde AdminPanel sayfası token'ı görebilir
+        window.location.href = '/admin'
+      } else {
+        setError(data.message || 'Kullanıcı adı, şifre veya admin kodu hatalı!')
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error('Admin giriş hatası:', err)
+      setError('Giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.')
       setLoading(false)
     }
   }
@@ -56,7 +99,9 @@ function AdminLogin() {
             boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
           }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔐</div>
+              <div style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
+                <Icon name="lock" size={32} />
+              </div>
               <h1 style={{ 
                 color: '#2c3e50', 
                 marginBottom: '0.5rem',
@@ -81,7 +126,7 @@ function AdminLogin() {
                 alignItems: 'center',
                 gap: '0.5rem'
               }}>
-                <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: '600' }}>Uyarı:</span>
                 <span>{error}</span>
               </div>
             )}
@@ -165,7 +210,7 @@ function AdminLogin() {
                     color: '#2c3e50'
                   }}
                 >
-                  🔑 Admin Kodu
+                  <Icon name="lock" size={16} /> Admin Kodu
                   <span style={{ 
                     fontSize: '0.75rem', 
                     color: '#e74c3c', 
@@ -203,7 +248,7 @@ function AdminLogin() {
                   color: '#e67e22',
                   fontStyle: 'italic'
                 }}>
-                  ⚠️ Bu kod sadece yetkili adminler tarafından bilinir
+                  Bu kod sadece yetkili adminler tarafından bilinir
                 </small>
               </div>
 
@@ -230,7 +275,7 @@ function AdminLogin() {
                   if (!loading) e.target.style.background = '#3498db'
                 }}
               >
-                {loading ? '⏳ Giriş yapılıyor...' : '🔓 Giriş Yap'}
+                {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
               </button>
             </form>
 
@@ -244,7 +289,7 @@ function AdminLogin() {
               textAlign: 'center'
             }}>
               <p style={{ margin: 0 }}>
-                ⚠️ Bu sayfa sadece yetkili personel içindir.
+              Uyarı: Bu sayfa sadece yetkili personel içindir.
               </p>
             </div>
           </div>
