@@ -894,14 +894,14 @@ function Cart() {
             <div>
               <div style={{
                 background: 'white',
-                padding: '1.5rem',
-                borderRadius: '12px',
-                border: '1px solid #e5e7eb',
+                padding: '1.25rem',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
                 position: isMobile ? 'relative' : 'sticky',
                 top: isMobile ? '0' : '2rem',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                boxShadow: 'var(--shadow)'
               }}>
-                <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Sipariş Özeti</h2>
+                <h2 style={{ fontSize: '1.25rem', marginBottom: '1.25rem', fontWeight: '600' }}>Sipariş Özeti</h2>
 
                 <div style={{ marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -1324,9 +1324,9 @@ function Cart() {
                     {showPaymentForm && preparedOrderData && (
                       <div style={{
                         marginTop: '1rem',
-                        padding: '1rem',
-                        background: 'var(--bg-light)',
-                        borderRadius: '8px',
+                        padding: '0.875rem',
+                        background: 'var(--bg-color)',
+                        borderRadius: '6px',
                         border: '1px solid var(--border-color)'
                       }}>
                         <div style={{
@@ -1334,11 +1334,11 @@ function Cart() {
                           justifyContent: 'space-between',
                           alignItems: 'center',
                           marginBottom: '0.75rem',
-                          paddingBottom: '0.6rem',
+                          paddingBottom: '0.5rem',
                           borderBottom: '1px solid var(--border-color)'
                         }}>
                           <h3 style={{ 
-                            fontSize: '1rem', 
+                            fontSize: '0.95rem', 
                             margin: 0, 
                             color: 'var(--text-color)',
                             display: 'flex',
@@ -1346,7 +1346,7 @@ function Cart() {
                             gap: '0.4rem',
                             fontWeight: '600'
                           }}>
-                            <Icon name="lock" size={14} /> Güvenli Ödeme
+                            <Icon name="lock" size={13} /> Güvenli Ödeme
                           </h3>
                           <button
                             onClick={() => {
@@ -1361,8 +1361,8 @@ function Cart() {
                               border: 'none',
                               color: 'var(--text-light)',
                               cursor: 'pointer',
-                              fontSize: '0.8rem',
-                              padding: '0.25rem 0.5rem'
+                              fontSize: '0.75rem',
+                              padding: '0.2rem 0.4rem'
                             }}
                           >
                             Kapat
