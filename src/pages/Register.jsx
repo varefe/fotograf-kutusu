@@ -276,7 +276,7 @@ function Register() {
                     }}
                     title={showPassword ? 'Şifreyi Gizle' : 'Şifreyi Göster'}
                   >
-                    {showPassword ? '🙈' : '👁️'}
+                    {showPassword ? 'Gizle' : 'Göster'}
                   </button>
                 </div>
               </div>
@@ -323,7 +323,7 @@ function Register() {
                     }}
                     title={showConfirmPassword ? 'Şifreyi Gizle' : 'Şifreyi Göster'}
                   >
-                    {showConfirmPassword ? '🙈' : '👁️'}
+                    {showConfirmPassword ? 'Gizle' : 'Göster'}
                   </button>
                 </div>
               </div>

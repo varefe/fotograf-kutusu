@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { useCart } from '../context/CartContext'
 import { calculatePrice, getBulkPrice } from '../utils/priceCalculator'
 
@@ -254,21 +255,23 @@ function ProductUpload() {
                   borderRadius: '8px',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  border: '2px dashed #ccc',
+                  border: '2px dashed var(--border-color)',
                   marginBottom: '1rem',
-                  transition: 'all 0.3s'
+                  transition: 'border-color 0.2s, background-color 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#667eea'
-                  e.currentTarget.style.background = '#f0f4ff'
+                  e.currentTarget.style.borderColor = 'var(--primary-color)'
+                  e.currentTarget.style.background = 'var(--bg-gray)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#ccc'
+                  e.currentTarget.style.borderColor = 'var(--border-color)'
                   e.currentTarget.style.background = 'white'
                 }}
               >
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: '600', color: '#667eea', marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
+                  <Icon name="camera" size={36} />
+                </div>
+                <div style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--primary-color)', marginBottom: '0.5rem' }}>
                   Fotoğraflarınızı buraya sürükleyin
                 </div>
                 <div style={{ color: '#666' }}>veya tıklayarak seçin</div>
@@ -335,9 +338,9 @@ function ProductUpload() {
                   border: `1px solid ${previews.length >= 15 ? '#10b981' : '#ffc107'}`
                 }}>
                   {previews.length >= 15 ? (
-                    <>✓ {previews.length} fotoğraf seçildi - Sepete eklenebilir</>
+                    <><Icon name="check" size={14} /> {previews.length} fotoğraf seçildi - Sepete eklenebilir</>
                   ) : (
-                    <>⚠️ {previews.length} fotoğraf seçildi - En az 15 fotoğraf gerekli</>
+                    <>Uyarı: {previews.length} fotoğraf seçildi - En az 15 fotoğraf gerekli</>
                   )}
                 </div>
               )}
@@ -387,14 +390,16 @@ function ProductUpload() {
 
               {/* Fiyat Özeti */}
               <div style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'var(--bg-color)',
                 padding: '1.5rem',
                 borderRadius: '12px',
-                color: 'white',
-                marginBottom: '1.5rem'
+                color: 'var(--text-color)',
+                marginBottom: '1.5rem',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow)'
               }}>
                 <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Birim Fiyat</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Birim Fiyat</div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
                     ₺{(() => {
                       const bulkPrices = {
@@ -419,17 +424,17 @@ function ProductUpload() {
                   </div>
                 </div>
                 <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Adet</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Adet</div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{quantity}</div>
                 </div>
                 <div style={{
-                  borderTop: '2px solid rgba(255,255,255,0.3)',
+                  borderTop: '1px solid var(--border-color)',
                   paddingTop: '1rem',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
-                  <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Toplam</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Toplam</div>
                   <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
                     ₺{(() => {
                       // Toplam fiyat: (birim fiyat × quantity) + kargo (sadece bir fotoğraf için)
@@ -467,15 +472,17 @@ function ProductUpload() {
                   fontSize: '1.1rem',
                   fontWeight: 'bold',
                   background: photos.length >= 15 && quantity >= 15 ? 'var(--primary-color)' : '#ccc',
-                  color: photos.length >= 15 && quantity >= 15 ? '#000000' : '#666',
+                  color: photos.length >= 15 && quantity >= 15 ? '#ffffff' : '#64748b',
                   border: 'none',
                   borderRadius: '8px',
                   cursor: photos.length >= 15 && quantity >= 15 ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.3s',
-                  boxShadow: photos.length >= 15 && quantity >= 15 ? '0 2px 8px rgba(212, 175, 55, 0.3)' : 'none'
+                  transition: 'color 0.2s, background-color 0.2s',
+                  boxShadow: photos.length >= 15 && quantity >= 15 ? 'var(--shadow)' : 'none'
                 }}
               >
-                🛒 Sepete Ekle
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Icon name="cart" size={18} /> Sepete Ekle
+                </span>
               </button>
               {photos.length > 0 && photos.length < 15 && (
                 <div style={{
@@ -488,7 +495,7 @@ function ProductUpload() {
                   textAlign: 'center',
                   border: '1px solid #ffc107'
                 }}>
-                  ⚠️ Sepete eklemek için en az 15 fotoğraf seçmelisiniz ({15 - photos.length} fotoğraf daha gerekli)
+                  Uyarı: Sepete eklemek için en az 15 fotoğraf seçmelisiniz ({15 - photos.length} fotoğraf daha gerekli)
                 </div>
               )}
             </div>

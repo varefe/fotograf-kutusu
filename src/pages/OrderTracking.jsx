@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
 import { API_URL } from '../config/api'
 
@@ -137,7 +138,7 @@ function OrderTracking() {
       <main style={{ padding: '2rem 0', minHeight: '70vh' }}>
         <div className="container">
           <h1 style={{ fontSize: '2rem', marginBottom: '2rem' }}>
-            📦 Sipariş Takibi
+            <Icon name="cart" size={16} /> Sipariş Takibi
           </h1>
           <p style={{ color: '#666', marginBottom: '2rem' }}>
             Iyzico'dan siparişlerinizi takip edin ve veritabanına senkronize edin.
@@ -268,7 +269,7 @@ function OrderTracking() {
               borderRadius: '12px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}>
-              <h2 style={{ marginBottom: '1.5rem' }}>🔄 Sipariş Senkronize Et</h2>
+              <h2 style={{ marginBottom: '1.5rem' }}>Sipariş Senkronize Et</h2>
               <form onSubmit={handleSync}>
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
@@ -307,7 +308,7 @@ function OrderTracking() {
                     cursor: loading || !paymentIds.trim() ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {loading ? 'Senkronize ediliyor...' : '🔄 Senkronize Et'}
+                  {loading ? 'Senkronize ediliyor...' : 'Senkronize Et'}
                 </button>
               </form>
 
@@ -330,7 +331,7 @@ function OrderTracking() {
                         <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
                           {syncResult.syncedOrders.map((order, index) => (
                             <li key={index} style={{ marginBottom: '0.25rem' }}>
-                              Payment: {order.paymentId} - {order.action === 'created' ? '✅ Oluşturuldu' : '🔄 Güncellendi'}
+                              Payment: {order.paymentId} - {order.action === 'created' ? 'Oluşturuldu' : 'Güncellendi'}
                             </li>
                           ))}
                         </ul>

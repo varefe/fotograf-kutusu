@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PaymentForm from '../components/PaymentForm'
+import Icon from '../components/Icon'
 import { getDecryptedOrders, saveOrderToStorage } from '../utils/encryption'
 import { API_URL } from '../config/api'
 import { useAuth } from '../context/AuthContext'
@@ -307,7 +308,9 @@ function Payment() {
       <>
         <Navbar />
         <main style={{ padding: '4rem 0', textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+            <Icon name="clock" size={32} />
+          </div>
           <h2>Yükleniyor...</h2>
         </main>
         <Footer />
@@ -327,8 +330,7 @@ function Payment() {
         <main style={{ 
           padding: '4rem 0', 
           minHeight: '60vh',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          backgroundAttachment: 'fixed'
+          background: 'var(--bg-light)'
         }}>
           <div className="container">
             <div style={{
@@ -337,116 +339,43 @@ function Payment() {
               textAlign: 'center',
               padding: '4rem 3rem',
               background: 'white',
-              borderRadius: '20px',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-              position: 'relative',
-              overflow: 'hidden'
+              borderRadius: '16px',
+              boxShadow: 'var(--shadow-lg)',
+              border: '1px solid var(--border-color)'
             }}>
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '300px',
-                height: '300px',
-                background: 'radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%)',
-                borderRadius: '50%',
-                animation: 'pulse 2s ease-in-out infinite'
-              }}></div>
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{
-                  fontSize: '4rem',
-                  marginBottom: '1.5rem',
-                  animation: 'spin 2s linear infinite',
-                  filter: 'drop-shadow(0 4px 8px rgba(102, 126, 234, 0.3))'
-                }}>⏳</div>
+              <div>
+                <div style={{ fontSize: '2rem', marginBottom: '1.5rem' }}>
+                  <Icon name="clock" size={36} />
+                </div>
                 <h2 style={{
-                  color: '#2c3e50',
+                  color: '#0f172a',
                   fontSize: '1.75rem',
                   fontWeight: '600',
                   marginBottom: '1rem'
                 }}>Ödeme formu hazırlanıyor...</h2>
                 <p style={{ 
-                  color: '#495057', 
+                  color: '#475569', 
                   marginTop: '1rem',
                   fontSize: '1rem'
                 }}>
                   Sipariş No: <strong style={{ 
-                    color: '#667eea',
+                    color: 'var(--primary-color)',
                     fontFamily: 'monospace',
                     fontSize: '1.1rem'
                   }}>{orderId}</strong>
                 </p>
                 <p style={{ 
-                  color: '#6c757d', 
+                  color: '#64748b', 
                   marginTop: '1rem', 
                   fontSize: '0.95rem'
                 }}>
                   Lütfen bekleyin, güvenli ödeme sayfası yükleniyor...
                 </p>
-                <div style={{
-                  marginTop: '2rem',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <div style={{
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    background: '#667eea',
-                    animation: 'bounce 1.4s ease-in-out infinite both'
-                  }}></div>
-                  <div style={{
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    background: '#667eea',
-                    animation: 'bounce 1.4s ease-in-out 0.2s infinite both'
-                  }}></div>
-                  <div style={{
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    background: '#667eea',
-                    animation: 'bounce 1.4s ease-in-out 0.4s infinite both'
-                  }}></div>
-                </div>
               </div>
             </div>
           </div>
         </main>
         <Footer />
-        <style>{`
-          @keyframes pulse {
-            0%, 100% {
-              opacity: 0.4;
-              transform: translate(-50%, -50%) scale(1);
-            }
-            50% {
-              opacity: 0.8;
-              transform: translate(-50%, -50%) scale(1.1);
-            }
-          }
-          @keyframes spin {
-            0% {
-              transform: rotate(0deg);
-            }
-            100% {
-              transform: rotate(360deg);
-            }
-          }
-          @keyframes bounce {
-            0%, 80%, 100% {
-              transform: scale(0);
-              opacity: 0.5;
-            }
-            40% {
-              transform: scale(1);
-              opacity: 1;
-            }
-          }
-        `}</style>
       </>
     )
   }
@@ -458,8 +387,7 @@ function Payment() {
         <main style={{ 
           padding: '4rem 0', 
           minHeight: '60vh',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          backgroundAttachment: 'fixed'
+          background: 'var(--bg-light)'
         }}>
           <div className="container">
             <div style={{
@@ -468,29 +396,31 @@ function Payment() {
               textAlign: 'center',
               background: 'white',
               padding: '3rem',
-              borderRadius: '20px',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+              borderRadius: '16px',
+              boxShadow: 'var(--shadow-lg)',
+              border: '1px solid var(--border-color)'
             }}>
               <div style={{
                 width: '80px',
                 height: '80px',
                 margin: '0 auto 1.5rem',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
+                background: '#fee2e2',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '2.5rem',
-                boxShadow: '0 4px 12px rgba(238, 90, 111, 0.3)'
-              }}>❌</div>
+                fontSize: '2rem',
+                color: '#ef4444',
+                boxShadow: 'none'
+              }}>×</div>
               <h2 style={{ 
-                color: '#e74c3c', 
+                color: '#ef4444', 
                 marginBottom: '1rem',
                 fontSize: '1.75rem',
                 fontWeight: '600'
               }}>Bir Hata Oluştu</h2>
               <p style={{ 
-                color: '#495057', 
+                color: '#475569', 
                 marginBottom: '2rem',
                 fontSize: '1rem',
                 lineHeight: '1.6'
@@ -499,24 +429,14 @@ function Payment() {
                 onClick={() => navigate('/order')}
                 style={{
                   padding: '0.875rem 2rem',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
+                  background: 'var(--primary-color)',
+                  color: '#ffffff',
                   border: 'none',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontWeight: '600',
                   fontSize: '1rem',
-                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                  transition: 'all 0.3s ease',
-                  transform: 'translateY(0)'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
+                  boxShadow: 'var(--shadow)'
                 }}
               >
                 Sipariş Sayfasına Dön
@@ -535,8 +455,7 @@ function Payment() {
       <main style={{ 
         padding: '2rem 0', 
         minHeight: '60vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        backgroundAttachment: 'fixed'
+        background: 'var(--bg-light)'
       }}>
         <div className="container">
           <div style={{
@@ -544,46 +463,36 @@ function Payment() {
             margin: '0 auto',
             background: 'white',
             padding: '0',
-            borderRadius: '20px',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            borderRadius: '16px',
+            boxShadow: 'var(--shadow-lg)',
+            border: '1px solid var(--border-color)',
             overflow: 'hidden'
           }}>
             {/* Modern Header */}
             <div style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'var(--bg-color)',
               padding: '2.5rem 2rem',
               textAlign: 'center',
-              color: 'white',
+              color: 'var(--text-color)',
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              borderBottom: '1px solid var(--border-color)'
             }}>
-              <div style={{
-                position: 'absolute',
-                top: '-50%',
-                right: '-50%',
-                width: '200%',
-                height: '200%',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
-                animation: 'pulse 3s ease-in-out infinite'
-              }}></div>
               <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{
-                  fontSize: '3rem',
-                  marginBottom: '0.5rem',
-                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'
-                }}>💳</div>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
+                  <Icon name="lock" size={28} />
+                </div>
                 <h1 style={{
                   margin: '0',
                   fontSize: '2rem',
                   fontWeight: '700',
-                  textShadow: '0 2px 4px rgba(0,0,0,0.2)',
                   letterSpacing: '0.5px'
                 }}>Güvenli Ödeme</h1>
                 <p style={{
                   margin: '0.5rem 0 0 0',
                   fontSize: '1rem',
-                  opacity: 0.95,
-                  fontWeight: '300'
+                  color: 'var(--text-light)',
+                  fontWeight: '400'
                 }}>Siparişinizi tamamlamak için ödeme bilgilerinizi girin</p>
               </div>
             </div>
@@ -605,11 +514,11 @@ function Payment() {
                     width: '40px',
                     height: '40px',
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    background: 'var(--bg-gray)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: 'white',
+                    color: 'var(--text-color)',
                     fontSize: '1.2rem',
                     fontWeight: 'bold'
                   }}>#</div>
@@ -635,12 +544,12 @@ function Payment() {
                   borderRadius: '8px',
                   border: '1px solid #e9ecef',
                   fontSize: '0.9rem',
-                  color: '#495057',
+                  color: '#475569',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
                 }}>
-                  <span>🔒</span>
+                  <Icon name="lock" size={14} />
                   <span>SSL ile Korunuyor</span>
                 </div>
               </div>
@@ -663,7 +572,9 @@ function Payment() {
                   background: '#f8f9fa',
                   borderBottom: '1px solid #e9ecef'
                 }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔐</div>
+                  <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+                    <Icon name="lock" size={28} />
+                  </div>
                   <h3 style={{ margin: 0, color: '#2c3e50' }}>3D Secure Doğrulama</h3>
                   <p style={{ margin: '0.5rem 0 0 0', color: '#6c757d' }}>
                     Güvenli ödeme için bankanızın doğrulama sayfasına yönlendiriliyorsunuz...
@@ -692,7 +603,9 @@ function Payment() {
                   display: 'none',
                   zIndex: 1000
                 }} id="threeds-loading">
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                  <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+                    <Icon name="clock" size={28} />
+                  </div>
                   <p style={{ margin: 0, color: '#2c3e50' }}>Yönlendiriliyor...</p>
                 </div>
               </div>
@@ -712,12 +625,14 @@ function Payment() {
               </div>
             ) : loading ? (
               <div style={{ textAlign: 'center', padding: '4rem' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+                  <Icon name="clock" size={32} />
+                </div>
                 <h2>Sipariş bilgileri yükleniyor...</h2>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '4rem' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>❌</div>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem', color: '#ef4444' }}>×</div>
                 <h2>Sipariş bilgileri bulunamadı</h2>
                 <button
                   onClick={() => navigate('/order')}
@@ -725,7 +640,7 @@ function Payment() {
                     marginTop: '1rem',
                     padding: '0.75rem 2rem',
                     background: 'var(--primary-color)',
-                    color: '#000000',
+                    color: '#ffffff',
                     border: 'none',
                     borderRadius: '8px',
                     cursor: 'pointer',
@@ -743,9 +658,9 @@ function Payment() {
             <div style={{
               marginTop: '2rem',
               padding: '2rem',
-              background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+              background: 'var(--bg-light)',
               borderRadius: '12px',
-              border: '1px solid #dee2e6',
+              border: '1px solid var(--border-color)',
               textAlign: 'center'
             }}>
               <div style={{
@@ -759,22 +674,24 @@ function Payment() {
                   width: '50px',
                   height: '50px',
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'var(--bg-gray)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '1.5rem',
-                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
-                }}>🔒</div>
+                  boxShadow: 'var(--shadow)'
+                }}>
+                  <Icon name="lock" size={18} />
+                </div>
                 <h3 style={{
                   margin: '0',
-                  color: '#2c3e50',
+                  color: '#0f172a',
                   fontSize: '1.25rem',
                   fontWeight: '600'
                 }}>Güvenli Ödeme</h3>
               </div>
               <p style={{
-                color: '#6c757d',
+                color: '#64748b',
                 marginBottom: '1.5rem',
                 fontSize: '0.95rem',
                 lineHeight: '1.6'
@@ -794,7 +711,7 @@ function Payment() {
                 padding: '1rem',
                 background: 'white',
                 borderRadius: '8px',
-                border: '1px solid #e9ecef'
+                border: '1px solid var(--border-color)'
               }}>
                 <img 
                   src="/logos/visa.png" 
@@ -844,13 +761,13 @@ function Payment() {
                 gap: '0.75rem',
                 padding: '0.75rem 1.5rem',
                 background: 'white',
-                borderRadius: '25px',
-                border: '2px solid #28a745',
-                boxShadow: '0 2px 8px rgba(40, 167, 69, 0.2)'
+                borderRadius: '999px',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow)'
               }}>
-                <span style={{ fontSize: '1.2rem' }}>✅</span>
+                <Icon name="lock" size={16} />
                 <span style={{
-                  color: '#28a745',
+                  color: 'var(--text-color)',
                   fontWeight: '600',
                   fontSize: '0.9rem'
                 }}>SSL Sertifikası ile Güvenli Alışveriş</span>
@@ -861,36 +778,6 @@ function Payment() {
         </div>
       </main>
       <Footer />
-      <style>{`
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 0.4;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.8;
-            transform: scale(1.05);
-          }
-        }
-        @keyframes spin {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
-          }
-        }
-        @keyframes bounce {
-          0%, 80%, 100% {
-            transform: scale(0);
-            opacity: 0.5;
-          }
-          40% {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-      `}</style>
     </>
   )
 }

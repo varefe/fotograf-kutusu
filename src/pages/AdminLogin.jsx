@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { API_URL } from '../config/api'
 import { useAuth } from '../context/AuthContext'
 import { getBrowserId } from '../utils/browserFingerprint'
@@ -98,7 +99,9 @@ function AdminLogin() {
             boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
           }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔐</div>
+              <div style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
+                <Icon name="lock" size={32} />
+              </div>
               <h1 style={{ 
                 color: '#2c3e50', 
                 marginBottom: '0.5rem',
@@ -123,7 +126,7 @@ function AdminLogin() {
                 alignItems: 'center',
                 gap: '0.5rem'
               }}>
-                <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: '600' }}>Uyarı:</span>
                 <span>{error}</span>
               </div>
             )}
@@ -207,7 +210,7 @@ function AdminLogin() {
                     color: '#2c3e50'
                   }}
                 >
-                  🔑 Admin Kodu
+                  <Icon name="lock" size={16} /> Admin Kodu
                   <span style={{ 
                     fontSize: '0.75rem', 
                     color: '#e74c3c', 
@@ -245,7 +248,7 @@ function AdminLogin() {
                   color: '#e67e22',
                   fontStyle: 'italic'
                 }}>
-                  ⚠️ Bu kod sadece yetkili adminler tarafından bilinir
+                  Bu kod sadece yetkili adminler tarafından bilinir
                 </small>
               </div>
 
@@ -272,7 +275,7 @@ function AdminLogin() {
                   if (!loading) e.target.style.background = '#3498db'
                 }}
               >
-                {loading ? '⏳ Giriş yapılıyor...' : '🔓 Giriş Yap'}
+                {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
               </button>
             </form>
 
@@ -286,7 +289,7 @@ function AdminLogin() {
               textAlign: 'center'
             }}>
               <p style={{ margin: 0 }}>
-                ⚠️ Bu sayfa sadece yetkili personel içindir.
+              Uyarı: Bu sayfa sadece yetkili personel içindir.
               </p>
             </div>
           </div>

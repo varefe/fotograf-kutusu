@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { API_URL } from '../config/api'
 
 function ForgotPassword() {
@@ -72,8 +73,8 @@ function ForgotPassword() {
             borderRadius: '12px',
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
           }}>
-            <h1 style={{ textAlign: 'center', marginBottom: '2rem', fontSize: '2rem' }}>
-              🔑 Şifremi Unuttum
+            <h1 style={{ textAlign: 'center', marginBottom: '2rem', fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <Icon name="lock" size={20} /> Şifremi Unuttum
             </h1>
 
             {error && (
@@ -112,7 +113,7 @@ function ForgotPassword() {
                 border: '2px solid #1976d2'
               }}>
                 <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>
-                  ⚠️ Geliştirme Modu
+                  Geliştirme Modu
                 </h3>
                 <p style={{ marginBottom: '0.5rem' }}>
                   <strong>Şifre sıfırlama bağlantısı:</strong>
@@ -174,29 +175,17 @@ function ForgotPassword() {
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      background: loading ? '#ccc' : 'var(--primary-color)',
-                      color: loading ? '#666' : '#000000',
+                    background: loading ? '#e2e8f0' : 'var(--primary-color)',
+                    color: loading ? '#64748b' : '#ffffff',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '1.1rem',
                       fontWeight: 'bold',
                       cursor: loading ? 'not-allowed' : 'pointer',
                       marginBottom: '1rem',
-                      boxShadow: loading ? 'none' : '0 2px 8px rgba(212, 175, 55, 0.3)',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!loading) {
-                        e.target.style.background = 'var(--primary-gold)'
-                        e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.4)'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!loading) {
-                        e.target.style.background = 'var(--primary-color)'
-                        e.target.style.boxShadow = '0 2px 8px rgba(212, 175, 55, 0.3)'
-                      }
-                    }}
+                    boxShadow: loading ? 'none' : 'var(--shadow)',
+                    transition: 'color 0.2s, background-color 0.2s, box-shadow 0.2s'
+                  }}
                   >
                     {loading ? 'Gönderiliyor...' : 'Şifre Sıfırlama Bağlantısı Gönder'}
                   </button>
@@ -205,7 +194,7 @@ function ForgotPassword() {
             )}
 
             <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-              <Link to="/login" style={{ color: '#667eea', fontWeight: '600' }}>
+              <Link to="/login" style={{ color: 'var(--primary-color)', fontWeight: '600' }}>
                 ← Giriş sayfasına dön
               </Link>
             </div>

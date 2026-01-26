@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import PaymentForm from '../components/PaymentForm'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
@@ -659,7 +660,9 @@ function Cart() {
         <Navbar />
         <main style={{ padding: '4rem 0', minHeight: '60vh', textAlign: 'center' }}>
           <div className="container">
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🛒</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
+              <Icon name="cart" size={40} />
+            </div>
             <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Sepetiniz Boş</h1>
             <p style={{ color: '#666', marginBottom: '2rem' }}>
               Sepetinize ürün eklemek için ana sayfaya dönün
@@ -842,8 +845,8 @@ function Cart() {
                         setSelectedItemGroup(group)
                       }}
                       style={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white',
+                        background: 'var(--primary-color)',
+                        color: '#ffffff',
                         border: 'none',
                         borderRadius: '10px',
                         padding: isMobile ? '0.7rem 1rem' : '0.85rem 1.25rem',
@@ -851,7 +854,7 @@ function Cart() {
                         fontSize: '0.95rem',
                         fontWeight: '600',
                         transition: 'none',
-                        boxShadow: '0 2px 6px rgba(102, 126, 234, 0.25)'
+                        boxShadow: 'var(--shadow)'
                       }}
                     >
                       Tüm Fotoğrafları Gör ({group.items.length})
@@ -875,22 +878,14 @@ function Cart() {
                   cursor: 'pointer',
                   fontSize: '0.9rem',
                   fontWeight: '600',
-                  transition: 'all 0.3s ease',
+                  transition: 'color 0.2s, background-color 0.2s, border-color 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
                   justifyContent: 'center'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#e5e7eb'
-                  e.currentTarget.style.borderColor = '#d1d5db'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#f3f4f6'
-                  e.currentTarget.style.borderColor = '#e5e7eb'
-                }}
               >
-                🧹 Sepeti Temizle
+                Sepeti Temizle
               </button>
             </div>
 
@@ -916,7 +911,7 @@ function Cart() {
                     <span>Kargo</span>
                     <span>
                       {totalPrice >= 99 ? (
-                        <span style={{ color: '#10b981', fontWeight: 'bold' }}>ÜCRETSİZ 🎉</span>
+                        <span style={{ color: '#10b981', fontWeight: 'bold' }}>ÜCRETSİZ</span>
                       ) : (
                         `₺${shippingPrice}`
                       )}
@@ -972,19 +967,23 @@ function Cart() {
                   <div style={{
                     marginBottom: '1.5rem',
                     padding: '1.5rem',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    background: 'var(--bg-color)',
                     borderRadius: '12px',
-                    color: 'white',
-                    textAlign: 'center'
+                    color: 'var(--text-color)',
+                    textAlign: 'center',
+                    border: '1px solid var(--border-color)',
+                    boxShadow: 'var(--shadow)'
                   }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🔐</div>
-                    <h3 style={{ fontSize: '1.2rem', marginBottom: '0.75rem', color: 'white' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+                      <Icon name="lock" size={28} />
+                    </div>
+                    <h3 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>
                       Siparişi Tamamlamak İçin
                     </h3>
                     <p style={{ 
                       fontSize: '0.95rem', 
                       marginBottom: '1.5rem', 
-                      opacity: 0.95,
+                      color: 'var(--text-light)',
                       lineHeight: '1.6'
                     }}>
                       Hızlı ve güvenli sipariş vermek için lütfen giriş yapın veya kayıt olun
@@ -993,54 +992,16 @@ function Cart() {
                       <Link
                         to="/login"
                         state={{ from: '/cart', message: 'Sipariş verebilmek için lütfen giriş yapın veya kayıt olun.' }}
-                        style={{
-                          display: 'block',
-                          padding: '0.875rem 1.5rem',
-                          background: 'white',
-                          color: '#667eea',
-                          textDecoration: 'none',
-                          borderRadius: '8px',
-                          fontWeight: 'bold',
-                          fontSize: '1rem',
-                          transition: 'all 0.3s ease',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.transform = 'translateY(-2px)'
-                          e.target.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.transform = 'translateY(0)'
-                          e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
-                        }}
+                        className="btn btn-primary btn-block"
                       >
-                        🔑 Giriş Yap
+                        Giriş Yap
                       </Link>
                       <Link
                         to="/register"
                         state={{ from: '/cart', message: 'Sipariş verebilmek için lütfen kayıt olun.' }}
-                        style={{
-                          display: 'block',
-                          padding: '0.875rem 1.5rem',
-                          background: 'rgba(255,255,255,0.2)',
-                          color: 'white',
-                          textDecoration: 'none',
-                          borderRadius: '8px',
-                          fontWeight: 'bold',
-                          fontSize: '1rem',
-                          border: '2px solid white',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.background = 'rgba(255,255,255,0.3)'
-                          e.target.style.transform = 'translateY(-2px)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.background = 'rgba(255,255,255,0.2)'
-                          e.target.style.transform = 'translateY(0)'
-                        }}
+                        className="btn btn-secondary btn-block"
                       >
-                        ✨ Kayıt Ol
+                        Kayıt Ol
                       </Link>
                     </div>
                   </div>
@@ -1050,15 +1011,16 @@ function Cart() {
                     <div style={{
                       padding: '0.75rem',
                       marginBottom: '1rem',
-                      background: '#e8f5e9',
+                      background: '#f8fafc',
                       borderRadius: '8px',
                       fontSize: '0.9rem',
-                      color: '#2e7d32',
+                      color: 'var(--text-color)',
+                      border: '1px solid var(--border-color)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
                     }}>
-                      <span>✅</span>
+                      <Icon name="check" size={14} />
                       <span>Giriş yaptınız: <strong>{user?.email || user?.firstName || 'Kullanıcı'}</strong></span>
                     </div>
                     <input
@@ -1139,31 +1101,25 @@ function Cart() {
 
                 {submitSuccess ? (
                   <div style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    background: '#f8fafc',
                     padding: '2rem',
                     borderRadius: '12px',
                     textAlign: 'center',
-                    color: 'white',
+                    color: 'var(--text-color)',
+                    border: '1px solid var(--border-color)',
+                    boxShadow: 'var(--shadow)',
                     marginTop: '1rem'
                   }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+                    <div style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
+                      <Icon name="check" size={28} />
+                    </div>
                     <h3 style={{ marginBottom: '0.5rem' }}>Sipariş Başarıyla Oluşturuldu!</h3>
-                    <p style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '1rem' }}>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '1rem' }}>
                       Sipariş No: <strong>#{orderId}</strong>
                     </p>
                     <Link
                       to="/"
-                      style={{
-                        display: 'inline-block',
-                        marginTop: '1rem',
-                        padding: '0.75rem 2rem',
-                        background: 'rgba(255,255,255,0.2)',
-                        color: 'white',
-                        textDecoration: 'none',
-                        borderRadius: '6px',
-                        fontWeight: 'bold',
-                        border: '2px solid white'
-                      }}
+                      className="btn btn-primary btn-small"
                     >
                       Ana Sayfaya Dön
                     </Link>
@@ -1177,30 +1133,20 @@ function Cart() {
                       padding: '1rem',
                       fontSize: '1.1rem',
                       fontWeight: 'bold',
-                      background: (isSubmitting || !isAuthenticated || showPaymentForm) ? '#ccc' : '#667eea',
-                      color: 'white',
+                      background: (isSubmitting || !isAuthenticated || showPaymentForm) ? '#e2e8f0' : 'var(--primary-color)',
+                      color: (isSubmitting || !isAuthenticated || showPaymentForm) ? '#64748b' : '#ffffff',
                       border: 'none',
                       borderRadius: '8px',
                       cursor: (isSubmitting || !isAuthenticated || showPaymentForm) ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.3s',
+                      transition: 'color 0.2s, background-color 0.2s',
                       opacity: (isSubmitting || !isAuthenticated || showPaymentForm) ? 0.6 : 1
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSubmitting && isAuthenticated) {
-                        e.currentTarget.style.background = '#5568d3'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSubmitting && isAuthenticated) {
-                        e.currentTarget.style.background = '#667eea'
-                      }
                     }}
                     title={!isAuthenticated ? 'Sipariş verebilmek için lütfen giriş yapın' : ''}
                   >
-                    {isSubmitting ? '⏳ Sipariş Oluşturuluyor...' : 
-                     !isAuthenticated ? '🔐 Giriş Yaparak Devam Et' : 
-                     showPaymentForm ? '💳 Ödeme Formu Açık' : 
-                     '💳 Sipariş Ver ve Ödeme Yap'}
+                    {isSubmitting ? 'Sipariş Oluşturuluyor...' : 
+                     !isAuthenticated ? 'Giriş Yaparak Devam Et' : 
+                     showPaymentForm ? 'Ödeme Formu Açık' : 
+                     'Sipariş Ver ve Ödeme Yap'}
                   </button>
                 )}
               </div>
@@ -1233,7 +1179,7 @@ function Cart() {
                   alignItems: 'center',
                   gap: '0.5rem'
                 }}>
-                  💳 Güvenli Ödeme
+                  <Icon name="lock" size={18} /> Güvenli Ödeme
                 </h2>
                 <button
                   onClick={() => {
@@ -1273,7 +1219,9 @@ function Cart() {
                     background: '#f8f9fa',
                     borderBottom: '1px solid #e9ecef'
                   }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔐</div>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
+                      <Icon name="lock" size={24} />
+                    </div>
                     <h3 style={{ margin: 0, color: '#2c3e50' }}>3D Secure Doğrulama</h3>
                     <p style={{ margin: '0.5rem 0 0 0', color: '#6c757d', fontSize: '0.9rem' }}>
                       Güvenli ödeme için bankanızın doğrulama sayfasına yönlendiriliyorsunuz...
@@ -1343,14 +1291,19 @@ function Cart() {
                   <div style={{
                     marginTop: '1.5rem',
                     padding: '1rem',
-                    background: '#f0f9ff',
+                    background: 'var(--bg-gray)',
                     borderRadius: '8px',
-                    border: '1px solid #bae6fd',
+                    border: '1px solid var(--border-color)',
                     textAlign: 'center',
                     fontSize: '0.85rem',
-                    color: '#0369a1'
+                    color: 'var(--text-light)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
                   }}>
-                    🔒 Ödemeleriniz 256-bit SSL sertifikası ile korunmaktadır. Kart bilgileriniz hiçbir şekilde saklanmaz.
+                    <Icon name="lock" size={14} />
+                    <span>Ödemeleriniz 256-bit SSL sertifikası ile korunmaktadır. Kart bilgileriniz hiçbir şekilde saklanmaz.</span>
                   </div>
                 </div>
               )}
@@ -1610,7 +1563,7 @@ function Cart() {
                       position: 'absolute',
                       bottom: '8px',
                       right: '8px',
-                      background: 'rgba(102, 126, 234, 0.9)',
+                      background: 'rgba(37, 99, 235, 0.9)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '6px',
@@ -1624,15 +1577,17 @@ function Cart() {
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.opacity = '1'
-                      e.currentTarget.style.background = 'rgba(102, 126, 234, 1)'
+                      e.currentTarget.style.background = 'rgba(37, 99, 235, 1)'
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.opacity = '0'
-                      e.currentTarget.style.background = 'rgba(102, 126, 234, 0.9)'
+                      e.currentTarget.style.background = 'rgba(37, 99, 235, 0.9)'
                     }}
                     title="Fotoğrafı değiştir"
                   >
-                    📷 Değiştir
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Icon name="camera" size={12} /> Değiştir
+                    </span>
                   </button>
                 </div>
               ))}

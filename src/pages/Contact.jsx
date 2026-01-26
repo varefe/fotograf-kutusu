@@ -1,5 +1,6 @@
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 
 function Contact() {
   return (
@@ -24,13 +25,9 @@ function Contact() {
               </p>
 
               <div className="contact-info">
-                <div className="contact-item" style={{
-                  background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%)',
-                  border: '2px solid var(--primary-color)',
-                  borderRadius: '12px'
-                }}>
+                <div className="contact-item">
                   <h3 style={{ color: 'var(--primary-color)', fontSize: '1.5rem', marginBottom: '1rem' }}>
-                    📧 E-posta
+                    <Icon name="mail" size={18} /> E-posta
                   </h3>
                   <p style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--text-color)' }}>
                     <a href="mailto:admin@fotografkutusu.com" style={{
@@ -55,13 +52,9 @@ function Contact() {
                   </p>
                 </div>
 
-                <div className="contact-item" style={{
-                  background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%)',
-                  border: '2px solid var(--primary-color)',
-                  borderRadius: '12px'
-                }}>
+                <div className="contact-item">
                   <h3 style={{ color: 'var(--primary-color)', fontSize: '1.5rem', marginBottom: '1rem' }}>
-                    📞 Telefon
+                    <Icon name="phone" size={18} /> Telefon
                   </h3>
                   <p style={{ fontSize: '1.3rem', fontWeight: '700', color: 'var(--text-color)', marginBottom: '0.5rem' }}>
                     <a href="tel:05067087684" style={{
@@ -86,13 +79,9 @@ function Contact() {
                   </p>
                 </div>
 
-                <div className="contact-item" style={{
-                  background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%)',
-                  border: '2px solid var(--primary-color)',
-                  borderRadius: '12px'
-                }}>
+                <div className="contact-item">
                   <h3 style={{ color: 'var(--primary-color)', fontSize: '1.5rem', marginBottom: '1rem' }}>
-                    📍 Adres
+                    <Icon name="pin" size={18} /> Adres
                   </h3>
                   <p style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--text-color)', lineHeight: '1.8' }}>
                     Altın Oran Fotoğrafçılık<br />
@@ -101,13 +90,9 @@ function Contact() {
                   </p>
                 </div>
 
-                <div className="contact-item" style={{
-                  background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%)',
-                  border: '2px solid var(--primary-color)',
-                  borderRadius: '12px'
-                }}>
+                <div className="contact-item">
                   <h3 style={{ color: 'var(--primary-color)', fontSize: '1.5rem', marginBottom: '1rem' }}>
-                    ⏰ Çalışma Saatleri
+                    <Icon name="clock" size={18} /> Çalışma Saatleri
                   </h3>
                   <p style={{ fontSize: '1rem', color: 'var(--text-color)', lineHeight: '2', fontWeight: '500' }}>
                     <strong>Pazartesi - Cuma:</strong> 09:00 - 18:00<br />
@@ -119,10 +104,11 @@ function Contact() {
 
               <div style={{ 
                 marginTop: '3rem', 
-                padding: '2rem', 
-                background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%)',
+                padding: '2rem',
+                background: 'var(--bg-color)',
                 borderRadius: '12px',
-                border: '2px solid var(--primary-color)'
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow)'
               }}>
                 <h2 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>Sosyal Medya</h2>
                 <p style={{ marginBottom: '1.5rem', color: 'var(--text-light)' }}>
@@ -135,48 +121,20 @@ function Contact() {
                     gap: '0.5rem',
                     padding: '0.75rem 1.5rem',
                     background: 'var(--primary-color)',
-                    color: '#000000',
+                    color: '#ffffff',
                     borderRadius: '8px',
                     textDecoration: 'none',
-                    fontWeight: '600',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 2px 8px rgba(212, 175, 55, 0.3)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.background = 'var(--primary-gold)'
-                    e.target.style.transform = 'translateY(-2px)'
-                    e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.4)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.background = 'var(--primary-color)'
-                    e.target.style.transform = 'translateY(0)'
-                    e.target.style.boxShadow = '0 2px 8px rgba(212, 175, 55, 0.3)'
+                    fontWeight: '600'
                   }}
                   >
-                    <span>📷</span> Instagram
+                    <Icon name="instagram" size={16} /> Instagram
                   </a>
                 </div>
               </div>
 
               <h2 style={{ marginTop: '3rem' }}>Sık Sorulan Sorular</h2>
               
-              <div className="faq-item" style={{
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                padding: '1.5rem',
-                marginBottom: '1rem',
-                background: 'white',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--primary-color)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.15)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-color)'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-              >
+              <div className="faq-item">
                 <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.75rem' }}>
                   Siparişim ne zaman hazır olur?
                 </h3>
@@ -185,23 +143,7 @@ function Contact() {
                 </p>
               </div>
 
-              <div className="faq-item" style={{
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                padding: '1.5rem',
-                marginBottom: '1rem',
-                background: 'white',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--primary-color)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.15)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-color)'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-              >
+              <div className="faq-item">
                 <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.75rem' }}>
                   Hangi ödeme yöntemlerini kabul ediyorsunuz?
                 </h3>
@@ -211,23 +153,7 @@ function Contact() {
                 </p>
               </div>
 
-              <div className="faq-item" style={{
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                padding: '1.5rem',
-                marginBottom: '1rem',
-                background: 'white',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--primary-color)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.15)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-color)'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-              >
+              <div className="faq-item">
                 <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.75rem' }}>
                   Kargo ücreti ne kadar?
                 </h3>
@@ -236,23 +162,7 @@ function Contact() {
                 </p>
               </div>
 
-              <div className="faq-item" style={{
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                padding: '1.5rem',
-                marginBottom: '1rem',
-                background: 'white',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--primary-color)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.15)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-color)'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-              >
+              <div className="faq-item">
                 <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.75rem' }}>
                   İade yapabilir miyim?
                 </h3>
@@ -265,7 +175,7 @@ function Contact() {
                   }}
                   onMouseEnter={(e) => {
                     e.target.style.textDecoration = 'underline'
-                    e.target.style.color = 'var(--primary-gold)'
+                    e.target.style.color = 'var(--primary-dark)'
                   }}
                   onMouseLeave={(e) => {
                     e.target.style.textDecoration = 'none'

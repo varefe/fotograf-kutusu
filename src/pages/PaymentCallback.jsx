@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+import Icon from '../components/Icon'
 
 /**
  * PaymentCallback - Iyzico callback'ini backend'e yönlendirir
@@ -46,7 +47,9 @@ function PaymentCallback() {
       <div style={{
         fontSize: '2rem',
         marginBottom: '1rem'
-      }}>⏳</div>
+      }}>
+        <Icon name="clock" size={28} />
+      </div>
       <p>Ödeme işlemi kontrol ediliyor...</p>
       <p style={{ fontSize: '0.9rem', color: '#666' }}>Yönlendiriliyor...</p>
     </div>

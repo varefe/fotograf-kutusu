@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 
 function Home() {
   const navigate = useNavigate()
@@ -24,32 +25,28 @@ function Home() {
       image: 'https://images.pexels.com/photos/1024311/pexels-photo-1024311.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', // Duvarda çerçeveli anı fotoğrafları - wall gallery
       alt: 'Duvarda çerçeveli anı fotoğrafları',
       title: 'Anılarınızı Ölümsüzleştirin',
-      subtitle: 'En değerli anılarınızı profesyonel çerçevelerle süsleyin',
-      gradient: 'linear-gradient(135deg, var(--primary-gold) 0%, var(--primary-color) 50%, var(--primary-dark) 100%)'
+      subtitle: 'En değerli anılarınızı profesyonel çerçevelerle süsleyin'
     },
     {
       id: 2,
       image: 'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', // Masa üstünde küçük fotoğraflar ve polo kartlar - polaroid instant photos
       alt: 'Polo kartlar ve küçük fotoğraflar',
       title: 'Polo Kartlar ve Küçük Baskılar',
-      subtitle: '10x15 ve 15x20 boyutlarında özel polo kartlar',
-      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      subtitle: '10x15 ve 15x20 boyutlarında özel polo kartlar'
     },
     {
       id: 3,
       image: 'https://images.pexels.com/photos/1024311/pexels-photo-1024311.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', // Anı duvarı - aile fotoğrafları - memory wall
       alt: 'Anı duvarı aile fotoğrafları',
       title: 'Aile Anılarınız',
-      subtitle: 'Sevdiklerinizle geçirdiğiniz özel anları çerçeveleyin',
-      gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+      subtitle: 'Sevdiklerinizle geçirdiğiniz özel anları çerçeveleyin'
     },
     {
       id: 4,
       image: 'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', // Çerçeveli fotoğraf koleksiyonu - photo frames collection
       alt: 'Çerçeveli fotoğraf koleksiyonu',
       title: 'Fotoğraf Koleksiyonunuz',
-      subtitle: 'Farklı boyutlarda profesyonel baskı ve çerçeveleme',
-      gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
+      subtitle: 'Farklı boyutlarda profesyonel baskı ve çerçeveleme'
     }
   ]
 
@@ -198,7 +195,7 @@ function Home() {
                   opacity: index === currentSlide ? 1 : 0,
                   transform: `translateX(${(index - currentSlide) * 100}%)`,
                   transition: 'opacity 0.8s ease-in-out, transform 0.8s ease-in-out',
-                  backgroundImage: `url(${slide.image}), ${slide.gradient}`,
+                  backgroundImage: `url(${slide.image})`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat',
@@ -215,7 +212,7 @@ function Home() {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  background: 'linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%)',
+                  background: 'rgba(2, 6, 23, 0.45)',
                   zIndex: 1
                 }}></div>
                 
@@ -224,18 +221,14 @@ function Home() {
                   position: 'relative',
                   zIndex: 2,
                   textAlign: 'center',
-                  color: 'white',
-                  textShadow: '2px 2px 4px rgba(0,0,0,0.5)'
+                  color: '#f8fafc'
                 }}>
-                  <div style={{
-                    animation: index === currentSlide && isVisible.hero ? 'slideInDown 0.8s ease-out' : 'none'
-                  }}>
+                  <div>
                     <h1 style={{
                       fontSize: '3.5rem',
                       marginBottom: '1rem',
                       fontWeight: 900,
-                      color: '#ffffff',
-                      textShadow: '3px 3px 6px rgba(0,0,0,0.7)'
+                      color: '#ffffff'
                     }}>
                       {slide.title}
                     </h1>
@@ -244,10 +237,8 @@ function Home() {
                       style={{
                         fontSize: '1.5rem',
                         marginBottom: '2rem',
-                        color: '#ffffff',
-                        fontWeight: 500,
-                        textShadow: '2px 2px 4px rgba(0,0,0,0.7)',
-                        animation: index === currentSlide && isVisible.hero ? 'slideInDown 0.8s ease-out 0.2s both' : 'none'
+                        color: '#e2e8f0',
+                        fontWeight: 500
                       }}
                     >
                       {slide.subtitle}
@@ -255,9 +246,7 @@ function Home() {
                     <p style={{ 
                       marginTop: '1rem', 
                       fontSize: '1.1rem', 
-                      color: '#f0f0f0',
-                      textShadow: '1px 1px 3px rgba(0,0,0,0.7)',
-                      animation: index === currentSlide && isVisible.hero ? 'slideInDown 0.8s ease-out 0.4s both' : 'none'
+                      color: '#cbd5f5'
                     }}>
                       Ürün seçin, fotoğraflarınızı yükleyin, sepete ekleyin!
                     </p>
@@ -270,35 +259,6 @@ function Home() {
             <button
               onClick={prevSlide}
               className="carousel-arrow carousel-arrow-left"
-              style={{
-                position: 'absolute',
-                left: '20px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'rgba(255, 255, 255, 0.9)',
-                border: 'none',
-                width: '50px',
-                height: '50px',
-                borderRadius: '50%',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.5rem',
-                color: '#2c3e50',
-                zIndex: 10,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                transition: 'all 0.3s ease',
-                fontWeight: 'bold'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 1)'
-                e.target.style.transform = 'translateY(-50%) scale(1.1)'
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 0.9)'
-                e.target.style.transform = 'translateY(-50%) scale(1)'
-              }}
               aria-label="Önceki slide"
             >
               ‹
@@ -306,35 +266,6 @@ function Home() {
             <button
               onClick={nextSlide}
               className="carousel-arrow carousel-arrow-right"
-              style={{
-                position: 'absolute',
-                right: '20px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'rgba(255, 255, 255, 0.9)',
-                border: 'none',
-                width: '50px',
-                height: '50px',
-                borderRadius: '50%',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.5rem',
-                color: '#2c3e50',
-                zIndex: 10,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                transition: 'all 0.3s ease',
-                fontWeight: 'bold'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 1)'
-                e.target.style.transform = 'translateY(-50%) scale(1.1)'
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 0.9)'
-                e.target.style.transform = 'translateY(-50%) scale(1)'
-              }}
               aria-label="Sonraki slide"
             >
               ›
@@ -391,55 +322,33 @@ function Home() {
           }}
         >
           <div className="container">
-            <h2 style={{
-              animation: isVisible.steps ? 'slideInUp 0.8s ease-out' : 'none'
-            }}>Nasıl Çalışır?</h2>
+            <h2>Nasıl Çalışır?</h2>
             <div className="steps">
               <div 
                 className="step"
-                style={{
-                  animation: isVisible.steps ? 'fadeInLeft 0.6s ease-out 0.1s both' : 'none'
-                }}
               >
-                <div className="step-number" style={{
-                  animation: isVisible.steps ? 'bounceIn 0.6s ease-out 0.3s both' : 'none'
-                }}>1</div>
+                <div className="step-number">1</div>
                 <h3>Fotoğrafınızı Yükleyin</h3>
                 <p>İstediğiniz boyutta fotoğrafınızı yükleyin</p>
               </div>
               <div 
                 className="step"
-                style={{
-                  animation: isVisible.steps ? 'fadeInLeft 0.6s ease-out 0.2s both' : 'none'
-                }}
               >
-                <div className="step-number" style={{
-                  animation: isVisible.steps ? 'bounceIn 0.6s ease-out 0.4s both' : 'none'
-                }}>2</div>
+                <div className="step-number">2</div>
                 <h3>Boyut ve Adet Seçin</h3>
                 <p>Standart veya özel boyut seçin, adet belirleyin</p>
               </div>
               <div 
                 className="step"
-                style={{
-                  animation: isVisible.steps ? 'fadeInLeft 0.6s ease-out 0.3s both' : 'none'
-                }}
               >
-                <div className="step-number" style={{
-                  animation: isVisible.steps ? 'bounceIn 0.6s ease-out 0.5s both' : 'none'
-                }}>3</div>
+                <div className="step-number">3</div>
                 <h3>Bilgilerinizi Girin</h3>
                 <p>İletişim ve adres bilgilerinizi tamamlayın</p>
               </div>
               <div 
                 className="step"
-                style={{
-                  animation: isVisible.steps ? 'fadeInLeft 0.6s ease-out 0.4s both' : 'none'
-                }}
               >
-                <div className="step-number" style={{
-                  animation: isVisible.steps ? 'bounceIn 0.6s ease-out 0.6s both' : 'none'
-                }}>4</div>
+                <div className="step-number">4</div>
                 <h3>Baskı ve Teslimat</h3>
                 <p>Otomatik baskı, çerçeveleme ve kargo</p>
               </div>
@@ -457,14 +366,11 @@ function Home() {
           }}
         >
           <div className="container">
-            <h2 style={{
-              animation: isVisible.pricing ? 'slideInUp 0.8s ease-out' : 'none'
-            }}>Ürünlerimiz</h2>
+            <h2>Ürünlerimiz</h2>
             <p style={{ 
               textAlign: 'center', 
               color: '#666', 
-              marginBottom: '2rem',
-              animation: isVisible.pricing ? 'slideInUp 0.8s ease-out 0.2s both' : 'none'
+              marginBottom: '2rem'
             }}>
               Ürün seçin, fotoğraflarınızı yükleyin ve sepete ekleyin
             </p>
@@ -475,14 +381,14 @@ function Home() {
                   className={`pricing-card ${product.featured ? 'featured' : ''}`}
                   onClick={() => handleProductClick(product)}
                   style={{
-                    animation: isVisible.pricing ? `fadeInUp 0.6s ease-out ${0.3 + index * 0.1}s both` : 'none',
                     cursor: 'pointer'
                   }}
                 >
                   <div 
                     className="pricing-card-image"
                     style={{
-                      backgroundImage: product.image ? `url(${product.image})` : 'linear-gradient(135deg, var(--bg-light) 0%, var(--bg-gray) 100%)',
+                      backgroundImage: product.image ? `url(${product.image})` : 'none',
+                      backgroundColor: product.image ? 'transparent' : 'var(--bg-gray)',
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                       backgroundRepeat: 'no-repeat',
@@ -499,7 +405,7 @@ function Home() {
                         justifyContent: 'center',
                         height: '100%'
                       }}>
-                        📷
+                        <Icon name="camera" size={40} />
                       </div>
                     )}
                     {/* Overlay for better text readability */}
@@ -509,7 +415,7 @@ function Home() {
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      background: product.image ? 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 100%)' : 'transparent',
+                      background: product.image ? 'rgba(2, 6, 23, 0.15)' : 'transparent',
                       pointerEvents: 'none'
                     }}></div>
                   </div>
@@ -530,31 +436,8 @@ function Home() {
                         </li>
                       ))}
                     </ul>
-                    <button style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      background: 'var(--primary-color)',
-                      color: '#000000',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontWeight: '700',
-                      fontSize: '1rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: '0 4px 15px rgba(212, 175, 55, 0.3)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = 'var(--primary-gold)'
-                      e.target.style.transform = 'translateY(-2px)'
-                      e.target.style.boxShadow = '0 6px 20px rgba(212, 175, 55, 0.4)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = 'var(--primary-color)'
-                      e.target.style.transform = 'translateY(0)'
-                      e.target.style.boxShadow = '0 4px 15px rgba(212, 175, 55, 0.3)'
-                    }}
-                    >
-                      Fotoğraf Yükle →
+                    <button className="btn btn-primary btn-block">
+                      Fotoğraf Yükle
                     </button>
                   </div>
                 </div>
@@ -598,7 +481,7 @@ function Home() {
               />
             </div>
             <div className="security-badge">
-              <span className="security-badge-icon">🔒</span>
+              <Icon name="lock" size={16} className="security-badge-icon" />
               <span>SSL Sertifikası ile Güvenli Alışveriş</span>
             </div>
           </div>

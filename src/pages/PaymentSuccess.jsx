@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
 import { getDecryptedOrders } from '../utils/encryption'
 import { API_URL } from '../config/api'
@@ -227,10 +228,9 @@ function PaymentSuccess() {
               textAlign: 'center',
               padding: '3rem'
             }}>
-              <div style={{
-                fontSize: '3rem',
-                marginBottom: '1rem'
-              }}>⏳</div>
+              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+                <Icon name="clock" size={32} />
+              </div>
               <h2>Sipariş detayları yükleniyor...</h2>
             </div>
           </div>
@@ -254,16 +254,15 @@ function PaymentSuccess() {
             borderRadius: '12px',
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
           }}>
-            <div style={{
-              fontSize: '4rem',
-              marginBottom: '1rem'
-            }}>✅</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
+              <Icon name="check" size={32} />
+            </div>
             <h1 style={{
-              color: '#2c3e50',
+              color: 'var(--text-color)',
               marginBottom: '1rem'
             }}>Ödeme Başarılı!</h1>
             <p style={{
-              color: '#666',
+              color: 'var(--text-light)',
               marginBottom: '2rem',
               fontSize: '1.1rem'
             }}>
@@ -291,10 +290,10 @@ function PaymentSuccess() {
                 textAlign: 'left'
               }}>
                 <h2 style={{
-                  color: '#2c3e50',
+                  color: 'var(--text-color)',
                   marginBottom: '1.5rem',
                   fontSize: '1.5rem',
-                  borderBottom: '2px solid #3498db',
+                  borderBottom: '2px solid var(--primary-color)',
                   paddingBottom: '0.5rem'
                 }}>Sipariş Detayları</h2>
                 

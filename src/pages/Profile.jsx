@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
 import { API_URL } from '../config/api'
 
@@ -211,7 +212,7 @@ function Profile() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                📝 Profil
+                <Icon name="user" size={16} /> Profil
               </button>
               <button
                 onClick={() => setActiveTab('password')}
@@ -231,7 +232,7 @@ function Profile() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                🔒 Şifre
+                <Icon name="lock" size={16} /> Şifre
               </button>
               <button
                 onClick={() => {
@@ -257,7 +258,7 @@ function Profile() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                📦 Siparişler
+                <Icon name="cart" size={16} /> Siparişler
               </button>
               <button
                 onClick={() => navigate('/order-tracking')}
@@ -277,7 +278,7 @@ function Profile() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                🔄 Sipariş Takibi
+                <Icon name="pin" size={16} /> Sipariş Takibi
               </button>
               <button
                 onClick={() => {
@@ -545,18 +546,22 @@ function Profile() {
                         fontWeight: 'bold'
                       }}
                     >
-                      {loading ? 'Yükleniyor...' : '🔄 Yenile'}
+                      {loading ? 'Yükleniyor...' : 'Yenile'}
                     </button>
                   </div>
                   
                   {loading && orders.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem' }}>
-                      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                      <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+                        <Icon name="clock" size={32} />
+                      </div>
                       <p>Siparişler yükleniyor...</p>
                     </div>
                   ) : orders.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', background: '#f9fafb', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📭</div>
+                      <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
+                        <Icon name="mail" size={32} />
+                      </div>
                       <p style={{ color: '#666', fontSize: '1.1rem', marginBottom: '1rem' }}>
                         Henüz siparişiniz bulunmamaktadır.
                       </p>
@@ -565,7 +570,7 @@ function Profile() {
                         style={{
                           padding: '0.75rem 2rem',
                           background: 'var(--primary-color)',
-                          color: '#000000',
+                          color: '#ffffff',
                           border: 'none',
                           borderRadius: '8px',
                           cursor: 'pointer',
@@ -676,7 +681,7 @@ function Profile() {
                             </div>
                             <div>
                               <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
-                                📦 Kargo
+                                Kargo
                               </div>
                               <div style={{ fontWeight: '600', color: '#2c3e50' }}>
                                 {order.shippingType === 'express' ? 'Express' : 'Standart'}
@@ -693,8 +698,9 @@ function Profile() {
                             fontSize: '0.9rem',
                             color: '#666'
                           }}>
-                            <div>
-                              📅 {new Date(order.createdAt).toLocaleDateString('tr-TR', { 
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <Icon name="clock" size={14} />
+                              {new Date(order.createdAt).toLocaleDateString('tr-TR', { 
                                 year: 'numeric', 
                                 month: 'long', 
                                 day: 'numeric',
@@ -710,7 +716,7 @@ function Profile() {
                               color: order.paymentStatus === 'paid' ? '#065f46' : '#92400e',
                               fontWeight: 'bold'
                             }}>
-                              {order.paymentStatus === 'paid' ? '✅ Ödendi' : '⏳ Bekliyor'}
+                              {order.paymentStatus === 'paid' ? 'Ödendi' : 'Bekliyor'}
                             </div>
                           </div>
                         </div>
@@ -815,7 +821,9 @@ function Profile() {
 
                       {selectedOrder.photo?.base64 && (
                         <div style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
-                          <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#2c3e50' }}>📸 Sipariş Fotoğrafı</h3>
+                          <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <Icon name="camera" size={18} /> Sipariş Fotoğrafı
+                          </h3>
                           <div style={{ 
                             textAlign: 'center',
                             background: 'white',

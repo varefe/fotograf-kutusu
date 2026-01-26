@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
 import { API_URL } from '../config/api'
 
@@ -303,7 +304,7 @@ function AdminPanel() {
         }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '2rem', color: '#2c3e50' }}>
-              🛡️ Admin Paneli
+              <Icon name="shield" size={18} /> Admin Paneli
             </h1>
             <p style={{ margin: '0.5rem 0 0 0', color: '#666', fontSize: '0.95rem' }}>
               Hoş geldiniz, {user?.firstName} {user?.lastName}
@@ -323,7 +324,7 @@ function AdminPanel() {
                 fontSize: '1rem'
               }}
             >
-              🔄 Yenile
+              Yenile
             </button>
           </div>
         </div>
@@ -349,7 +350,7 @@ function AdminPanel() {
               transition: 'all 0.2s'
             }}
           >
-            📦 Siparişler ({orders.length})
+            <Icon name="cart" size={16} /> Siparişler ({orders.length})
           </button>
           <button
             onClick={() => setActiveTab('users')}
@@ -365,7 +366,7 @@ function AdminPanel() {
               transition: 'all 0.2s'
             }}
           >
-            👥 Kullanıcılar ({users.length})
+            <Icon name="user" size={16} /> Kullanıcılar ({users.length})
           </button>
           <button
             onClick={() => setActiveTab('stats')}
@@ -397,7 +398,7 @@ function AdminPanel() {
               transition: 'all 0.2s'
             }}
           >
-            🔄 Sipariş Takibi
+            Sipariş Takibi
           </button>
         </div>
 
@@ -461,17 +462,22 @@ function AdminPanel() {
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '4rem' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+                  <Icon name="clock" size={32} />
+                </div>
                 <h2>Siparişler yükleniyor...</h2>
               </div>
             ) : filteredOrders.length === 0 ? (
               <div style={{ 
                 textAlign: 'center', 
                 padding: '4rem',
-                background: '#f5f5f5',
-                borderRadius: '12px'
+                background: 'var(--bg-light)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)'
               }}>
-                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📭</div>
+                <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
+                  <Icon name="mail" size={32} />
+                </div>
                 <h2 style={{ color: '#666' }}>Sipariş bulunamadı</h2>
                 {orders.length === 0 && !loading && (
                   <div style={{ marginTop: '1rem', color: '#999', fontSize: '0.9rem' }}>
@@ -492,7 +498,7 @@ function AdminPanel() {
                         fontWeight: 'bold'
                       }}
                     >
-                      🔄 Tekrar Dene
+                      Tekrar Dene
                     </button>
                   </div>
                 )}
@@ -636,10 +642,12 @@ function AdminPanel() {
                           {order.customerInfo?.firstName || 'Müşteri'} {order.customerInfo?.lastName || ''}
                         </td>
                         <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                          <div>📧 {order.customerInfo?.email || '-'}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <Icon name="mail" size={14} /> {order.customerInfo?.email || '-'}
+                          </div>
                           {order.customerInfo?.phone && (
-                            <div style={{ color: '#666', marginTop: '0.25rem' }}>
-                              📞 {order.customerInfo.phone}
+                            <div style={{ color: '#666', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <Icon name="phone" size={14} /> {order.customerInfo.phone}
                             </div>
                           )}
                         </td>
@@ -689,10 +697,10 @@ function AdminPanel() {
                                 '#856404',
                               display: 'inline-block'
                             }}>
-                              {order.paymentStatus === 'paid' ? '✅ Ödendi' : 
-                               order.paymentStatus === 'failed' ? '❌ Başarısız' :
-                               order.paymentStatus === 'cancelled' ? '🚫 İptal Edildi' :
-                               '⏳ Bekliyor'}
+                              {order.paymentStatus === 'paid' ? 'Ödendi' : 
+                               order.paymentStatus === 'failed' ? 'Başarısız' :
+                               order.paymentStatus === 'cancelled' ? 'İptal Edildi' :
+                               'Bekliyor'}
                             </span>
                           </div>
                         </td>
@@ -714,7 +722,7 @@ function AdminPanel() {
                                 fontWeight: 'bold'
                               }}
                             >
-                              👁️ Detay
+                              Detay
                             </button>
                             <button
                               onClick={() => setDeleteConfirm({
@@ -775,7 +783,9 @@ function AdminPanel() {
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '4rem' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+                  <Icon name="clock" size={32} />
+                </div>
                 <h2>Kullanıcılar yükleniyor...</h2>
               </div>
             ) : filteredUsers.length === 0 ? (
@@ -785,7 +795,9 @@ function AdminPanel() {
                 background: '#f5f5f5',
                 borderRadius: '12px'
               }}>
-                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>👤</div>
+                <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
+                  <Icon name="user" size={32} />
+                </div>
                 <h2 style={{ color: '#666' }}>Kullanıcı bulunamadı</h2>
               </div>
             ) : (
@@ -841,7 +853,15 @@ function AdminPanel() {
                             color: userItem.role === 'admin' ? '#155724' : '#666',
                             display: 'inline-block'
                           }}>
-                            {userItem.role === 'admin' ? '🛡️ Admin' : '👤 Kullanıcı'}
+                            {userItem.role === 'admin' ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Icon name="shield" size={14} /> Admin
+                              </span>
+                            ) : (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Icon name="user" size={14} /> Kullanıcı
+                              </span>
+                            )}
                           </span>
                         </td>
                         <td style={{ padding: '1rem' }}>
@@ -1036,7 +1056,7 @@ function AdminPanel() {
                 borderRadius: '12px',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
               }}>
-                <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50' }}>🔄 Sipariş Senkronize Et</h2>
+                <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50' }}>Sipariş Senkronize Et</h2>
                 {trackingError && (
                   <div style={{
                     background: '#fee',
@@ -1147,7 +1167,7 @@ function AdminPanel() {
                       cursor: trackingLoading || !trackingPaymentIds.trim() ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    {trackingLoading ? 'Senkronize ediliyor...' : '🔄 Senkronize Et'}
+                    {trackingLoading ? 'Senkronize ediliyor...' : 'Senkronize Et'}
                   </button>
                 </form>
 
@@ -1171,7 +1191,7 @@ function AdminPanel() {
                           <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
                             {trackingSyncResult.syncedOrders.map((order, index) => (
                               <li key={index} style={{ marginBottom: '0.25rem' }}>
-                                Payment: {order.paymentId} - {order.action === 'created' ? '✅ Oluşturuldu' : '🔄 Güncellendi'}
+                                Payment: {order.paymentId} - {order.action === 'created' ? 'Oluşturuldu' : 'Güncellendi'}
                               </li>
                             ))}
                           </ul>
@@ -1191,7 +1211,7 @@ function AdminPanel() {
               border: '1px solid #ffc107',
               marginTop: '2rem'
             }}>
-              <h3 style={{ marginTop: 0, color: '#856404' }}>ℹ️ Nasıl Kullanılır?</h3>
+              <h3 style={{ marginTop: 0, color: '#856404' }}>Nasıl Kullanılır?</h3>
               <ol style={{ color: '#856404', lineHeight: '1.8', paddingLeft: '1.5rem' }}>
                 <li><strong>Payment ID Bulma:</strong> Iyzico panelinden veya e-posta bildirimlerinden Payment ID'lerinizi alın</li>
                 <li><strong>Ödeme Arama:</strong> Payment ID veya Conversation ID ile Iyzico'dan ödeme bilgilerini arayın</li>
@@ -1215,86 +1235,107 @@ function AdminPanel() {
             marginBottom: '2rem'
           }}>
             <div style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'var(--bg-color)',
               padding: '2rem',
               borderRadius: '12px',
-              color: 'white',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              color: 'var(--text-color)',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow)'
             }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>👥</div>
-              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Toplam Kullanıcı</div>
+              <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem', color: 'var(--text-light)' }}>
+                <Icon name="user" size={24} />
+              </div>
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Toplam Kullanıcı</div>
               <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.totalUsers || 0}</div>
             </div>
             
             <div style={{
-              background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+              background: 'var(--bg-color)',
               padding: '2rem',
               borderRadius: '12px',
-              color: 'white',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              color: 'var(--text-color)',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow)'
             }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📦</div>
-              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Toplam Sipariş</div>
+              <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem', color: 'var(--text-light)' }}>
+                <Icon name="cart" size={24} />
+              </div>
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Toplam Sipariş</div>
               <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.totalOrders || 0}</div>
             </div>
             
             <div style={{
-              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              background: 'var(--bg-color)',
               padding: '2rem',
               borderRadius: '12px',
-              color: 'white',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              color: 'var(--text-color)',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow)'
             }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>💰</div>
-              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Toplam Gelir</div>
+              <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem', color: 'var(--text-light)' }}>
+                <Icon name="card" size={24} />
+              </div>
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Toplam Gelir</div>
               <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{formatPrice(stats.totalRevenue || 0)}</div>
             </div>
             
             <div style={{
-              background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+              background: 'var(--bg-color)',
               padding: '2rem',
               borderRadius: '12px',
-              color: 'white',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              color: 'var(--text-color)',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow)'
             }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>✅</div>
-              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Ödenen Sipariş</div>
+              <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem', color: 'var(--text-light)' }}>
+                <Icon name="check" size={24} />
+              </div>
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Ödenen Sipariş</div>
               <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.paidOrders || 0}</div>
             </div>
             
             <div style={{
-              background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+              background: 'var(--bg-color)',
               padding: '2rem',
               borderRadius: '12px',
-              color: 'white',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              color: 'var(--text-color)',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow)'
             }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>⏳</div>
-              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Bekleyen Sipariş</div>
+              <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem', color: 'var(--text-light)' }}>
+                <Icon name="clock" size={24} />
+              </div>
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Bekleyen Sipariş</div>
               <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.pendingOrders || 0}</div>
             </div>
             
             <div style={{
-              background: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+              background: 'var(--bg-color)',
               padding: '2rem',
               borderRadius: '12px',
-              color: 'white',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              color: 'var(--text-color)',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow)'
             }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📅</div>
-              <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.5rem' }}>Son 30 Gün Sipariş</div>
+              <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem', color: 'var(--text-light)' }}>
+                <Icon name="clock" size={24} />
+              </div>
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Son 30 Gün Sipariş</div>
               <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.recentOrders || 0}</div>
             </div>
             
             <div style={{
-              background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+              background: 'var(--bg-color)',
               padding: '2rem',
               borderRadius: '12px',
-              color: '#333',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              color: 'var(--text-color)',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow)'
             }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🆕</div>
-              <div style={{ fontSize: '0.9rem', opacity: 0.8, marginBottom: '0.5rem' }}>Son 30 Gün Yeni Kullanıcı</div>
+              <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem', color: 'var(--text-light)' }}>
+                <Icon name="user" size={24} />
+              </div>
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Son 30 Gün Yeni Kullanıcı</div>
               <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{stats.recentUsers || 0}</div>
             </div>
           </div>
@@ -1457,7 +1498,9 @@ function AdminPanel() {
                   </div>
                 ) : selectedOrder.photo?.base64 && (
                   <div style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
-                    <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#2c3e50' }}>📸 Sipariş Fotoğrafı</h3>
+                    <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Icon name="camera" size={18} /> Sipariş Fotoğrafı
+                    </h3>
                     <div style={{ 
                       textAlign: 'center',
                       background: 'white',
@@ -1574,7 +1617,7 @@ function AdminPanel() {
                 textAlign: 'center',
                 marginBottom: '1rem'
               }}>
-                ⚠️
+                !
               </div>
               <h2 style={{
                 textAlign: 'center',
