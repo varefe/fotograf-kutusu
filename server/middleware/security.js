@@ -22,7 +22,27 @@ export const securityLogger = (req, res, next) => {
 };
 
 /**
+ * IP adresini sayıya çevir
+ */
+const ipToNumber = (ip) => {
+  return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+};
+
+/**
+ * CIDR notasyonunu kontrol et (örn: 74.220.51.0/24)
+ */
+const isIPInCIDR = (ip, cidr) => {
+  const [network, prefixLength] = cidr.split('/');
+  const prefix = parseInt(prefixLength, 10);
+  const networkNum = ipToNumber(network);
+  const ipNum = ipToNumber(ip);
+  const mask = (0xFFFFFFFF << (32 - prefix)) >>> 0;
+  return (ipNum & mask) === (networkNum & mask);
+};
+
+/**
  * IP whitelist (opsiyonel - admin için)
+ * CIDR notasyonu destekler (örn: 74.220.51.0/24)
  */
 export const ipWhitelist = (allowedIPs = []) => {
   return (req, res, next) => {
@@ -31,11 +51,46 @@ export const ipWhitelist = (allowedIPs = []) => {
       return next();
     }
     
-    const clientIP = req.ip || req.connection.remoteAddress;
+    // Client IP'yi al (proxy arkasındaysa X-Forwarded-For header'ını kontrol et)
+    let clientIP = req.ip || req.connection.remoteAddress;
     
-    if (allowedIPs.includes(clientIP)) {
+    // X-Forwarded-For header'ını kontrol et (reverse proxy arkasında)
+    if (req.headers['x-forwarded-for']) {
+      const forwardedIPs = req.headers['x-forwarded-for'].split(',');
+      clientIP = forwardedIPs[0].trim();
+    }
+    
+    // IPv6 localhost'u IPv4'e çevir
+    if (clientIP === '::1' || clientIP === '::ffff:127.0.0.1') {
+      clientIP = '127.0.0.1';
+    }
+    // IPv6 formatını temizle
+    if (clientIP.startsWith('::ffff:')) {
+      clientIP = clientIP.replace('::ffff:', '');
+    }
+    
+    // IP veya CIDR kontrolü
+    let isAllowed = false;
+    for (const allowed of allowedIPs) {
+      if (allowed.includes('/')) {
+        // CIDR notasyonu
+        if (isIPInCIDR(clientIP, allowed)) {
+          isAllowed = true;
+          break;
+        }
+      } else {
+        // Tek IP
+        if (clientIP === allowed) {
+          isAllowed = true;
+          break;
+        }
+      }
+    }
+    
+    if (isAllowed) {
       next();
     } else {
+      console.warn(`[SECURITY] IP whitelist reddedildi: ${clientIP} - ${req.method} ${req.path}`);
       res.status(403).json({
         success: false,
         error: 'Erişim reddedildi',

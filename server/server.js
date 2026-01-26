@@ -8,7 +8,7 @@ import paymentRoutes from './routes/payment.js';
 import userRoutes from './routes/user.js';
 import adminRoutes from './routes/admin.js';
 import orderTrackingRoutes from './routes/orderTracking.js';
-import { securityLogger, securityHeaders } from './middleware/security.js';
+import { securityLogger, securityHeaders, ipWhitelist } from './middleware/security.js';
 
 dotenv.config();
 
@@ -212,8 +212,19 @@ if (NODE_ENV === 'development') {
 }
 app.use('/api/payment', paymentLimiter, paymentRoutes);
 app.use('/api/user', generalLimiter, userRoutes);
-// adminRoutes'u mount et (tüm admin route'ları burada)
-app.use('/api/admin', adminRoutes);
+
+// Admin routes için IP whitelist (opsiyonel - environment variable'dan)
+const allowedIPs = process.env.ALLOWED_IPS 
+  ? process.env.ALLOWED_IPS.split(',').map(ip => ip.trim()).filter(ip => ip)
+  : [];
+if (allowedIPs.length > 0) {
+  console.log(`🔒 IP Whitelist aktif: ${allowedIPs.length} IP aralığı/IP`);
+  app.use('/api/admin', ipWhitelist(allowedIPs), adminRoutes);
+} else {
+  // IP whitelist yoksa normal şekilde mount et
+  app.use('/api/admin', adminRoutes);
+}
+
 app.use('/api/order-tracking', generalLimiter, orderTrackingRoutes);
 
 // Health check
