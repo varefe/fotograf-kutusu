@@ -2,7 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
-import { connectDB } from './config/database.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { connectPostgres } from './config/postgres.js';
+import { defineUser } from './models/User.js';
+import { defineOrder } from './models/Order.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import orderRoutes from './routes/order.js';
 import paymentRoutes from './routes/payment.js';
 import userRoutes from './routes/user.js';
@@ -188,18 +196,37 @@ if (NODE_ENV !== 'development') {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// MongoDB database bağlantısı (non-blocking - uygulama çalışmaya devam eder)
-connectDB(5).then(() => {
-  console.log('✅ Veritabanı hazır');
+// PostgreSQL database bağlantısı ve modelleri initialize et
+let User = null;
+let Order = null;
+
+connectPostgres(5).then(async (sequelize) => {
+  console.log('✅ PostgreSQL bağlantısı hazır');
+  
+  // Modelleri oluştur
+  User = defineUser(sequelize);
+  Order = defineOrder(sequelize);
+  
+  // Tabloları oluştur (sync)
+  try {
+    await User.sync({ alter: true });
+    await Order.sync({ alter: true });
+    console.log('✅ PostgreSQL tabloları hazır');
+  } catch (syncError) {
+    console.error('⚠️ Tablo sync hatası:', syncError.message);
+  }
 }).catch((error) => {
-  console.error('❌ Veritabanı bağlantı hatası:', error.message);
-  console.warn('⚠️ Uygulama MongoDB olmadan çalışmaya devam ediyor. Bağlantı otomatik olarak tekrar deneniyor...');
+  console.error('❌ PostgreSQL bağlantı hatası:', error.message);
+  console.warn('⚠️ Uygulama PostgreSQL olmadan çalışmaya devam ediyor. Bağlantı otomatik olarak tekrar deneniyor...');
   // 10 saniye sonra tekrar dene
   setTimeout(() => {
-    console.log('🔄 MongoDB bağlantısı tekrar deneniyor...');
-    connectDB(3).catch(() => {});
+    console.log('🔄 PostgreSQL bağlantısı tekrar deneniyor...');
+    connectPostgres(3).catch(() => {});
   }, 10000);
 });
+
+// Modelleri export et (route'lar için)
+export { User, Order };
 
 // Routes (rate limiting ile)
 // Development modunda rate limiting'i atla (test için)
@@ -412,6 +439,13 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
+  // #region agent log
+  try {
+    const logPath = path.join(__dirname, '..', '.cursor', 'debug.log');
+    const logLine = JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'server.js:app.listen',message:'Server started successfully',data:{port:PORT,nodeEnv:NODE_ENV},timestamp:Date.now()}) + '\n';
+    fs.appendFileSync(logPath, logLine);
+  } catch (e) {}
+  // #endregion
   console.log(`✅ Server ${PORT} portunda çalışıyor`);
   console.log(`🌐 Environment: ${NODE_ENV}`);
   console.log(`🔒 Rate Limiting: Aktif`);

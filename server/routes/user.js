@@ -1,8 +1,17 @@
 import express from 'express';
 import crypto from 'crypto';
-import mongoose from 'mongoose';
-import User from '../models/UserSchema.js';
-import { connectDB } from '../config/database.js';
+import { connectPostgres } from '../config/postgres.js';
+import { defineUser } from '../models/User.js';
+
+// User model'ini lazy load et
+let User = null;
+const getUser = async () => {
+  if (!User) {
+    const sequelize = await connectPostgres();
+    User = defineUser(sequelize);
+  }
+  return User;
+};
 import { generateToken } from '../utils/jwt.js';
 import { requireAuth } from '../middleware/userAuth.js';
 import { validateOrderData, sanitizeInput } from '../utils/validation.js';
@@ -14,7 +23,7 @@ const router = express.Router();
  */
 router.post('/register', async (req, res) => {
   try {
-    await connectDB();
+    await connectPostgres();
 
     const { email, password, firstName, lastName, phone, address } = req.body;
 
@@ -56,7 +65,8 @@ router.post('/register', async (req, res) => {
     }
 
     // E-posta kontrolü
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const UserModel = await getUser();
+    const existingUser = await UserModel.findOne({ where: { email: email.toLowerCase() } });
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -66,7 +76,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Yeni kullanıcı oluştur
-    const user = new User({
+    const user = await UserModel.create({
       email: email.toLowerCase(),
       password,
       firstName: sanitizeInput(firstName),
@@ -75,17 +85,15 @@ router.post('/register', async (req, res) => {
       address: address ? sanitizeInput(address) : ''
     });
 
-    await user.save();
-
     // Token oluştur
-    const token = generateToken(user._id, user.email, user.role);
+    const token = generateToken(user.id, user.email, user.role);
 
     res.status(201).json({
       success: true,
       message: 'Kayıt başarılı',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -109,46 +117,16 @@ router.post('/register', async (req, res) => {
  */
 router.post('/login', async (req, res) => {
   try {
-    // MongoDB bağlantısını kontrol et (retry ile)
-    let dbConnected = false;
-    let connectionAttempts = 0;
-    const maxAttempts = 2; // Sadece 2 deneme
-    
-    // Önce mevcut bağlantıyı kontrol et
-    if (mongoose.connection.readyState === 1) {
-      dbConnected = true;
-      console.log('✅ MongoDB bağlantısı zaten aktif');
-    } else {
-      // Bağlantı yoksa dene
-      while (!dbConnected && connectionAttempts < maxAttempts) {
-        connectionAttempts++;
-        try {
-          await connectDB(2); // 2 deneme
-          dbConnected = mongoose.connection.readyState === 1;
-          if (dbConnected) {
-            console.log('✅ MongoDB bağlantısı başarılı (login)');
-            break;
-          }
-        } catch (dbError) {
-          console.error(`❌ MongoDB bağlantı hatası (login, deneme ${connectionAttempts}/${maxAttempts}):`, dbError.message);
-          // Bağlantı durumunu tekrar kontrol et
-          dbConnected = mongoose.connection.readyState === 1;
-          if (dbConnected) break;
-          
-          // Son deneme değilse bekle
-          if (connectionAttempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 saniye bekle
-          }
-        }
-      }
-      
-      if (!dbConnected) {
-        return res.status(503).json({
-          success: false,
-          error: 'Veritabanı bağlantı hatası',
-          message: 'Veritabanına bağlanılamıyor. Lütfen daha sonra tekrar deneyin veya MongoDB servisini kontrol edin.'
-        });
-      }
+    // PostgreSQL bağlantısını kontrol et
+    try {
+      await connectPostgres(2);
+    } catch (dbError) {
+      console.error('❌ PostgreSQL bağlantı hatası (login):', dbError.message);
+      return res.status(503).json({
+        success: false,
+        error: 'Veritabanı bağlantı hatası',
+        message: 'Veritabanına bağlanılamıyor. Lütfen daha sonra tekrar deneyin.'
+      });
     }
 
     const { email, password } = req.body;
@@ -185,14 +163,14 @@ router.post('/login', async (req, res) => {
     }
 
     // Token oluştur
-    const token = generateToken(user._id, user.email, user.role);
+    const token = generateToken(user.id, user.email, user.role);
 
     res.json({
       success: true,
       message: 'Giriş başarılı',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -216,7 +194,7 @@ router.post('/login', async (req, res) => {
  */
 router.post('/admin/login', async (req, res) => {
   try {
-    await connectDB();
+    await connectPostgres();
 
     const { username, password, adminCode } = req.body;
 
@@ -247,18 +225,18 @@ router.post('/admin/login', async (req, res) => {
     // Admin email'i environment variable'dan al veya varsayılan kullan
     const adminEmail = process.env.ADMIN_EMAIL || `${ADMIN_USERNAME}@admin.local`;
     
-    let adminUser = await User.findOne({ email: adminEmail.toLowerCase() });
+    const UserModel = await getUser();
+    let adminUser = await UserModel.findOne({ where: { email: adminEmail.toLowerCase() } });
     
     if (!adminUser) {
       // Admin kullanıcısı yoksa oluştur
-      adminUser = new User({
+      adminUser = await UserModel.create({
         email: adminEmail.toLowerCase(),
         password: password, // Şifre hash'lenecek (pre-save hook)
         firstName: 'Admin',
         lastName: 'User',
         role: 'admin'
       });
-      await adminUser.save();
       console.log('✅ Admin kullanıcısı oluşturuldu:', adminEmail);
     } else {
       // Admin kullanıcısı varsa, şifresini kontrol et
@@ -279,14 +257,14 @@ router.post('/admin/login', async (req, res) => {
     }
 
     // Token oluştur
-    const token = generateToken(adminUser._id, adminUser.email, adminUser.role);
+    const token = generateToken(adminUser.id, adminUser.email, adminUser.role);
 
     res.json({
       success: true,
       message: 'Admin girişi başarılı',
       token,
       user: {
-        id: adminUser._id,
+        id: adminUser.id,
         email: adminUser.email,
         firstName: adminUser.firstName,
         lastName: adminUser.lastName,
@@ -310,9 +288,10 @@ router.post('/admin/login', async (req, res) => {
  */
 router.get('/profile', requireAuth, async (req, res) => {
   try {
-    await connectDB();
+    await connectPostgres();
 
-    const user = await User.findById(req.user.id);
+    const UserModel = await getUser();
+    const user = await UserModel.findByPk(req.user.id);
     
     if (!user) {
       return res.status(404).json({
@@ -324,7 +303,7 @@ router.get('/profile', requireAuth, async (req, res) => {
     res.json({
       success: true,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -349,11 +328,12 @@ router.get('/profile', requireAuth, async (req, res) => {
  */
 router.put('/profile', requireAuth, async (req, res) => {
   try {
-    await connectDB();
+    await connectPostgres();
 
     const { firstName, lastName, phone, address } = req.body;
 
-    const user = await User.findById(req.user.id);
+    const UserModel = await getUser();
+    const user = await UserModel.findByPk(req.user.id);
     
     if (!user) {
       return res.status(404).json({
@@ -383,7 +363,7 @@ router.put('/profile', requireAuth, async (req, res) => {
       success: true,
       message: 'Profil güncellendi',
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -407,7 +387,7 @@ router.put('/profile', requireAuth, async (req, res) => {
  */
 router.post('/forgot-password', async (req, res) => {
   try {
-    await connectDB();
+    await connectPostgres();
 
     const { email } = req.body;
 
@@ -466,7 +446,7 @@ router.post('/forgot-password', async (req, res) => {
  */
 router.post('/reset-password', async (req, res) => {
   try {
-    await connectDB();
+    await connectPostgres();
 
     const { token, newPassword } = req.body;
 
@@ -536,7 +516,7 @@ router.post('/reset-password', async (req, res) => {
  */
 router.put('/change-password', requireAuth, async (req, res) => {
   try {
-    await connectDB();
+    await connectPostgres();
 
     const { currentPassword, newPassword } = req.body;
 
@@ -566,7 +546,8 @@ router.put('/change-password', requireAuth, async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.user.id);
+    const UserModel = await getUser();
+    const user = await UserModel.findByPk(req.user.id);
     
     if (!user) {
       return res.status(404).json({
