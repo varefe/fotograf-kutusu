@@ -98,21 +98,33 @@ function Cart() {
       return
     }
 
-    if (!customerInfo.email || !customerInfo.address) {
-      alert('Lütfen e-posta ve adres bilgilerini doldurun')
+    // Kullanıcı bilgilerini user objesinden al
+    const userCustomerInfo = {
+      email: user?.email || '',
+      address: user?.address || '',
+      phone: user?.phone || '',
+      firstName: user?.firstName || '',
+      lastName: user?.lastName || ''
+    }
+
+    if (!userCustomerInfo.email || !userCustomerInfo.address) {
+      alert('Profil bilgileriniz eksik. Lütfen profil sayfanızdan adres bilgilerinizi güncelleyin.')
+      navigate('/profile')
       return
     }
 
     // Adres uzunluk kontrolü
-    if (customerInfo.address.trim().length < 10) {
-      alert('Adres en az 10 karakter olmalıdır')
+    if (userCustomerInfo.address.trim().length < 10) {
+      alert('Adres en az 10 karakter olmalıdır. Lütfen profil sayfanızdan adres bilgilerinizi güncelleyin.')
+      navigate('/profile')
       return
     }
 
     // Email format kontrolü
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(customerInfo.email.trim())) {
-      alert('Geçerli bir e-posta adresi giriniz')
+    if (!emailRegex.test(userCustomerInfo.email.trim())) {
+      alert('Geçerli bir e-posta adresi gerekli. Lütfen profil sayfanızdan e-posta adresinizi güncelleyin.')
+      navigate('/profile')
       return
     }
 
@@ -288,17 +300,17 @@ function Cart() {
             customSize: firstItem.product.customSize,
             quantity: firstItem.quantity,
             shippingType: shippingType,
-            email: customerInfo.email,
-            address: customerInfo.address,
-            phone: customerInfo.phone || '',
-            firstName: customerInfo.firstName || 'Müşteri',
-            lastName: customerInfo.lastName || 'Müşteri',
+            email: userCustomerInfo.email,
+            address: userCustomerInfo.address,
+            phone: userCustomerInfo.phone || '',
+            firstName: userCustomerInfo.firstName || 'Müşteri',
+            lastName: userCustomerInfo.lastName || 'Müşteri',
             customerInfo: {
-              firstName: customerInfo.firstName || 'Müşteri',
-              lastName: customerInfo.lastName || 'Müşteri',
-              email: customerInfo.email,
-              phone: customerInfo.phone || '',
-              address: customerInfo.address
+              firstName: userCustomerInfo.firstName || 'Müşteri',
+              lastName: userCustomerInfo.lastName || 'Müşteri',
+              email: userCustomerInfo.email,
+              phone: userCustomerInfo.phone || '',
+              address: userCustomerInfo.address
             },
             price: calculatedPrice,
             status: 'Yeni',
@@ -959,7 +971,7 @@ function Cart() {
                   </div>
                 ) : (
                   <>
-                    {/* Adres Bilgilerini Doldur Butonu */}
+                    {/* Kargo Bilgilerini Doldur Butonu */}
                     {!showAddressForm && (
                       <button
                         onClick={() => setShowAddressForm(true)}
@@ -977,11 +989,11 @@ function Cart() {
                           marginBottom: '1rem'
                         }}
                       >
-                        Adres Bilgilerini Doldur
+                        Kargo Bilgilerini Doldur
                       </button>
                     )}
 
-                    {/* Adres Formu */}
+                    {/* Adres Formu - Sadece Kargo Tipi Seçimi */}
                     {showAddressForm && (
                       <div style={{ marginBottom: '1rem' }}>
                         <div style={{
@@ -990,7 +1002,7 @@ function Cart() {
                           alignItems: 'center',
                           marginBottom: '0.75rem'
                         }}>
-                          <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>İletişim Bilgileri</h3>
+                          <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>Kargo Bilgileri</h3>
                           <button
                             onClick={() => {
                               setShowAddressForm(false)
@@ -1043,98 +1055,37 @@ function Cart() {
                             <option value="express">Express Kargo (1-2 gün, ₺35)</option>
                           </select>
                         </div>
-                        <input
-                          type="text"
-                          placeholder="Ad *"
-                          value={customerInfo.firstName}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, firstName: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '0.6rem',
-                            marginBottom: '0.6rem',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            fontSize: '0.9rem'
-                          }}
-                        />
-                        <input
-                          type="text"
-                          placeholder="Soyad *"
-                          value={customerInfo.lastName}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, lastName: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '0.6rem',
-                            marginBottom: '0.6rem',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            fontSize: '0.9rem'
-                          }}
-                        />
-                        <input
-                          type="email"
-                          placeholder="E-posta *"
-                          value={customerInfo.email}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                          required
-                          style={{
-                            width: '100%',
-                            padding: '0.6rem',
-                            marginBottom: '0.6rem',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            fontSize: '0.9rem'
-                          }}
-                        />
-                        <textarea
-                          placeholder="Adres *"
-                          value={customerInfo.address}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                          required
-                          rows="3"
-                          style={{
-                            width: '100%',
-                            padding: '0.6rem',
-                            marginBottom: '0.6rem',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            fontSize: '0.9rem',
-                            resize: 'vertical'
-                          }}
-                        />
-                        <input
-                          type="tel"
-                          placeholder="Telefon (Opsiyonel)"
-                          value={customerInfo.phone}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '0.6rem',
-                            marginBottom: '0.75rem',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            fontSize: '0.9rem'
-                          }}
-                        />
                         
                         {/* Ödeme Formunu Aç Butonu */}
                         {!showPaymentForm && (
                           <button
                             onClick={async () => {
+                              // Kullanıcı bilgilerini user objesinden al
+                              const userCustomerInfo = {
+                                email: user?.email || '',
+                                address: user?.address || '',
+                                phone: user?.phone || '',
+                                firstName: user?.firstName || '',
+                                lastName: user?.lastName || ''
+                              }
+                              
                               // Adres bilgilerini kontrol et
-                              if (!customerInfo.email || !customerInfo.address || !customerInfo.firstName || !customerInfo.lastName) {
-                                alert('Lütfen tüm zorunlu alanları doldurun')
+                              if (!userCustomerInfo.email || !userCustomerInfo.address || !userCustomerInfo.firstName || !userCustomerInfo.lastName) {
+                                alert('Profil bilgileriniz eksik. Lütfen profil sayfanızdan adres bilgilerinizi güncelleyin.')
+                                navigate('/profile')
                                 return
                               }
                               
-                              if (customerInfo.address.trim().length < 10) {
-                                alert('Adres en az 10 karakter olmalıdır')
+                              if (userCustomerInfo.address.trim().length < 10) {
+                                alert('Adres en az 10 karakter olmalıdır. Lütfen profil sayfanızdan adres bilgilerinizi güncelleyin.')
+                                navigate('/profile')
                                 return
                               }
                               
                               const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-                              if (!emailRegex.test(customerInfo.email.trim())) {
-                                alert('Geçerli bir e-posta adresi giriniz')
+                              if (!emailRegex.test(userCustomerInfo.email.trim())) {
+                                alert('Geçerli bir e-posta adresi gerekli. Lütfen profil sayfanızdan e-posta adresinizi güncelleyin.')
+                                navigate('/profile')
                                 return
                               }
                               
@@ -1243,11 +1194,11 @@ function Cart() {
                                   customSize: firstItem.product.customSize,
                                   quantity: firstItem.quantity,
                                   customerInfo: {
-                                    ...customerInfo,
-                                    email: customerInfo.email.trim(),
-                                    address: customerInfo.address.trim(),
-                                    firstName: customerInfo.firstName.trim(),
-                                    lastName: customerInfo.lastName.trim()
+                                    ...userCustomerInfo,
+                                    email: userCustomerInfo.email.trim(),
+                                    address: userCustomerInfo.address.trim(),
+                                    firstName: userCustomerInfo.firstName.trim(),
+                                    lastName: userCustomerInfo.lastName.trim()
                                   },
                                   shippingType,
                                   price: finalTotal,
