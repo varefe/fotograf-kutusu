@@ -13,6 +13,7 @@ import { securityLogger, securityHeaders } from './middleware/security.js';
 dotenv.config();
 
 const app = express();
+// Railway ve diğer cloud servisler PORT'u otomatik sağlar
 const PORT = process.env.PORT || 5001; // Port 5000 AirTunes tarafından kullanılıyor, 5001'e değiştir
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
