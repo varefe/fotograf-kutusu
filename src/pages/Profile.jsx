@@ -299,7 +299,7 @@ function Profile() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                🚪 Çıkış
+                <Icon name="logout" size={16} /> Çıkış
               </button>
             </div>
 
@@ -663,7 +663,7 @@ function Profile() {
                           }}>
                             <div>
                               <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
-                                📐 Boyut
+                                <Icon name="ruler" size={14} /> Boyut
                               </div>
                               <div style={{ fontWeight: '600', color: '#2c3e50' }}>
                                 {order.size === 'custom' && order.customSize
@@ -673,7 +673,7 @@ function Profile() {
                             </div>
                             <div>
                               <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
-                                🔢 Adet
+                                <Icon name="hash" size={14} /> Adet
                               </div>
                               <div style={{ fontWeight: '600', color: '#2c3e50' }}>
                                 {order.quantity || 1} adet

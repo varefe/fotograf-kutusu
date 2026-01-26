@@ -1666,7 +1666,9 @@ function Cart() {
                 }}
                 title="Yeni fotoğraf ekle"
               >
-                <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>➕</div>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
+                  <Icon name="plus" size={28} />
+                </div>
                 <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>Yeni Fotoğraf Ekle</div>
               </div>
             </div>

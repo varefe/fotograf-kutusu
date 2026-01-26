@@ -382,7 +382,7 @@ function AdminPanel() {
               transition: 'all 0.2s'
             }}
           >
-            📊 İstatistikler
+            <Icon name="chart" size={16} /> İstatistikler
           </button>
           <button
             onClick={() => setActiveTab('tracking')}
@@ -426,7 +426,7 @@ function AdminPanel() {
             }}>
               <input
                 type="text"
-                placeholder="🔍 Sipariş ID, E-posta veya Telefon ile ara..."
+                placeholder="Sipariş ID, E-posta veya Telefon ile ara..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -536,7 +536,7 @@ function AdminPanel() {
                           {isGroupStart && isGrouped && (
                             <tr style={{ background: '#e8f4f8', borderTop: '2px solid #3498db' }}>
                               <td colSpan="9" style={{ padding: '0.75rem 1rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                                🔗 Sipariş Grubu: {order.orderGroupId} 
+                                <Icon name="link" size={14} /> Sipariş Grubu: {order.orderGroupId} 
                                 {(() => {
                                   const groupOrders = filteredOrders.filter(o => o.orderGroupId === order.orderGroupId);
                                   return ` (${groupOrders.length} sipariş)`;
@@ -556,7 +556,7 @@ function AdminPanel() {
                               #{order._id || order.id}
                               {isGrouped && (
                                 <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
-                                  🔗 {order.orderGroupId?.substring(0, 12)}...
+                                  <Icon name="link" size={12} /> {order.orderGroupId?.substring(0, 12)}...
                                 </div>
                               )}
                             </td>
@@ -741,7 +741,7 @@ function AdminPanel() {
                                 fontWeight: 'bold'
                               }}
                             >
-                              🗑️ Sil
+                              <Icon name="trash" size={14} /> Sil
                             </button>
                           </div>
                         </td>
@@ -767,7 +767,7 @@ function AdminPanel() {
             }}>
               <input
                 type="text"
-                placeholder="🔍 E-posta, Ad, Soyad veya Telefon ile ara..."
+                placeholder="E-posta, Ad, Soyad veya Telefon ile ara..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -883,7 +883,7 @@ function AdminPanel() {
                                 fontWeight: 'bold'
                               }}
                             >
-                              🗑️ Sil
+                              <Icon name="trash" size={14} /> Sil
                             </button>
                           )}
                         </td>
@@ -912,7 +912,9 @@ function AdminPanel() {
                 borderRadius: '12px',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
               }}>
-                <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50' }}>🔍 Iyzico Ödeme Ara</h2>
+                <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Icon name="search" size={18} /> Iyzico Ödeme Ara
+                </h2>
                 {trackingError && (
                   <div style={{
                     background: '#fee',
@@ -1019,7 +1021,11 @@ function AdminPanel() {
                       cursor: trackingLoading || (!trackingPaymentId && !trackingConversationId) ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    {trackingLoading ? 'Aranıyor...' : '🔍 Ara'}
+                    {trackingLoading ? 'Aranıyor...' : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Icon name="search" size={14} /> Ara
+                      </span>
+                    )}
                   </button>
                 </form>
 
@@ -1399,7 +1405,9 @@ function AdminPanel() {
                     <div><strong>Sipariş No:</strong> #{selectedOrder._id || selectedOrder.id}</div>
                     {selectedOrder.orderGroupId && (
                       <div style={{ marginTop: '0.5rem', color: '#667eea', fontSize: '0.9rem' }}>
-                        <strong>🔗 Sipariş Grubu:</strong> {selectedOrder.orderGroupId}
+                        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <Icon name="link" size={14} /> Sipariş Grubu:
+                        </strong> {selectedOrder.orderGroupId}
                       </div>
                     )}
                     <div><strong>Tarih:</strong> {formatDate(selectedOrder.createdAt)}</div>
@@ -1675,7 +1683,7 @@ function AdminPanel() {
                     fontSize: '1rem'
                   }}
                 >
-                  🗑️ Sil
+                  <Icon name="trash" size={14} /> Sil
                 </button>
               </div>
             </div>

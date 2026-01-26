@@ -250,7 +250,7 @@ function Admin() {
                 fontSize: '1rem'
               }}
             >
-              🚪 Çıkış Yap
+              <Icon name="logout" size={16} /> Çıkış Yap
             </button>
           </div>
         </div>
@@ -308,7 +308,7 @@ function Admin() {
               transition: 'all 0.2s'
             }}
           >
-            📊 İstatistikler
+            <Icon name="chart" size={16} /> İstatistikler
           </button>
         </div>
 
@@ -337,7 +337,7 @@ function Admin() {
             }}>
               <input
                 type="text"
-                placeholder="🔍 Sipariş ID, E-posta veya Telefon ile ara..."
+                placeholder="Sipariş ID, E-posta veya Telefon ile ara..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -520,7 +520,7 @@ function Admin() {
             }}>
               <input
                 type="text"
-                placeholder="🔍 E-posta, Ad, Soyad veya Telefon ile ara..."
+                placeholder="E-posta, Ad, Soyad veya Telefon ile ara..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{

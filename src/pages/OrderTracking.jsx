@@ -181,7 +181,9 @@ function OrderTracking() {
               borderRadius: '12px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}>
-              <h2 style={{ marginBottom: '1.5rem' }}>🔍 Ödeme Ara</h2>
+              <h2 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Icon name="search" size={18} /> Ödeme Ara
+              </h2>
               <form onSubmit={handleSearch}>
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
@@ -232,7 +234,11 @@ function OrderTracking() {
                     cursor: loading || (!paymentId && !conversationId) ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {loading ? 'Aranıyor...' : '🔍 Ara'}
+                  {loading ? 'Aranıyor...' : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Icon name="search" size={14} /> Ara
+                    </span>
+                  )}
                 </button>
               </form>
 
@@ -351,7 +357,9 @@ function OrderTracking() {
             border: '1px solid #ffc107',
             marginTop: '2rem'
           }}>
-            <h3 style={{ marginTop: 0, color: '#856404' }}>ℹ️ Nasıl Kullanılır?</h3>
+            <h3 style={{ marginTop: 0, color: '#856404', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Icon name="info" size={16} /> Nasıl Kullanılır?
+            </h3>
             <ol style={{ color: '#856404', lineHeight: '1.8', paddingLeft: '1.5rem' }}>
               <li><strong>Payment ID Bulma:</strong> Iyzico panelinden veya e-posta bildirimlerinden Payment ID'lerinizi alın</li>
               <li><strong>Ödeme Arama:</strong> Payment ID veya Conversation ID ile Iyzico'dan ödeme bilgilerini arayın</li>
