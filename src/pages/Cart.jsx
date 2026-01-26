@@ -19,6 +19,7 @@ function Cart() {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [orderId, setOrderId] = useState(null)
   const [selectedItemGroup, setSelectedItemGroup] = useState(null) // Seçilen ürün grubu (tüm fotoğrafları içeren)
+  const [showAddressForm, setShowAddressForm] = useState(false) // Adres formunu göster/gizle
   const [showPaymentForm, setShowPaymentForm] = useState(false) // Ödeme formunu göster/gizle
   const [preparedOrderData, setPreparedOrderData] = useState(null) // Hazırlanan sipariş verisi
   const [paymentError, setPaymentError] = useState(null) // Ödeme hatası
@@ -932,63 +933,43 @@ function Cart() {
                 </div>
 
                 <div style={{
-                  borderTop: '2px solid #e5e7eb',
+                  borderTop: '1px solid var(--border-color)',
                   paddingTop: '1rem',
-                  marginBottom: '1.5rem'
+                  marginBottom: '1rem'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: '600' }}>
                     <span>Toplam</span>
-                    <span style={{ color: '#667eea' }}>₺{finalTotal.toFixed(2)}</span>
+                    <span style={{ color: 'var(--primary-color)' }}>₺{finalTotal.toFixed(2)}</span>
                   </div>
-                </div>
-
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
-                    Kargo Tipi
-                  </label>
-                  <select
-                    value={shippingType}
-                    onChange={(e) => setShippingType(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #ddd',
-                      borderRadius: '8px',
-                      fontSize: '1rem'
-                    }}
-                  >
-                    <option value="standard">Standart Kargo (3-5 gün, ₺15)</option>
-                    <option value="express">Express Kargo (1-2 gün, ₺35)</option>
-                  </select>
                 </div>
 
                 {/* Kullanıcı giriş yapmamışsa kayıt ol/giriş yap bölümü */}
                 {!isAuthenticated ? (
                   <div style={{
-                    marginBottom: '1.5rem',
-                    padding: '1.5rem',
+                    marginBottom: '1rem',
+                    padding: '1.25rem',
                     background: 'var(--bg-color)',
-                    borderRadius: '12px',
+                    borderRadius: '8px',
                     color: 'var(--text-color)',
                     textAlign: 'center',
                     border: '1px solid var(--border-color)',
                     boxShadow: 'var(--shadow)'
                   }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
-                      <Icon name="lock" size={28} />
+                    <div style={{ fontSize: '1.5rem', marginBottom: '0.75rem' }}>
+                      <Icon name="lock" size={24} />
                     </div>
-                    <h3 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: '0.6rem', fontWeight: '600' }}>
                       Siparişi Tamamlamak İçin
                     </h3>
                     <p style={{ 
-                      fontSize: '0.95rem', 
-                      marginBottom: '1.5rem', 
+                      fontSize: '0.875rem', 
+                      marginBottom: '1rem', 
                       color: 'var(--text-light)',
-                      lineHeight: '1.6'
+                      lineHeight: '1.5'
                     }}>
                       Hızlı ve güvenli sipariş vermek için lütfen giriş yapın veya kayıt olun
                     </p>
-                    <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
                       <Link
                         to="/login"
                         state={{ from: '/cart', message: 'Sipariş verebilmek için lütfen giriş yapın veya kayıt olun.' }}
@@ -1006,312 +987,501 @@ function Cart() {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>İletişim Bilgileri</h3>
-                    <div style={{
-                      padding: '0.75rem',
-                      marginBottom: '1rem',
-                      background: '#f8fafc',
-                      borderRadius: '8px',
-                      fontSize: '0.9rem',
-                      color: 'var(--text-color)',
-                      border: '1px solid var(--border-color)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}>
-                      <Icon name="check" size={14} />
-                      <span>Giriş yaptınız: <strong>{user?.email || user?.firstName || 'Kullanıcı'}</strong></span>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Ad *"
-                      value={customerInfo.firstName}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, firstName: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        marginBottom: '0.75rem',
-                        border: '1px solid #ddd',
-                        borderRadius: '8px',
-                        fontSize: '1rem'
-                      }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Soyad *"
-                      value={customerInfo.lastName}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, lastName: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        marginBottom: '0.75rem',
-                        border: '1px solid #ddd',
-                        borderRadius: '8px',
-                        fontSize: '1rem'
-                      }}
-                    />
-                    <input
-                      type="email"
-                      placeholder="E-posta *"
-                      value={customerInfo.email}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        marginBottom: '0.75rem',
-                        border: '1px solid #ddd',
-                        borderRadius: '8px',
-                        fontSize: '1rem'
-                      }}
-                    />
-                    <textarea
-                      placeholder="Adres *"
-                      value={customerInfo.address}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                      required
-                      rows="3"
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        marginBottom: '0.75rem',
-                        border: '1px solid #ddd',
-                        borderRadius: '8px',
-                        fontSize: '1rem',
-                        resize: 'vertical'
-                      }}
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Telefon (Opsiyonel)"
-                      value={customerInfo.phone}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        marginBottom: '0.75rem',
-                        border: '1px solid #ddd',
-                        borderRadius: '8px',
-                        fontSize: '1rem'
-                      }}
-                    />
-                  </div>
-                )}
+                  <>
+                    {/* Adres Bilgilerini Doldur Butonu */}
+                    {!showAddressForm && (
+                      <button
+                        onClick={() => setShowAddressForm(true)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          fontSize: '0.95rem',
+                          fontWeight: '600',
+                          background: 'var(--primary-color)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'color 0.2s, background-color 0.2s',
+                          marginBottom: '1rem'
+                        }}
+                      >
+                        Adres Bilgilerini Doldur
+                      </button>
+                    )}
 
-                {submitSuccess ? (
-                  <div style={{
-                    background: '#f8fafc',
-                    padding: '2rem',
-                    borderRadius: '12px',
-                    textAlign: 'center',
-                    color: 'var(--text-color)',
-                    border: '1px solid var(--border-color)',
-                    boxShadow: 'var(--shadow)',
-                    marginTop: '1rem'
-                  }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
-                      <Icon name="check" size={28} />
-                    </div>
-                    <h3 style={{ marginBottom: '0.5rem' }}>Sipariş Başarıyla Oluşturuldu!</h3>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '1rem' }}>
-                      Sipariş No: <strong>#{orderId}</strong>
-                    </p>
-                    <Link
-                      to="/"
-                      className="btn btn-primary btn-small"
-                    >
-                      Ana Sayfaya Dön
-                    </Link>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleCheckout}
-                    disabled={isSubmitting || !isAuthenticated || showPaymentForm}
-                    style={{
-                      width: '100%',
-                      padding: '1rem',
-                      fontSize: '1.1rem',
-                      fontWeight: 'bold',
-                      background: (isSubmitting || !isAuthenticated || showPaymentForm) ? '#e2e8f0' : 'var(--primary-color)',
-                      color: (isSubmitting || !isAuthenticated || showPaymentForm) ? '#64748b' : '#ffffff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: (isSubmitting || !isAuthenticated || showPaymentForm) ? 'not-allowed' : 'pointer',
-                      transition: 'color 0.2s, background-color 0.2s',
-                      opacity: (isSubmitting || !isAuthenticated || showPaymentForm) ? 0.6 : 1
-                    }}
-                    title={!isAuthenticated ? 'Sipariş verebilmek için lütfen giriş yapın' : ''}
-                  >
-                    {isSubmitting ? 'Sipariş Oluşturuluyor...' : 
-                     !isAuthenticated ? 'Giriş Yaparak Devam Et' : 
-                     showPaymentForm ? 'Ödeme Formu Açık' : 
-                     'Sipariş Ver ve Ödeme Yap'}
-                  </button>
+                    {/* Adres Formu */}
+                    {showAddressForm && (
+                      <div style={{ marginBottom: '1rem' }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.75rem'
+                        }}>
+                          <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>İletişim Bilgileri</h3>
+                          <button
+                            onClick={() => {
+                              setShowAddressForm(false)
+                              setShowPaymentForm(false)
+                              setPreparedOrderData(null)
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-light)',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              padding: '0.25rem 0.5rem'
+                            }}
+                          >
+                            Kapat
+                          </button>
+                        </div>
+                        <div style={{
+                          padding: '0.6rem',
+                          marginBottom: '0.75rem',
+                          background: 'var(--bg-light)',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          color: 'var(--text-color)',
+                          border: '1px solid var(--border-color)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem'
+                        }}>
+                          <Icon name="check" size={12} />
+                          <span>Giriş yaptınız: <strong>{user?.email || user?.firstName || 'Kullanıcı'}</strong></span>
+                        </div>
+                        <div style={{ marginBottom: '0.75rem' }}>
+                          <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                            Kargo Tipi
+                          </label>
+                          <select
+                            value={shippingType}
+                            onChange={(e) => setShippingType(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '0.6rem',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              fontSize: '0.9rem'
+                            }}
+                          >
+                            <option value="standard">Standart Kargo (3-5 gün, ₺15)</option>
+                            <option value="express">Express Kargo (1-2 gün, ₺35)</option>
+                          </select>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Ad *"
+                          value={customerInfo.firstName}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, firstName: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '0.6rem',
+                            marginBottom: '0.6rem',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            fontSize: '0.9rem'
+                          }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Soyad *"
+                          value={customerInfo.lastName}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, lastName: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '0.6rem',
+                            marginBottom: '0.6rem',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            fontSize: '0.9rem'
+                          }}
+                        />
+                        <input
+                          type="email"
+                          placeholder="E-posta *"
+                          value={customerInfo.email}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                          required
+                          style={{
+                            width: '100%',
+                            padding: '0.6rem',
+                            marginBottom: '0.6rem',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            fontSize: '0.9rem'
+                          }}
+                        />
+                        <textarea
+                          placeholder="Adres *"
+                          value={customerInfo.address}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
+                          required
+                          rows="3"
+                          style={{
+                            width: '100%',
+                            padding: '0.6rem',
+                            marginBottom: '0.6rem',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            fontSize: '0.9rem',
+                            resize: 'vertical'
+                          }}
+                        />
+                        <input
+                          type="tel"
+                          placeholder="Telefon (Opsiyonel)"
+                          value={customerInfo.phone}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '0.6rem',
+                            marginBottom: '0.75rem',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            fontSize: '0.9rem'
+                          }}
+                        />
+                        
+                        {/* Ödeme Formunu Aç Butonu */}
+                        {!showPaymentForm && (
+                          <button
+                            onClick={async () => {
+                              // Adres bilgilerini kontrol et
+                              if (!customerInfo.email || !customerInfo.address || !customerInfo.firstName || !customerInfo.lastName) {
+                                alert('Lütfen tüm zorunlu alanları doldurun')
+                                return
+                              }
+                              
+                              if (customerInfo.address.trim().length < 10) {
+                                alert('Adres en az 10 karakter olmalıdır')
+                                return
+                              }
+                              
+                              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                              if (!emailRegex.test(customerInfo.email.trim())) {
+                                alert('Geçerli bir e-posta adresi giriniz')
+                                return
+                              }
+                              
+                              setIsSubmitting(true)
+                              
+                              try {
+                                // OrderId oluştur
+                                const newOrderId = Date.now().toString()
+                                
+                                // Fotoğrafları base64'e çevir
+                                const photosArray = []
+                                let photoFilesToProcess = []
+                                
+                                if (location.state?.photos && location.state.photos.length > 0) {
+                                  photoFilesToProcess = location.state.photos
+                                } else if (photoFiles && photoFiles.length > 0) {
+                                  photoFilesToProcess = photoFiles
+                                } else {
+                                  photoFilesToProcess = cartItems
+                                    .map(item => item.photo?.file)
+                                    .filter(file => file instanceof File)
+                                }
+                                
+                                if (photoFilesToProcess.length === 0) {
+                                  photoFilesToProcess = cartItems.map(item => ({
+                                    preview: item.photo?.preview,
+                                    name: item.photo?.filename || `photo-${cartItems.indexOf(item)}.jpg`
+                                  }))
+                                }
+                                
+                                if (photoFilesToProcess.length === 0) {
+                                  alert('Fotoğraf bulunamadı. Lütfen tekrar deneyin.')
+                                  setIsSubmitting(false)
+                                  return
+                                }
+                                
+                                const convertPhoto = (photoFile, index) => {
+                                  return new Promise((resolve, reject) => {
+                                    if (photoFile instanceof File) {
+                                      const reader = new FileReader()
+                                      reader.onloadend = () => {
+                                        const base64String = reader.result.split(',')[1]
+                                        resolve({
+                                          filename: photoFile.name || `photo-${index}.jpg`,
+                                          originalName: photoFile.name || `photo-${index}.jpg`,
+                                          base64: base64String,
+                                          mimetype: photoFile.type || 'image/jpeg',
+                                          size: photoFile.size || 0
+                                        })
+                                      }
+                                      reader.onerror = reject
+                                      reader.readAsDataURL(photoFile)
+                                    } else if (photoFile.preview) {
+                                      const preview = photoFile.preview
+                                      if (preview.startsWith('data:image/')) {
+                                        const base64String = preview.split(',')[1]
+                                        const mimetype = preview.match(/data:image\/([^;]+)/)?.[1] || 'jpeg'
+                                        resolve({
+                                          filename: photoFile.name || `photo-${index}.jpg`,
+                                          originalName: photoFile.name || `photo-${index}.jpg`,
+                                          base64: base64String,
+                                          mimetype: `image/${mimetype}`,
+                                          size: 0
+                                        })
+                                      } else {
+                                        fetch(preview)
+                                          .then(response => response.blob())
+                                          .then(blob => {
+                                            const reader = new FileReader()
+                                            reader.onloadend = () => {
+                                              const base64String = reader.result.split(',')[1]
+                                              resolve({
+                                                filename: photoFile.name || `photo-${index}.jpg`,
+                                                originalName: photoFile.name || `photo-${index}.jpg`,
+                                                base64: base64String,
+                                                mimetype: blob.type || 'image/jpeg',
+                                                size: blob.size || 0
+                                              })
+                                            }
+                                            reader.onerror = reject
+                                            reader.readAsDataURL(blob)
+                                          })
+                                          .catch(reject)
+                                      }
+                                    } else {
+                                      reject(new Error(`Fotoğraf ${index} işlenemedi`))
+                                    }
+                                  })
+                                }
+                                
+                                const photoPromises = photoFilesToProcess.map((photoFile, index) => 
+                                  convertPhoto(photoFile, index)
+                                )
+                                const convertedPhotos = await Promise.all(photoPromises)
+                                photosArray.push(...convertedPhotos)
+                                
+                                const firstItem = cartItems[0]
+                                
+                                // Sipariş verisini hazırla
+                                const orderData = {
+                                  id: newOrderId,
+                                  photos: photosArray,
+                                  photo: photosArray[0] || null,
+                                  items: cartItems,
+                                  size: firstItem.product.size,
+                                  customSize: firstItem.product.customSize,
+                                  quantity: firstItem.quantity,
+                                  customerInfo: {
+                                    ...customerInfo,
+                                    email: customerInfo.email.trim(),
+                                    address: customerInfo.address.trim(),
+                                    firstName: customerInfo.firstName.trim(),
+                                    lastName: customerInfo.lastName.trim()
+                                  },
+                                  shippingType,
+                                  price: finalTotal,
+                                  totalPrice: totalPrice,
+                                  shippingPrice: shippingPrice,
+                                  status: 'Yeni',
+                                  paymentStatus: 'pending',
+                                  notes: `${photosArray.length} fotoğraf`,
+                                  createdAt: new Date().toISOString()
+                                }
+                                
+                                // localStorage'a kaydet
+                                saveOrderToStorage(orderData)
+                                
+                                setPreparedOrderData(orderData)
+                                setOrderId(newOrderId)
+                                setShowPaymentForm(true)
+                                setIsSubmitting(false)
+                              } catch (error) {
+                                console.error('Sipariş hazırlama hatası:', error)
+                                alert('Sipariş hazırlanırken bir hata oluştu. Lütfen tekrar deneyin.')
+                                setIsSubmitting(false)
+                              }
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              fontSize: '0.95rem',
+                              fontWeight: '600',
+                              background: 'var(--primary-color)',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              transition: 'color 0.2s, background-color 0.2s'
+                            }}
+                          >
+                            Ödeme Formunu Aç
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Ödeme Formu */}
+                    {showPaymentForm && preparedOrderData && (
+                      <div style={{
+                        marginTop: '1rem',
+                        padding: '1rem',
+                        background: 'var(--bg-light)',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-color)'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.75rem',
+                          paddingBottom: '0.6rem',
+                          borderBottom: '1px solid var(--border-color)'
+                        }}>
+                          <h3 style={{ 
+                            fontSize: '1rem', 
+                            margin: 0, 
+                            color: 'var(--text-color)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            fontWeight: '600'
+                          }}>
+                            <Icon name="lock" size={14} /> Güvenli Ödeme
+                          </h3>
+                          <button
+                            onClick={() => {
+                              setShowPaymentForm(false)
+                              setPreparedOrderData(null)
+                              setPaymentError(null)
+                              setShow3DSecure(false)
+                              setThreeDSecureHtml(null)
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-light)',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              padding: '0.25rem 0.5rem'
+                            }}
+                          >
+                            Kapat
+                          </button>
+                        </div>
+
+                        {show3DSecure && threeDSecureHtml ? (
+                          <div style={{ 
+                            width: '100%', 
+                            minHeight: '500px',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            position: 'relative'
+                          }}>
+                            <div style={{
+                              padding: '1rem',
+                              textAlign: 'center',
+                              background: 'var(--bg-light)',
+                              borderBottom: '1px solid var(--border-color)'
+                            }}>
+                              <div style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>
+                                <Icon name="lock" size={20} />
+                              </div>
+                              <h3 style={{ margin: 0, color: 'var(--text-color)', fontSize: '1.1rem', fontWeight: '600' }}>3D Secure Doğrulama</h3>
+                              <p style={{ margin: '0.4rem 0 0 0', color: 'var(--text-light)', fontSize: '0.8rem' }}>
+                                Güvenli ödeme için bankanızın doğrulama sayfasına yönlendiriliyorsunuz...
+                              </p>
+                            </div>
+                            <div 
+                              id="threeds-container"
+                              style={{ 
+                                width: '100%', 
+                                minHeight: '500px',
+                                padding: '0',
+                                background: 'white',
+                                borderRadius: '8px',
+                                overflow: 'hidden'
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            {paymentError && (
+                              <div style={{
+                                marginBottom: '0.75rem',
+                                padding: '0.75rem',
+                                background: '#fee',
+                                border: '1px solid #fcc',
+                                borderRadius: '6px',
+                                color: '#c33',
+                                fontSize: '0.85rem'
+                              }}>
+                                {paymentError}
+                              </div>
+                            )}
+
+                            <PaymentForm 
+                              onSubmit={handlePaymentSubmit}
+                              loading={isSubmitting}
+                              error={paymentError}
+                            />
+
+                            {/* Güvenlik Bilgisi */}
+                            <div style={{
+                              marginTop: '0.75rem',
+                              padding: '0.6rem',
+                              background: 'var(--bg-gray)',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border-color)',
+                              textAlign: 'center',
+                              fontSize: '0.7rem',
+                              color: 'var(--text-light)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.4rem',
+                              lineHeight: '1.4'
+                            }}>
+                              <Icon name="lock" size={11} />
+                              <span>Ödemeleriniz 256-bit SSL sertifikası ile korunmaktadır. Kart bilgileriniz hiçbir şekilde saklanmaz.</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Başarı Mesajı */}
+                    {submitSuccess && (
+                      <div style={{
+                        background: '#f8fafc',
+                        padding: '1.5rem',
+                        borderRadius: '8px',
+                        textAlign: 'center',
+                        color: 'var(--text-color)',
+                        border: '1px solid var(--border-color)',
+                        boxShadow: 'var(--shadow)',
+                        marginTop: '1rem'
+                      }}>
+                        <div style={{ fontSize: '1.75rem', marginBottom: '0.75rem', color: 'var(--primary-color)' }}>
+                          <Icon name="check" size={24} />
+                        </div>
+                        <h3 style={{ marginBottom: '0.4rem', fontSize: '1.1rem', fontWeight: '600' }}>Sipariş Başarıyla Oluşturuldu!</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-light)', marginBottom: '0.75rem' }}>
+                          Sipariş No: <strong>#{orderId}</strong>
+                        </p>
+                        <Link
+                          to="/"
+                          className="btn btn-primary btn-small"
+                        >
+                          Ana Sayfaya Dön
+                        </Link>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
           </div>
-
-          {/* Ödeme Formu Bölümü */}
-          {showPaymentForm && preparedOrderData && (
-            <div id="payment-section" style={{
-              marginTop: '1.5rem',
-              background: 'white',
-              padding: '1.25rem',
-              borderRadius: '8px',
-              border: '1px solid var(--border-color)',
-              boxShadow: 'var(--shadow)'
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1rem',
-                paddingBottom: '0.75rem',
-                borderBottom: '1px solid var(--border-color)'
-              }}>
-                <h2 style={{ 
-                  fontSize: '1.25rem', 
-                  margin: 0, 
-                  color: 'var(--text-color)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  fontWeight: '600'
-                }}>
-                  <Icon name="lock" size={16} /> Güvenli Ödeme
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowPaymentForm(false)
-                    setPreparedOrderData(null)
-                    setPaymentError(null)
-                    setShow3DSecure(false)
-                    setThreeDSecureHtml(null)
-                  }}
-                  style={{
-                    background: 'var(--bg-gray)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    padding: '0.4rem 0.75rem',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-light)',
-                    fontWeight: '500'
-                  }}
-                >
-                  Kapat
-                </button>
-              </div>
-
-              {show3DSecure && threeDSecureHtml ? (
-                <div style={{ 
-                  width: '100%', 
-                  minHeight: '500px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  position: 'relative'
-                }}>
-                  <div style={{
-                    padding: '1rem',
-                    textAlign: 'center',
-                    background: 'var(--bg-light)',
-                    borderBottom: '1px solid var(--border-color)'
-                  }}>
-                    <div style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>
-                      <Icon name="lock" size={20} />
-                    </div>
-                    <h3 style={{ margin: 0, color: 'var(--text-color)', fontSize: '1.1rem', fontWeight: '600' }}>3D Secure Doğrulama</h3>
-                    <p style={{ margin: '0.4rem 0 0 0', color: 'var(--text-light)', fontSize: '0.8rem' }}>
-                      Güvenli ödeme için bankanızın doğrulama sayfasına yönlendiriliyorsunuz...
-                    </p>
-                  </div>
-                  <div 
-                    id="threeds-container"
-                    style={{ 
-                      width: '100%', 
-                      minHeight: '500px',
-                      padding: '0',
-                      background: 'white',
-                      borderRadius: '8px',
-                      overflow: 'hidden'
-                    }}
-                  />
-                </div>
-              ) : (
-                <div>
-                  <div style={{ 
-                    marginBottom: '1rem', 
-                    padding: '0.75rem',
-                    background: 'var(--bg-light)',
-                    borderRadius: '6px',
-                    textAlign: 'center',
-                    border: '1px solid var(--border-color)'
-                  }}>
-                    <p style={{ 
-                      margin: 0, 
-                      color: 'var(--text-color)', 
-                      fontSize: '0.95rem', 
-                      fontWeight: '600' 
-                    }}>
-                      Toplam: {new Intl.NumberFormat('tr-TR', { 
-                        style: 'currency', 
-                        currency: 'TRY' 
-                      }).format(preparedOrderData.price || 0)}
-                    </p>
-                    <p style={{ 
-                      margin: '0.4rem 0 0 0', 
-                      color: 'var(--text-light)', 
-                      fontSize: '0.8rem' 
-                    }}>
-                      Sipariş No: <strong>{orderId}</strong>
-                    </p>
-                  </div>
-                  
-                  {paymentError && (
-                    <div style={{
-                      marginBottom: '1rem',
-                      padding: '1rem',
-                      background: '#fee',
-                      border: '1px solid #fcc',
-                      borderRadius: '8px',
-                      color: '#c33'
-                    }}>
-                      {paymentError}
-                    </div>
-                  )}
-
-                  <PaymentForm 
-                    onSubmit={handlePaymentSubmit}
-                    loading={isSubmitting}
-                    error={paymentError}
-                  />
-
-                  {/* Güvenlik Bilgisi */}
-                  <div style={{
-                    marginTop: '1rem',
-                    padding: '0.75rem',
-                    background: 'var(--bg-gray)',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-color)',
-                    textAlign: 'center',
-                    fontSize: '0.75rem',
-                    color: 'var(--text-light)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.4rem',
-                    lineHeight: '1.4'
-                  }}>
-                    <Icon name="lock" size={12} />
-                    <span>Ödemeleriniz 256-bit SSL sertifikası ile korunmaktadır. Kart bilgileriniz hiçbir şekilde saklanmaz.</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </main>
       <Footer />
