@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
 import { API_URL } from '../config/api'
 
@@ -34,6 +35,7 @@ function Profile() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [selectedOrder, setSelectedOrder] = useState(null)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -45,9 +47,15 @@ function Profile() {
         phone: user.phone || '',
         address: user.address || ''
       })
-      loadOrders()
     }
   }, [user, authLoading, navigate])
+
+  // Orders tab'ı aktif olduğunda siparişleri yükle
+  useEffect(() => {
+    if (user && activeTab === 'orders' && orders.length === 0 && !loading) {
+      loadOrders()
+    }
+  }, [activeTab, user])
 
   const loadOrders = async () => {
     try {
@@ -204,7 +212,7 @@ function Profile() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                📝 Profil
+                <Icon name="user" size={16} /> Profil
               </button>
               <button
                 onClick={() => setActiveTab('password')}
@@ -224,10 +232,16 @@ function Profile() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                🔒 Şifre
+                <Icon name="lock" size={16} /> Şifre
               </button>
               <button
-                onClick={() => setActiveTab('orders')}
+                onClick={() => {
+                  setActiveTab('orders')
+                  // Orders tab'ına geçildiğinde siparişleri yükle
+                  if (orders.length === 0 && !loading) {
+                    loadOrders()
+                  }
+                }}
                 style={{
                   width: window.innerWidth < 768 ? 'auto' : '100%',
                   minWidth: window.innerWidth < 768 ? '120px' : 'auto',
@@ -244,7 +258,27 @@ function Profile() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                📦 Siparişler
+                <Icon name="cart" size={16} /> Siparişler
+              </button>
+              <button
+                onClick={() => navigate('/order-tracking')}
+                style={{
+                  width: window.innerWidth < 768 ? 'auto' : '100%',
+                  minWidth: window.innerWidth < 768 ? '120px' : 'auto',
+                  padding: '0.75rem',
+                  marginBottom: window.innerWidth < 768 ? '0' : '0.5rem',
+                  marginRight: window.innerWidth < 768 ? '0.5rem' : '0',
+                  background: '#27ae60',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Icon name="pin" size={16} /> Sipariş Takibi
               </button>
               <button
                 onClick={() => {
@@ -265,7 +299,7 @@ function Profile() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                🚪 Çıkış
+                <Icon name="logout" size={16} /> Çıkış
               </button>
             </div>
 
@@ -512,18 +546,22 @@ function Profile() {
                         fontWeight: 'bold'
                       }}
                     >
-                      {loading ? 'Yükleniyor...' : '🔄 Yenile'}
+                      {loading ? 'Yükleniyor...' : 'Yenile'}
                     </button>
                   </div>
                   
                   {loading && orders.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem' }}>
-                      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                      <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+                        <Icon name="clock" size={32} />
+                      </div>
                       <p>Siparişler yükleniyor...</p>
                     </div>
                   ) : orders.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', background: '#f9fafb', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📭</div>
+                      <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
+                        <Icon name="mail" size={32} />
+                      </div>
                       <p style={{ color: '#666', fontSize: '1.1rem', marginBottom: '1rem' }}>
                         Henüz siparişiniz bulunmamaktadır.
                       </p>
@@ -532,7 +570,7 @@ function Profile() {
                         style={{
                           padding: '0.75rem 2rem',
                           background: 'var(--primary-color)',
-                          color: '#000000',
+                          color: '#ffffff',
                           border: 'none',
                           borderRadius: '8px',
                           cursor: 'pointer',
@@ -557,6 +595,7 @@ function Profile() {
                             transition: 'all 0.2s',
                             cursor: 'pointer'
                           }}
+                          onClick={() => setSelectedOrder(order)}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.borderColor = '#667eea'
                             e.currentTarget.style.boxShadow = '0 4px 8px rgba(102, 126, 234, 0.2)'
@@ -624,7 +663,7 @@ function Profile() {
                           }}>
                             <div>
                               <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
-                                📐 Boyut
+                                <Icon name="ruler" size={14} /> Boyut
                               </div>
                               <div style={{ fontWeight: '600', color: '#2c3e50' }}>
                                 {order.size === 'custom' && order.customSize
@@ -634,7 +673,7 @@ function Profile() {
                             </div>
                             <div>
                               <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
-                                🔢 Adet
+                                <Icon name="hash" size={14} /> Adet
                               </div>
                               <div style={{ fontWeight: '600', color: '#2c3e50' }}>
                                 {order.quantity || 1} adet
@@ -642,7 +681,7 @@ function Profile() {
                             </div>
                             <div>
                               <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
-                                📦 Kargo
+                                Kargo
                               </div>
                               <div style={{ fontWeight: '600', color: '#2c3e50' }}>
                                 {order.shippingType === 'express' ? 'Express' : 'Standart'}
@@ -659,8 +698,9 @@ function Profile() {
                             fontSize: '0.9rem',
                             color: '#666'
                           }}>
-                            <div>
-                              📅 {new Date(order.createdAt).toLocaleDateString('tr-TR', { 
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <Icon name="clock" size={14} />
+                              {new Date(order.createdAt).toLocaleDateString('tr-TR', { 
                                 year: 'numeric', 
                                 month: 'long', 
                                 day: 'numeric',
@@ -676,13 +716,190 @@ function Profile() {
                               color: order.paymentStatus === 'paid' ? '#065f46' : '#92400e',
                               fontWeight: 'bold'
                             }}>
-                              {order.paymentStatus === 'paid' ? '✅ Ödendi' : '⏳ Bekliyor'}
+                              {order.paymentStatus === 'paid' ? 'Ödendi' : 'Bekliyor'}
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Sipariş Detay Modal */}
+              {selectedOrder && (
+                <div 
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '2rem'
+                  }}
+                  onClick={() => setSelectedOrder(null)}
+                >
+                  <div 
+                    style={{
+                      background: 'white',
+                      borderRadius: '12px',
+                      padding: '2rem',
+                      maxWidth: '800px',
+                      width: '100%',
+                      maxHeight: '90vh',
+                      overflowY: 'auto',
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                      <h2 style={{ margin: 0, color: '#2c3e50' }}>Sipariş Detayları</h2>
+                      <button
+                        onClick={() => setSelectedOrder(null)}
+                        style={{
+                          background: '#e74c3c',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '40px',
+                          height: '40px',
+                          fontSize: '1.5rem',
+                          cursor: 'pointer',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: '1.5rem' }}>
+                      <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
+                        <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Sipariş Bilgileri</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <div><strong>Sipariş No:</strong> #{selectedOrder._id || selectedOrder.id}</div>
+                          <div><strong>Tarih:</strong> {new Date(selectedOrder.createdAt).toLocaleDateString('tr-TR', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</div>
+                          <div><strong>Boyut:</strong> {
+                            selectedOrder.size === 'custom' && selectedOrder.customSize
+                              ? `${selectedOrder.customSize.width}x${selectedOrder.customSize.height} cm`
+                              : selectedOrder.size || '-'
+                          }</div>
+                          <div><strong>Adet:</strong> {selectedOrder.quantity || 1}</div>
+                          <div><strong>Kargo:</strong> {
+                            selectedOrder.shippingType === 'standard' ? 'Standart' :
+                            selectedOrder.shippingType === 'express' ? 'Express' : '-'
+                          }</div>
+                          <div><strong>Durum:</strong> {selectedOrder.status || 'Yeni'}</div>
+                        </div>
+                        <div style={{ marginTop: '1rem', padding: '1rem', background: '#e8f5e9', borderRadius: '6px' }}>
+                          <strong style={{ fontSize: '1.2rem' }}>Toplam: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(selectedOrder.price || 0)}</strong>
+                        </div>
+                      </div>
+
+                      <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
+                        <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Müşteri Bilgileri</h3>
+                        <div><strong>Ad Soyad:</strong> {selectedOrder.customerInfo?.firstName || 'Müşteri'} {selectedOrder.customerInfo?.lastName || ''}</div>
+                        <div style={{ marginTop: '0.5rem' }}><strong>E-posta:</strong> {selectedOrder.customerInfo?.email || '-'}</div>
+                        {selectedOrder.customerInfo?.phone && (
+                          <div style={{ marginTop: '0.5rem' }}><strong>Telefon:</strong> {selectedOrder.customerInfo.phone}</div>
+                        )}
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <strong>Adres:</strong>
+                          <p style={{ margin: '0.5rem 0 0 0', color: '#666' }}>{selectedOrder.customerInfo?.address || '-'}</p>
+                        </div>
+                      </div>
+
+                      {selectedOrder.photo?.base64 && (
+                        <div style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
+                          <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <Icon name="camera" size={18} /> Sipariş Fotoğrafı
+                          </h3>
+                          <div style={{ 
+                            textAlign: 'center',
+                            background: 'white',
+                            padding: '1rem',
+                            borderRadius: '8px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}>
+                            <img 
+                              src={`data:${selectedOrder.photo.mimetype || 'image/jpeg'};base64,${selectedOrder.photo.base64}`}
+                              alt="Sipariş fotoğrafı"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '500px',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                cursor: 'pointer'
+                              }}
+                              onClick={() => {
+                                const newWindow = window.open();
+                                newWindow.document.write(`
+                                  <html>
+                                    <head>
+                                      <title>Sipariş Fotoğrafı - ${selectedOrder._id || selectedOrder.id}</title>
+                                      <style>
+                                        body {
+                                          margin: 0;
+                                          padding: 20px;
+                                          background: #f5f5f5;
+                                          display: flex;
+                                          justify-content: center;
+                                          align-items: center;
+                                          min-height: 100vh;
+                                        }
+                                        img {
+                                          max-width: 100%;
+                                          max-height: 90vh;
+                                          border-radius: 8px;
+                                          box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+                                        }
+                                      </style>
+                                    </head>
+                                    <body>
+                                      <img src="data:${selectedOrder.photo.mimetype || 'image/jpeg'};base64,${selectedOrder.photo.base64}" alt="Sipariş fotoğrafı" />
+                                    </body>
+                                  </html>
+                                `);
+                              }}
+                              title="Fotoğrafa tıklayarak tam boyutta görüntüleyin"
+                            />
+                            {selectedOrder.photo.originalName && (
+                              <div style={{ marginTop: '0.5rem', color: '#666', fontSize: '0.9rem' }}>
+                                <strong>Dosya Adı:</strong> {selectedOrder.photo.originalName}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => setSelectedOrder(null)}
+                          style={{
+                            padding: '0.75rem 2rem',
+                            background: '#95a5a6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Kapat
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

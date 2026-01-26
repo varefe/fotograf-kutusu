@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import Icon from './Icon'
 
-function PaymentForm({ onSubmit, loading, error }) {
+function PaymentForm({ onSubmit, loading, error, actionLabel, onAction }) {
   const [formData, setFormData] = useState({
     cardHolderName: '',
     cardNumber: '',
@@ -331,51 +332,48 @@ function PaymentForm({ onSubmit, loading, error }) {
         marginBottom: '1.5rem',
         flexWrap: 'wrap'
       }}>
-        <div style={{ fontSize: '0.75rem', color: '#666' }}>🔒 PCI-DSS Güvenlik Sertifikalı</div>
-        <div style={{ fontSize: '0.75rem', color: '#666' }}>🔒 SSL Şifreli</div>
+        <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+          <Icon name="lock" size={12} /> PCI-DSS Güvenlik Sertifikalı
+        </div>
+        <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+          <Icon name="lock" size={12} /> SSL Şifreli
+        </div>
       </div>
 
       {/* Ödeme Butonu */}
       <button
-        type="submit"
+        type={onAction ? 'button' : 'submit'}
         disabled={loading}
+        onClick={onAction || undefined}
         style={{
           width: '100%',
           padding: '1rem',
-          background: loading ? '#ccc' : 'var(--primary-color)',
-          color: loading ? '#666' : '#000000',
+          background: loading ? '#e2e8f0' : 'var(--primary-color)',
+          color: loading ? '#64748b' : '#ffffff',
           border: 'none',
           borderRadius: '8px',
           fontSize: '1.2rem',
           fontWeight: 'bold',
           cursor: loading ? 'not-allowed' : 'pointer',
-          boxShadow: loading ? 'none' : '0 2px 8px rgba(212, 175, 55, 0.3)',
+          boxShadow: loading ? 'none' : 'var(--shadow)',
           transition: 'all 0.2s'
         }}
         onMouseEnter={(e) => {
           if (!loading) {
-            e.target.style.background = 'var(--primary-gold)'
-            e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.4)'
+            e.target.style.background = 'var(--primary-dark)'
+            e.target.style.boxShadow = 'var(--shadow-lg)'
           }
         }}
         onMouseLeave={(e) => {
           if (!loading) {
             e.target.style.background = 'var(--primary-color)'
-            e.target.style.boxShadow = '0 2px 8px rgba(212, 175, 55, 0.3)'
+            e.target.style.boxShadow = 'var(--shadow)'
           }
         }}
       >
-        {loading ? 'Ödeme İşleniyor...' : 'Ödeme Yap'}
+        {actionLabel || (loading ? 'Ödeme İşleniyor...' : 'Ödeme Yap')}
       </button>
 
-      {/* KVKK Onayı */}
-      <div style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#666', textAlign: 'center' }}>
-        Ödeme işlemine devam ederek{' '}
-        <a href="/privacy" target="_blank" style={{ color: '#667eea' }}>
-          KVKK Aydınlatma Metni
-        </a>
-        'ni okuduğumu ve anladığımı kabul ediyorum.
-      </div>
     </form>
   )
 }

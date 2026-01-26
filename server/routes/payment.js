@@ -2,6 +2,7 @@ import express from 'express';
 import Iyzipay from 'iyzipay';
 import { connectDB } from '../config/database.js';
 import OrderModel from '../models/OrderSchema.js';
+import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import https from 'https';
 
@@ -81,7 +82,7 @@ router.post('/create', async (req, res) => {
     // Callback URL'i backend'e ayarla (Iyzico callback'i backend'e gelmeli)
     // ÖNEMLİ: Callback URL'i backend URL'i olmalı, frontend URL'i değil!
     // Production: Railway backend URL'i
-    // Development: localhost:5000
+    // Development: localhost:5001 (Port 5000 AirTunes tarafından kullanılıyor)
     let backendUrl = process.env.BACKEND_URL;
     
     if (!backendUrl) {
@@ -89,8 +90,8 @@ router.post('/create', async (req, res) => {
       if (process.env.NODE_ENV === 'production' || !req.headers.host?.includes('localhost')) {
         backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
       } else {
-        // Development: localhost:5000
-        backendUrl = `http://localhost:${process.env.PORT || 5000}`;
+        // Development: localhost:5001 (PORT environment variable'dan alınır)
+        backendUrl = `http://localhost:${process.env.PORT || 5001}`;
       }
     }
     
@@ -628,24 +629,19 @@ router.post('/callback', async (req, res) => {
             console.log('🔍 Çıkarılan orderId:', orderId);
             
             if (orderId) {
-              // Siparişi veritabanına kaydet
-              OrderModel.findOneAndUpdate(
-                { id: orderId },
-                {
-                  paymentStatus: 'paid',
-                  paymentToken: goreqData.id,
-                  paymentMethod: '3D Secure',
-                  paidAt: new Date()
-                },
-                { new: true }
-              ).then(() => {
-                console.log('✅ Sipariş kaydedildi:', orderId);
-                res.redirect(`${frontendUrl}/payment/success?orderId=${orderId}&token=${goreqData.id}`);
-              }).catch((saveErr) => {
-                console.error('❌ Sipariş kaydetme hatası:', saveErr);
-                res.redirect(`${frontendUrl}/payment/success?orderId=${orderId}&token=${goreqData.id}`);
+              // ÖNEMLİ: Sipariş veritabanında yoksa PaymentSuccess sayfasında oluşturulacak
+              // Burada sadece loglama yapıyoruz, sipariş oluşturma PaymentSuccess'te yapılıyor
+              console.log('✅ 3D Secure ödeme başarılı, PaymentSuccess sayfasına yönlendiriliyor:', {
+                orderId,
+                paymentId: goreqData.id,
+                conversationId
               });
+              
+              // PaymentSuccess sayfası siparişi backend'e kaydedecek
+              // Burada sadece yönlendirme yapıyoruz
+              res.redirect(`${frontendUrl}/payment/success?orderId=${orderId}&token=${goreqData.id}`);
             } else {
+              console.warn('⚠️ ConversationId\'den orderId çıkarılamadı:', conversationId);
               res.redirect(`${frontendUrl}/payment/success?token=${goreqData.id}`);
             }
           } else {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { API_URL } from '../config/api'
 
 function ResetPassword() {
@@ -114,7 +115,9 @@ function ResetPassword() {
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✅</div>
+              <div style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
+                <Icon name="check" size={32} />
+              </div>
               <h1 style={{ marginBottom: '1rem', fontSize: '2rem', color: '#27ae60' }}>
                 Şifre Başarıyla Sıfırlandı!
               </h1>
@@ -124,7 +127,7 @@ function ResetPassword() {
               <Link 
                 to="/login" 
                 style={{ 
-                  color: '#667eea', 
+                  color: 'var(--primary-color)', 
                   fontWeight: '600',
                   textDecoration: 'underline'
                 }}
@@ -152,8 +155,8 @@ function ResetPassword() {
             borderRadius: '12px',
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
           }}>
-            <h1 style={{ textAlign: 'center', marginBottom: '2rem', fontSize: '2rem' }}>
-              🔐 Yeni Şifre Belirle
+            <h1 style={{ textAlign: 'center', marginBottom: '2rem', fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <Icon name="lock" size={20} /> Yeni Şifre Belirle
             </h1>
 
             {error && (
@@ -216,7 +219,7 @@ function ResetPassword() {
                     }}
                     title={showPassword ? 'Şifreyi Gizle' : 'Şifreyi Göster'}
                   >
-                    {showPassword ? '🙈' : '👁️'}
+                    {showPassword ? 'Gizle' : 'Göster'}
                   </button>
                 </div>
               </div>
@@ -263,7 +266,7 @@ function ResetPassword() {
                     }}
                     title={showConfirmPassword ? 'Şifreyi Gizle' : 'Şifreyi Göster'}
                   >
-                    {showConfirmPassword ? '🙈' : '👁️'}
+                    {showConfirmPassword ? 'Gizle' : 'Göster'}
                   </button>
                 </div>
               </div>
@@ -274,28 +277,16 @@ function ResetPassword() {
                 style={{
                   width: '100%',
                   padding: '0.75rem',
-                  background: loading || !token ? '#ccc' : 'var(--primary-color)',
-                  color: loading || !token ? '#666' : '#000000',
+                  background: loading || !token ? '#e2e8f0' : 'var(--primary-color)',
+                  color: loading || !token ? '#64748b' : '#ffffff',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '1.1rem',
                   fontWeight: 'bold',
                   cursor: loading || !token ? 'not-allowed' : 'pointer',
                   marginBottom: '1rem',
-                  boxShadow: loading || !token ? 'none' : '0 2px 8px rgba(212, 175, 55, 0.3)',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  if (!loading && token) {
-                    e.target.style.background = 'var(--primary-gold)'
-                    e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.4)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!loading && token) {
-                    e.target.style.background = 'var(--primary-color)'
-                    e.target.style.boxShadow = '0 2px 8px rgba(212, 175, 55, 0.3)'
-                  }
+                  boxShadow: loading || !token ? 'none' : 'var(--shadow)',
+                  transition: 'color 0.2s, background-color 0.2s, box-shadow 0.2s'
                 }}
               >
                 {loading ? 'Şifre Sıfırlanıyor...' : 'Şifreyi Sıfırla'}
@@ -303,7 +294,7 @@ function ResetPassword() {
             </form>
 
             <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-              <Link to="/login" style={{ color: '#667eea', fontWeight: '600' }}>
+              <Link to="/login" style={{ color: 'var(--primary-color)', fontWeight: '600' }}>
                 ← Giriş sayfasına dön
               </Link>
             </div>

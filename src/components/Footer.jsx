@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import Icon from './Icon'
 
 function Footer() {
   return (
@@ -12,20 +13,15 @@ function Footer() {
               Yüksek kaliteli fotoğraf baskı ve çerçeveleme hizmeti sunuyoruz. Müşteri memnuniyeti bizim önceliğimizdir.
             </p>
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" style={{ 
-                color: 'rgba(255, 255, 255, 0.8)', 
-                fontSize: '1.5rem',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.color = 'var(--primary-color)'
-                e.target.style.transform = 'scale(1.2)'
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.color = 'rgba(255, 255, 255, 0.8)'
-                e.target.style.transform = 'scale(1)'
-              }}
-              >📷</a>
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-social-link"
+                aria-label="Instagram"
+              >
+                <Icon name="instagram" size={20} />
+              </a>
             </div>
           </div>
 
@@ -81,7 +77,7 @@ function Footer() {
               />
             </div>
             <div className="ssl-badge">
-              <span className="ssl-icon">🔒</span>
+              <Icon name="lock" size={16} className="ssl-icon" />
               <span>SSL Sertifikası ile Güvenli Alışveriş</span>
             </div>
           </div>
@@ -91,15 +87,15 @@ function Footer() {
             <h3>İletişim</h3>
             <ul className="footer-links" style={{ listStyle: 'none', padding: 0 }}>
               <li style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>📞</span>
+                <Icon name="phone" size={16} />
                 <span>0 (506) 708 76 84</span>
               </li>
               <li style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>✉️</span>
+                <Icon name="mail" size={16} />
                 <span>admin@fotografkutusu.com</span>
               </li>
               <li style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <span>📍</span>
+                <Icon name="pin" size={16} />
                 <span>Ozan Sokak No 11<br />Altın Oran Fotoğrafçılık<br />Manisa Turgutlu</span>
               </li>
             </ul>

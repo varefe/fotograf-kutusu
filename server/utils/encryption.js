@@ -144,6 +144,19 @@ export const encryptSensitiveFields = (orderData) => {
     };
   }
   
+  // Photos array'ini şifrele (birden fazla fotoğraf)
+  if (encrypted.photos && Array.isArray(encrypted.photos)) {
+    encrypted.photos = encrypted.photos.map(photo => {
+      if (photo && photo.base64) {
+        return {
+          ...photo,
+          base64: encrypt(photo.base64)
+        };
+      }
+      return photo;
+    });
+  }
+  
   // Notları şifrele
   if (encrypted.notes) {
     encrypted.notes = encrypt(encrypted.notes);
@@ -179,6 +192,19 @@ export const decryptSensitiveFields = (orderData) => {
       ...decrypted.photo,
       base64: decrypt(decrypted.photo.base64)
     };
+  }
+  
+  // Photos array'ini çöz (birden fazla fotoğraf)
+  if (decrypted.photos && Array.isArray(decrypted.photos)) {
+    decrypted.photos = decrypted.photos.map(photo => {
+      if (photo && photo.base64) {
+        return {
+          ...photo,
+          base64: decrypt(photo.base64)
+        };
+      }
+      return photo;
+    });
   }
   
   // Notları çöz

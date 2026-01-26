@@ -1,5 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import User from '../models/UserSchema.js';
 import { connectDB } from '../config/database.js';
 import { generateToken } from '../utils/jwt.js';
@@ -108,7 +109,47 @@ router.post('/register', async (req, res) => {
  */
 router.post('/login', async (req, res) => {
   try {
-    await connectDB();
+    // MongoDB bağlantısını kontrol et (retry ile)
+    let dbConnected = false;
+    let connectionAttempts = 0;
+    const maxAttempts = 2; // Sadece 2 deneme
+    
+    // Önce mevcut bağlantıyı kontrol et
+    if (mongoose.connection.readyState === 1) {
+      dbConnected = true;
+      console.log('✅ MongoDB bağlantısı zaten aktif');
+    } else {
+      // Bağlantı yoksa dene
+      while (!dbConnected && connectionAttempts < maxAttempts) {
+        connectionAttempts++;
+        try {
+          await connectDB(2); // 2 deneme
+          dbConnected = mongoose.connection.readyState === 1;
+          if (dbConnected) {
+            console.log('✅ MongoDB bağlantısı başarılı (login)');
+            break;
+          }
+        } catch (dbError) {
+          console.error(`❌ MongoDB bağlantı hatası (login, deneme ${connectionAttempts}/${maxAttempts}):`, dbError.message);
+          // Bağlantı durumunu tekrar kontrol et
+          dbConnected = mongoose.connection.readyState === 1;
+          if (dbConnected) break;
+          
+          // Son deneme değilse bekle
+          if (connectionAttempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 saniye bekle
+          }
+        }
+      }
+      
+      if (!dbConnected) {
+        return res.status(503).json({
+          success: false,
+          error: 'Veritabanı bağlantı hatası',
+          message: 'Veritabanına bağlanılamıyor. Lütfen daha sonra tekrar deneyin veya MongoDB servisini kontrol edin.'
+        });
+      }
+    }
 
     const { email, password } = req.body;
 
@@ -165,6 +206,100 @@ router.post('/login', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Giriş hatası',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Admin giriş (özel endpoint)
+ */
+router.post('/admin/login', async (req, res) => {
+  try {
+    await connectDB();
+
+    const { username, password, adminCode } = req.body;
+
+    // Validasyon
+    if (!username || !password || !adminCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Eksik bilgi',
+        message: 'Kullanıcı adı, şifre ve admin kodu gereklidir'
+      });
+    }
+
+    // Admin bilgilerini environment variable'dan al
+    const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'efe';
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '193123';
+    const ADMIN_CODE = process.env.ADMIN_CODE || ' ADMIN2024SECRET';
+
+    // Admin bilgilerini kontrol et
+    if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD || adminCode !== ADMIN_CODE) {
+      return res.status(401).json({
+        success: false,
+        error: 'Giriş hatası',
+        message: 'Kullanıcı adı, şifre veya admin kodu hatalı'
+      });
+    }
+
+    // Admin kullanıcısını bul veya oluştur
+    // Admin email'i environment variable'dan al veya varsayılan kullan
+    const adminEmail = process.env.ADMIN_EMAIL || `${ADMIN_USERNAME}@admin.local`;
+    
+    let adminUser = await User.findOne({ email: adminEmail.toLowerCase() });
+    
+    if (!adminUser) {
+      // Admin kullanıcısı yoksa oluştur
+      adminUser = new User({
+        email: adminEmail.toLowerCase(),
+        password: password, // Şifre hash'lenecek (pre-save hook)
+        firstName: 'Admin',
+        lastName: 'User',
+        role: 'admin'
+      });
+      await adminUser.save();
+      console.log('✅ Admin kullanıcısı oluşturuldu:', adminEmail);
+    } else {
+      // Admin kullanıcısı varsa, şifresini kontrol et
+      const isPasswordValid = await adminUser.comparePassword(password);
+      if (!isPasswordValid) {
+        // Şifre yanlışsa güncelle
+        adminUser.password = password; // Pre-save hook hash'leyecek
+        await adminUser.save();
+        console.log('✅ Admin şifresi güncellendi');
+      }
+      
+      // Admin rolünü kontrol et
+      if (adminUser.role !== 'admin') {
+        adminUser.role = 'admin';
+        await adminUser.save();
+        console.log('✅ Admin rolü güncellendi');
+      }
+    }
+
+    // Token oluştur
+    const token = generateToken(adminUser._id, adminUser.email, adminUser.role);
+
+    res.json({
+      success: true,
+      message: 'Admin girişi başarılı',
+      token,
+      user: {
+        id: adminUser._id,
+        email: adminUser.email,
+        firstName: adminUser.firstName,
+        lastName: adminUser.lastName,
+        phone: adminUser.phone,
+        address: adminUser.address,
+        role: adminUser.role
+      }
+    });
+  } catch (error) {
+    console.error('Admin giriş hatası:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Admin giriş hatası',
       message: error.message
     });
   }

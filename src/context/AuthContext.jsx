@@ -116,7 +116,7 @@ export const AuthProvider = ({ children }) => {
         // Relative path (/api gibi)
         apiEndpoint = `${API_URL}/user/login`
       }
-      console.log('🔍 Login API Endpoint:', apiEndpoint)
+      // Login endpoint log kaldırıldı (gereksiz)
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {

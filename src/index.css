@@ -6,23 +6,25 @@
 }
 
 :root {
-    --primary-color: #D4AF37;
-    --primary-dark: #B8941F;
-    --primary-light: #E5C158;
-    --primary-gold: #FFD700;
-    --secondary-color: #10b981;
+    --primary-color: #2563eb;
+    --primary-dark: #1d4ed8;
+    --primary-light: #93c5fd;
+    --primary-gold: #3b82f6;
+    --secondary-color: #14b8a6;
     --danger-color: #ef4444;
-    --text-color: #000000;
-    --text-light: #4a4a4a;
+    --text-color: #0f172a;
+    --text-light: #64748b;
     --bg-color: #ffffff;
-    --bg-light: #fafafa;
-    --bg-gray: #f5f5f5;
-    --bg-dark: #1a1a1a;
-    --border-color: #e5e5e5;
-    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    --shadow-gold: 0 4px 15px rgba(212, 175, 55, 0.3);
+    --bg-light: #f8fafc;
+    --bg-gray: #f1f5f9;
+    --bg-dark: #0f172a;
+    --border-color: #e2e8f0;
+    --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.08);
+    --shadow-lg: 0 10px 20px rgba(15, 23, 42, 0.08);
+    --shadow-xl: 0 20px 30px rgba(15, 23, 42, 0.12);
+    --shadow-gold: 0 6px 16px rgba(37, 99, 235, 0.2);
+    --primary-shadow: rgba(37, 99, 235, 0.2);
+    --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.2);
 }
 
 body {
@@ -36,6 +38,25 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 20px;
+}
+
+.icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+}
+
+.icon svg {
+    width: 1em;
+    height: 1em;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 /* Navbar - Modern E-ticaret Stili */
@@ -134,7 +155,7 @@ body {
 .navbar-search input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+    box-shadow: var(--focus-ring);
 }
 
 .navbar-search button {
@@ -143,20 +164,20 @@ body {
     top: 50%;
     transform: translateY(-50%);
     background: var(--primary-color);
-    color: #000000;
+    color: #ffffff;
     border: none;
     padding: 0.5rem 1rem;
     border-radius: 6px;
     cursor: pointer;
     font-weight: 700;
     transition: all 0.2s;
-    box-shadow: var(--shadow-gold);
+    box-shadow: var(--shadow);
 }
 
 .navbar-search button:hover {
-    background: var(--primary-gold);
-    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
-    transform: translateY(-50%) scale(1.05);
+    background: var(--primary-dark);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-50%);
 }
 
 .nav-links {
@@ -219,35 +240,34 @@ body {
     display: inline-block;
     padding: 0.75rem 1.5rem;
     border: none;
-    border-radius: 0.5rem;
+    border-radius: 0.6rem;
     font-size: 1rem;
     font-weight: 600;
     text-decoration: none;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
     text-align: center;
 }
 
 .btn-primary {
     background-color: var(--primary-color);
-    color: #000000;
+    color: #ffffff;
     font-weight: 700;
-    box-shadow: var(--shadow-gold);
+    box-shadow: var(--shadow);
 }
 
 .btn-primary:hover {
-    background-color: var(--primary-gold);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+    background-color: var(--primary-dark);
+    box-shadow: var(--shadow-lg);
 }
 
 .btn-secondary {
-    background-color: var(--text-light);
-    color: white;
+    background-color: #e2e8f0;
+    color: var(--text-color);
 }
 
 .btn-secondary:hover {
-    background-color: #4b5563;
+    background-color: #cbd5e1;
 }
 
 .btn-danger {
@@ -269,10 +289,14 @@ body {
     font-size: 0.875rem;
 }
 
+.btn-block {
+    width: 100%;
+}
+
 /* Hero Section - Modern Banner */
 .hero {
-    background: linear-gradient(135deg, var(--primary-gold) 0%, var(--primary-color) 50%, var(--primary-dark) 100%);
-    color: #000000;
+    background-color: var(--bg-dark);
+    color: #ffffff;
     padding: 0;
     text-align: center;
     position: relative;
@@ -304,11 +328,41 @@ body {
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: var(--text-color);
+    z-index: 10;
+    box-shadow: var(--shadow);
+    transition: background-color 0.2s, box-shadow 0.2s;
 }
 
 .carousel-arrow:focus {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
+}
+
+.carousel-arrow:hover {
+    background: #ffffff;
+    box-shadow: var(--shadow-lg);
+}
+
+.carousel-arrow-left {
+    left: 16px;
+}
+
+.carousel-arrow-right {
+    right: 16px;
 }
 
 /* Carousel responsive */
@@ -347,12 +401,9 @@ body {
 .hero::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M 100 0 L 0 0 0 100" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
-    opacity: 0.3;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.2);
+    opacity: 0;
 }
 
 .hero .container {
@@ -364,14 +415,14 @@ body {
     font-size: 3.5rem;
     margin-bottom: 1rem;
     font-weight: 900;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-    color: #000000;
+    text-shadow: 0 6px 18px rgba(2, 6, 23, 0.45);
+    color: #ffffff;
 }
 
 .hero-subtitle {
     font-size: 1.5rem;
     margin-bottom: 2rem;
-    color: #1a1a1a;
+    color: #e2e8f0;
     font-weight: 500;
 }
 
@@ -398,12 +449,14 @@ body {
     text-align: center;
     padding: 2rem;
     border-radius: 1rem;
-    background-color: var(--bg-light);
-    transition: transform 0.2s;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.2s, transform 0.2s;
 }
 
 .step:hover {
-    transform: translateY(-8px) scale(1.02);
+    transform: translateY(-4px);
     box-shadow: var(--shadow-lg);
 }
 
@@ -413,14 +466,7 @@ body {
 }
 
 .step::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.1), transparent);
-    transition: left 0.5s;
+    content: none;
 }
 
 .step:hover::before {
@@ -431,7 +477,7 @@ body {
     width: 60px;
     height: 60px;
     background-color: var(--primary-color);
-    color: white;
+    color: #ffffff;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -523,8 +569,8 @@ body {
     padding: 0;
     border-radius: 12px;
     text-align: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s;
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.25s, transform 0.25s, border-color 0.25s;
     overflow: hidden;
     border: 1px solid var(--border-color);
     cursor: pointer;
@@ -536,16 +582,7 @@ body {
 }
 
 .pricing-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(212, 175, 55, 0.05) 0%, rgba(212, 175, 55, 0.1) 100%);
-    opacity: 0;
-    transition: opacity 0.3s;
-    z-index: 0;
+    content: none;
 }
 
 .pricing-card:hover::before {
@@ -553,9 +590,9 @@ body {
 }
 
 .pricing-card:hover {
-    transform: translateY(-12px) scale(1.02);
-    box-shadow: 0 16px 32px rgba(212, 175, 55, 0.3);
-    border-color: var(--primary-color);
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(37, 99, 235, 0.4);
 }
 
 .pricing-card-content {
@@ -572,30 +609,30 @@ body {
 }
 
 .pricing-card.featured {
-    border: 2px solid var(--primary-color);
+    border: 1px solid rgba(37, 99, 235, 0.35);
     position: relative;
-    box-shadow: var(--shadow-gold);
+    box-shadow: var(--shadow-lg);
 }
 
 .pricing-card.featured::before {
-    content: '⭐ Popüler';
+    content: 'Popüler';
     position: absolute;
     top: 12px;
     right: 12px;
-    background: var(--primary-color);
-    color: #000000;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--primary-color);
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
     font-size: 0.75rem;
     font-weight: 700;
     z-index: 1;
-    box-shadow: var(--shadow-gold);
+    box-shadow: none;
 }
 
 .pricing-card-image {
     width: 100%;
     height: 200px;
-    background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-gray) 100%);
+    background: var(--bg-gray);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -607,7 +644,7 @@ body {
 }
 
 .pricing-card:hover .pricing-card-image {
-    transform: scale(1.1);
+    transform: scale(1.02);
 }
 
 .pricing-card-content {
@@ -626,7 +663,7 @@ body {
     font-weight: 900;
     color: var(--primary-color);
     margin-bottom: 0.5rem;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    text-shadow: none;
 }
 
 .pricing-card .price-unit {
@@ -783,15 +820,15 @@ html {
 
 /* Interactive elements */
 button, .btn, a {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
 button:hover, .btn:hover {
-    transform: translateY(-2px);
+    transform: none;
 }
 
 button:active, .btn:active {
-    transform: translateY(0);
+    transform: none;
 }
 
 /* Navbar enhancements */
@@ -800,11 +837,11 @@ button:active, .btn:active {
 }
 
 .nav-brand a {
-    transition: transform 0.3s;
+    transition: color 0.2s;
 }
 
 .nav-brand a:hover {
-    transform: scale(1.05);
+    transform: none;
 }
 
 .nav-links a {
@@ -815,12 +852,12 @@ button:active, .btn:active {
 .nav-links a::after {
     content: '';
     position: absolute;
-    bottom: -5px;
+    bottom: -6px;
     left: 0;
     width: 0;
     height: 2px;
     background: var(--primary-color);
-    transition: width 0.3s;
+    transition: width 0.2s;
 }
 
 .nav-links a:hover::after {
@@ -834,8 +871,8 @@ button:active, .btn:active {
 }
 
 .step:hover .step-number {
-    transform: scale(1.1) rotate(5deg);
-    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+    transform: scale(1.04);
+    box-shadow: var(--shadow);
 }
 
 /* Pricing card button enhancement */
@@ -845,16 +882,7 @@ button:active, .btn:active {
 }
 
 .pricing-card button::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
+    content: none;
 }
 
 .pricing-card button:hover::before {
@@ -874,34 +902,14 @@ button:active, .btn:active {
 }
 
 .hero::after {
-    content: '';
-    position: absolute;
-    top: -50%;
-    right: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
-    animation: pulse 4s ease-in-out infinite;
+    content: none;
 }
 
 /* Loading shimmer effect */
 .shimmer {
-    background: linear-gradient(
-        90deg,
-        #f0f0f0 0%,
-        #e0e0e0 50%,
-        #f0f0f0 100%
-    );
-    background-size: 1000px 100%;
-    animation: shimmer 2s infinite;
+    background: #f1f5f9;
 }
 
-/* Parallax effect for hero */
-@media (prefers-reduced-motion: no-preference) {
-    .hero {
-        background-attachment: fixed;
-    }
-}
 
 /* Payment Security Section */
 .payment-security-section {
@@ -989,7 +997,7 @@ button:active, .btn:active {
 .form-group textarea:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    box-shadow: var(--focus-ring);
 }
 
 .form-row {
@@ -1012,7 +1020,7 @@ button:active, .btn:active {
 
 .upload-area:hover {
     border-color: var(--primary-color);
-    background-color: rgba(79, 70, 229, 0.05);
+    background-color: rgba(37, 99, 235, 0.04);
 }
 
 .upload-placeholder {
@@ -1077,10 +1085,11 @@ button:active, .btn:active {
 
 /* Page Header */
 .page-header {
-    background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
-    color: white;
+    background: var(--bg-color);
+    color: var(--text-color);
     padding: 3rem 0;
     text-align: center;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .page-header h1 {
@@ -1170,6 +1179,7 @@ button:active, .btn:active {
     background-color: var(--bg-color);
     padding: 1.5rem;
     border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
     box-shadow: var(--shadow);
 }
 
@@ -1189,6 +1199,7 @@ button:active, .btn:active {
     padding: 1.5rem;
     border-radius: 0.5rem;
     margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
     box-shadow: var(--shadow);
 }
 
@@ -1265,11 +1276,11 @@ button:active, .btn:active {
 
 /* Footer - Modern E-ticaret Stili */
 .footer {
-    background: linear-gradient(180deg, #000000 0%, #1a1a1a 100%);
+    background: #0f172a;
     color: white;
     padding: 4rem 0 2rem;
     margin-top: 4rem;
-    border-top: 3px solid var(--primary-color);
+    border-top: 1px solid rgba(148, 163, 184, 0.25);
 }
 
 .footer-content {
@@ -1286,6 +1297,18 @@ button:active, .btn:active {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.footer-social-link {
+    color: rgba(255, 255, 255, 0.75);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.footer-social-link:hover {
+    color: #ffffff;
 }
 
 .footer-links {

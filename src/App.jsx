@@ -10,6 +10,7 @@ import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Profile from './pages/Profile'
+import OrderTracking from './pages/OrderTracking'
 import Admin from './pages/Admin'
 import AdminLogin from './pages/AdminLogin'
 import AdminPanel from './pages/AdminPanel'
@@ -41,6 +42,7 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/order-tracking" element={<OrderTracking />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/admin-panel" element={<AdminPanel />} />

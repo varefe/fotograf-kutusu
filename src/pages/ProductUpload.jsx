@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import Icon from '../components/Icon'
 import { useCart } from '../context/CartContext'
-import { calculatePrice } from '../utils/priceCalculator'
+import { calculatePrice, getBulkPrice } from '../utils/priceCalculator'
 
 function ProductUpload() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { addToCart } = useCart()
+  const { addToCart, addMultipleToCart } = useCart()
   
   // URL'den ürün bilgilerini al
   const product = location.state?.product || {
@@ -73,9 +74,20 @@ function ProductUpload() {
 
   const handlePhotoSelect = async (e) => {
     const files = Array.from(e.target.files)
-    const imageFiles = files.filter(file => file.type.startsWith('image/'))
+    const imageFiles = files.filter(file => {
+      // Sadece dosya tipi kontrolü (boyut kontrolü yok)
+      if (!file.type.startsWith('image/')) {
+        return false
+      }
+      return true
+    })
     
-    if (imageFiles.length === 0) return
+    if (imageFiles.length === 0) {
+      if (files.length > 0) {
+        alert('Lütfen geçerli resim dosyaları seçin (JPEG, PNG, GIF, WebP)')
+      }
+      return
+    }
     
     // Dosyaları hemen ekle (preview'lar asenkron yüklenecek)
     setPhotos(prev => [...prev, ...imageFiles])
@@ -118,61 +130,55 @@ function ProductUpload() {
       return
     }
 
-    // Toplam fiyatı hesapla (bir kez, tüm fotoğraflar için)
-    const totalPrice = calculatePrice(
-      product.size,
-      quantity * photos.length, // Toplam adet: her fotoğraf için quantity adet
-      'standard',
-      product.customSize
-    )
-    
-    // Birim fiyatı hesapla (kargo hariç)
-    const bulkPrices = {
-      '10x15': { 15: 16, 25: 14, 35: 8, 50: 7.5, 100: 7 },
-      '15x20': { 15: 19, 25: 16, 35: 14, 50: 13, 100: 12 },
-      '20x30': { 15: 26, 25: 22, 35: 20, 50: 19, 100: 18 },
-      '30x40': { 15: 36, 25: 32, 35: 30, 50: 29, 100: 28 }
-    }
-    const sizeData = bulkPrices[product.size] || { 15: 26 }
-    let unitPrice = sizeData[15] // Varsayılan 15 adet fiyatı
-    if (quantity >= 100 && sizeData[100]) unitPrice = sizeData[100]
-    else if (quantity >= 50 && sizeData[50]) unitPrice = sizeData[50]
-    else if (quantity >= 35 && sizeData[35]) unitPrice = sizeData[35]
-    else if (quantity >= 25 && sizeData[25]) unitPrice = sizeData[25]
-    else if (quantity >= 15 && sizeData[15]) unitPrice = sizeData[15]
-    
-    // Kargo fiyatı (sadece bir kez eklenecek)
-    const subtotal = unitPrice * quantity * photos.length
-    const shippingPrice = subtotal >= 99 ? 0 : 15
-    
-    // Her fotoğraf için fiyat: (birim fiyat × quantity) + (kargo / fotoğraf sayısı)
-    const pricePerPhoto = (unitPrice * quantity) + (shippingPrice / photos.length)
-
-    // Fotoğrafları sepete ekle (base64'i storage'a kaydetme, sadece metadata)
-    // Base64 ödeme sayfasına geçerken oluşturulacak
-    photos.forEach((photo, index) => {
-      const cartItem = {
-        product: {
-          size: product.size,
-          name: product.name,
-          description: product.description,
-          customSize: product.customSize
-        },
-        photo: {
-          preview: previews[index],
-          filename: photo.name,
-          mimetype: photo.type,
-          size: photo.size
-          // File objesi ve base64 storage'a kaydedilmiyor (quota için)
-          // Base64 ödeme sayfasına geçerken oluşturulacak
-        },
-        quantity,
-        price: pricePerPhoto,
-        shippingType: 'standard'
+    // Her fotoğraf için ayrı ayrı fiyat hesapla (quantity adet için)
+    // ÖNEMLİ: Her fotoğraf için quantity adet için fiyat hesaplanır, toplam adet için değil
+    let basePrice = 0
+    if (product.size === 'custom' && product.customSize) {
+      const area = product.customSize.width * product.customSize.height
+      basePrice = Math.ceil(area / 100) * 0.5
+    } else {
+      // Her fotoğraf için quantity adet için fiyat hesapla
+      const bulkPrice = getBulkPrice(product.size, quantity)
+      if (bulkPrice) {
+        basePrice = bulkPrice
+      } else {
+        // Fallback: 15 adet fiyatı
+        const sizePrices = { '10x15': 16, '15x20': 19, '20x30': 26, '30x40': 36 }
+        basePrice = sizePrices[product.size] || 26
       }
+    }
+    
+    // Her fotoğraf için fiyat (quantity adet × birim fiyat - kargo hariç)
+    const pricePerPhoto = basePrice * quantity
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProductUpload.jsx:151',message:'Price calculation in ProductUpload',data:{quantity,photosCount:photos.length,basePrice,pricePerPhoto,totalQuantity:quantity*photos.length,calculation:`${basePrice} TL/adet × ${quantity} adet = ${pricePerPhoto} TL/fotoğraf`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
+    // Fiyat hesaplama log kaldırıldı (gereksiz)
 
-      addToCart(cartItem)
-    })
+    // Fotoğrafları toplu olarak sepete ekle (tek state güncellemesi - çok daha hızlı ve stabil)
+    const cartItems = photos.map((photo, index) => ({
+      product: {
+        size: product.size,
+        name: product.name,
+        description: product.description,
+        customSize: product.customSize
+      },
+      photo: {
+        preview: previews[index],
+        filename: photo.name,
+        mimetype: photo.type,
+        size: photo.size,
+        file: photo // File objesini de tut (base64'e çevirmek için)
+      },
+      quantity,
+      price: pricePerPhoto,
+      shippingType: 'standard'
+    }))
+
+    // Toplu ekleme (tek state güncellemesi)
+    addMultipleToCart(cartItems)
 
     // File objelerini location.state ile Cart'a gönder (base64'e çevirmek için)
     setTimeout(() => {
@@ -233,21 +239,23 @@ function ProductUpload() {
                   borderRadius: '8px',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  border: '2px dashed #ccc',
+                  border: '2px dashed var(--border-color)',
                   marginBottom: '1rem',
-                  transition: 'all 0.3s'
+                  transition: 'border-color 0.2s, background-color 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#667eea'
-                  e.currentTarget.style.background = '#f0f4ff'
+                  e.currentTarget.style.borderColor = 'var(--primary-color)'
+                  e.currentTarget.style.background = 'var(--bg-gray)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#ccc'
+                  e.currentTarget.style.borderColor = 'var(--border-color)'
                   e.currentTarget.style.background = 'white'
                 }}
               >
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: '600', color: '#667eea', marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
+                  <Icon name="camera" size={36} />
+                </div>
+                <div style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--primary-color)', marginBottom: '0.5rem' }}>
                   Fotoğraflarınızı buraya sürükleyin
                 </div>
                 <div style={{ color: '#666' }}>veya tıklayarak seçin</div>
@@ -314,9 +322,9 @@ function ProductUpload() {
                   border: `1px solid ${previews.length >= 15 ? '#10b981' : '#ffc107'}`
                 }}>
                   {previews.length >= 15 ? (
-                    <>✓ {previews.length} fotoğraf seçildi - Sepete eklenebilir</>
+                    <><Icon name="check" size={14} /> {previews.length} fotoğraf seçildi - Sepete eklenebilir</>
                   ) : (
-                    <>⚠️ {previews.length} fotoğraf seçildi - En az 15 fotoğraf gerekli</>
+                    <>Uyarı: {previews.length} fotoğraf seçildi - En az 15 fotoğraf gerekli</>
                   )}
                 </div>
               )}
@@ -366,14 +374,16 @@ function ProductUpload() {
 
               {/* Fiyat Özeti */}
               <div style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'var(--bg-color)',
                 padding: '1.5rem',
                 borderRadius: '12px',
-                color: 'white',
-                marginBottom: '1.5rem'
+                color: 'var(--text-color)',
+                marginBottom: '1.5rem',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow)'
               }}>
                 <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Birim Fiyat</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Birim Fiyat</div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
                     ₺{(() => {
                       const bulkPrices = {
@@ -398,17 +408,17 @@ function ProductUpload() {
                   </div>
                 </div>
                 <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Adet</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Adet</div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{quantity}</div>
                 </div>
                 <div style={{
-                  borderTop: '2px solid rgba(255,255,255,0.3)',
+                  borderTop: '1px solid var(--border-color)',
                   paddingTop: '1rem',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
-                  <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Toplam</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Toplam</div>
                   <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
                     ₺{(() => {
                       // Toplam fiyat: (birim fiyat × quantity) + kargo (sadece bir fotoğraf için)
@@ -446,15 +456,17 @@ function ProductUpload() {
                   fontSize: '1.1rem',
                   fontWeight: 'bold',
                   background: photos.length >= 15 && quantity >= 15 ? 'var(--primary-color)' : '#ccc',
-                  color: photos.length >= 15 && quantity >= 15 ? '#000000' : '#666',
+                  color: photos.length >= 15 && quantity >= 15 ? '#ffffff' : '#64748b',
                   border: 'none',
                   borderRadius: '8px',
                   cursor: photos.length >= 15 && quantity >= 15 ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.3s',
-                  boxShadow: photos.length >= 15 && quantity >= 15 ? '0 2px 8px rgba(212, 175, 55, 0.3)' : 'none'
+                  transition: 'color 0.2s, background-color 0.2s',
+                  boxShadow: photos.length >= 15 && quantity >= 15 ? 'var(--shadow)' : 'none'
                 }}
               >
-                🛒 Sepete Ekle
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Icon name="cart" size={18} /> Sepete Ekle
+                </span>
               </button>
               {photos.length > 0 && photos.length < 15 && (
                 <div style={{
@@ -467,7 +479,7 @@ function ProductUpload() {
                   textAlign: 'center',
                   border: '1px solid #ffc107'
                 }}>
-                  ⚠️ Sepete eklemek için en az 15 fotoğraf seçmelisiniz ({15 - photos.length} fotoğraf daha gerekli)
+                  Uyarı: Sepete eklemek için en az 15 fotoğraf seçmelisiniz ({15 - photos.length} fotoğraf daha gerekli)
                 </div>
               )}
             </div>

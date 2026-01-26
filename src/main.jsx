@@ -31,7 +31,12 @@ if ('serviceWorker' in navigator) {
         } else if (registration.waiting) {
           console.log('⏳ Service Worker bekliyor...');
           // Yeni service worker varsa, hemen aktif et
-          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          try {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          } catch (error) {
+            // Message channel kapalıysa hata verme
+            console.warn('⚠️ Service Worker mesaj gönderilemedi:', error.message);
+          }
         }
         
         // Güncelleme kontrolü

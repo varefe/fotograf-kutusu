@@ -33,6 +33,14 @@ function Register() {
       return
     }
 
+    // Email format kontrolü
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email.trim())) {
+      setError('Geçerli bir e-posta adresi giriniz')
+      setLoading(false)
+      return
+    }
+
     // Güçlü şifre kontrolü
     if (formData.password.length < 8) {
       setError('Şifre en az 8 karakter olmalıdır')
@@ -268,7 +276,7 @@ function Register() {
                     }}
                     title={showPassword ? 'Şifreyi Gizle' : 'Şifreyi Göster'}
                   >
-                    {showPassword ? '🙈' : '👁️'}
+                    {showPassword ? 'Gizle' : 'Göster'}
                   </button>
                 </div>
               </div>
@@ -315,7 +323,7 @@ function Register() {
                     }}
                     title={showConfirmPassword ? 'Şifreyi Gizle' : 'Şifreyi Göster'}
                   >
-                    {showConfirmPassword ? '🙈' : '👁️'}
+                    {showConfirmPassword ? 'Gizle' : 'Göster'}
                   </button>
                 </div>
               </div>
