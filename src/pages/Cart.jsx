@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -339,76 +339,47 @@ function Cart() {
     }
   }
 
-  // Sepet öğelerini grupla (aynı size, quantity, product.name olanları)
-  const groupedCartItems = cartItems.reduce((groups, item) => {
-    const key = `${item.product?.size || 'unknown'}-${item.quantity || 0}-${item.product?.name || 'unknown'}`
-    if (!groups[key]) {
-      groups[key] = {
-        id: key,
-        size: item.product?.size,
-        quantity: item.quantity,
-        productName: item.product?.name,
-        customSize: item.product?.customSize,
-        items: [],
-        totalPrice: 0
+  // Sepet öğelerini grupla - useMemo ile optimize edildi
+  const groupedCartItems = useMemo(() => {
+    const groups = cartItems.reduce((groups, item) => {
+      const key = `${item.product?.size || 'unknown'}-${item.quantity || 0}-${item.product?.name || 'unknown'}`
+      if (!groups[key]) {
+        groups[key] = {
+          id: key,
+          size: item.product?.size,
+          quantity: item.quantity,
+          productName: item.product?.name,
+          customSize: item.product?.customSize,
+          items: [],
+          totalPrice: 0
+        }
       }
-    }
-    groups[key].items.push(item)
-    return groups
-  }, {})
-  
-  // Grup fiyatlarını hesapla (tüm item'lar eklendikten sonra)
-  Object.values(groupedCartItems).forEach((group) => {
-    // Toplam adet = fotoğraf sayısı (her fotoğraf için 1 adet)
-    // Örnek: 1 fotoğraf → 1 adet
-    // Örnek: 51 fotoğraf → 51 adet
-    // Fotoğraf sayısı arttıkça toplam adet artar, bulk fiyat düşer
-    const totalQuantity = group.items.length
-    const sizePrices = {
-      '10x15': 16,
-      '15x20': 19,
-      '20x30': 26,
-      '30x40': 36
-    }
-    const unitPrice = sizePrices[group.size] || 26
-    // Grup fiyatı: toplam adet × bulk birim fiyat
-    group.totalPrice = totalQuantity * unitPrice
-  })
-  
-  // Debug: Grup fiyatlarını logla
-  Object.values(groupedCartItems).forEach((group, idx) => {
-    // Toplam adet için bulk fiyat hesapla
-    // Toplam adet = fotoğraf sayısı (her fotoğraf için 1 adet)
-    const totalQuantity = group.items.length
-    const sizePrices = {
-      '10x15': 16,
-      '15x20': 19,
-      '20x30': 26,
-      '30x40': 36
-    }
-    const unitPrice = sizePrices[group.size] || 26
-    // Beklenen toplam: toplam adet × bulk birim fiyat
-    const expectedTotal = totalQuantity * unitPrice
-    const actualTotal = group.totalPrice
-    const isCorrect = Math.abs(actualTotal - expectedTotal) < 0.01
-    const difference = actualTotal - expectedTotal
+      groups[key].items.push(item)
+      return groups
+    }, {})
     
-    console.log(`💰 Grup ${idx + 1} Fiyat Detayı:`)
-    console.log(`  Boyut: ${group.size}`)
-    console.log(`  Adet/Fotoğraf: ${group.quantity}`)
-    console.log(`  Fotoğraf Sayısı: ${group.items.length}`)
-    console.log(`  Toplam Adet: ${totalQuantity} (${group.items.length} fotoğraf, her biri 1 adet = ${totalQuantity} adet)`)
-    console.log(`  Bulk Birim Fiyat: ${unitPrice} TL/adet (${totalQuantity} adet için)`)
-    console.log(`  Beklenen Toplam: ${expectedTotal} TL (${totalQuantity} adet × ${unitPrice} TL/adet)`)
-    console.log(`  Gerçek Grup Fiyatı: ${actualTotal} TL`)
-    console.log(`  Doğru mu?: ${isCorrect ? '✅ EVET' : '❌ HAYIR'}`)
-    console.log(`  Fark: ${difference} TL`)
-  })
+    // Grup fiyatlarını hesapla
+    const sizePrices = {
+      '10x15': 16,
+      '15x20': 19,
+      '20x30': 26,
+      '30x40': 36
+    }
+    
+    Object.values(groups).forEach((group) => {
+      const totalQuantity = group.items.length
+      const unitPrice = sizePrices[group.size] || 26
+      group.totalPrice = totalQuantity * unitPrice
+    })
+    
+    return groups
+  }, [cartItems])
 
-  const groupedItemsArray = Object.values(groupedCartItems)
-  const rotationKey = groupedItemsArray
-    .map((group) => `${group.id}:${group.items.length}`)
-    .join('|')
+  const groupedItemsArray = useMemo(() => Object.values(groupedCartItems), [groupedCartItems])
+  const rotationKey = useMemo(() => 
+    groupedItemsArray.map((group) => `${group.id}:${group.items.length}`).join('|'),
+    [groupedItemsArray]
+  )
 
   useEffect(() => {
     if (groupedItemsArray.length === 0) return
@@ -455,9 +426,9 @@ function Cart() {
     }, 4500)
     return () => {
       clearInterval(interval)
-      clearTimeout(timeoutId)
+      if (timeoutId) clearTimeout(timeoutId)
     }
-  }, [rotationKey, photoRotationIndex])
+  }, [rotationKey, groupedItemsArray])
 
   // Ödeme formu submit handler
   const handlePaymentSubmit = async (cardData) => {

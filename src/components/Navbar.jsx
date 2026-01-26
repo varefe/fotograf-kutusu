@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
+import { memo, useMemo } from 'react'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import Icon from './Icon'
 
-function Navbar() {
+const Navbar = memo(function Navbar() {
   const { getCartCount } = useCart()
   const { user, isAuthenticated, isAdmin } = useAuth()
-  const cartCount = getCartCount()
+  const cartCount = useMemo(() => getCartCount(), [getCartCount])
 
   return (
     <nav className="navbar">
@@ -33,6 +34,7 @@ function Navbar() {
                 src="/logo.jpg" 
                 alt="Fotoğraf Kutusu" 
                 className="logo"
+                loading="lazy"
                 onError={(e) => {
                   e.target.style.display = 'none'
                 }}
@@ -79,6 +81,6 @@ function Navbar() {
       </div>
     </nav>
   )
-}
+})
 
 export default Navbar

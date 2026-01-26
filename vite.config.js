@@ -42,6 +42,24 @@ export default defineConfig({
       }
     }
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'vendor': ['axios']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: false, // Console.log'ları kaldırma (debug için)
+        drop_debugger: true
+      }
+    }
+  },
   server: {
     port: 3000,
     open: true,

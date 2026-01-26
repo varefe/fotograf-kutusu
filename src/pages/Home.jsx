@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Icon from '../components/Icon'
@@ -17,60 +17,59 @@ function Home() {
     pricing: false
   })
 
-  // Carousel fotoğrafları - Fotoğraf baskı hizmetine uygun görseller
-  // Pexels'tan ücretsiz yüksek kaliteli fotoğraflar
-  const carouselImages = [
+  // Carousel fotoğrafları - useMemo ile optimize edildi
+  const carouselImages = useMemo(() => [
     {
       id: 1,
-      image: 'https://images.pexels.com/photos/1024311/pexels-photo-1024311.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', // Duvarda çerçeveli anı fotoğrafları - wall gallery
+      image: 'https://images.pexels.com/photos/1024311/pexels-photo-1024311.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
       alt: 'Duvarda çerçeveli anı fotoğrafları',
       title: 'Anılarınızı Ölümsüzleştirin',
       subtitle: 'En değerli anılarınızı profesyonel çerçevelerle süsleyin'
     },
     {
       id: 2,
-      image: 'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', // Masa üstünde küçük fotoğraflar ve polo kartlar - polaroid instant photos
+      image: 'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
       alt: 'Polo kartlar ve küçük fotoğraflar',
       title: 'Polo Kartlar ve Küçük Baskılar',
       subtitle: '10x15 ve 15x20 boyutlarında özel polo kartlar'
     },
     {
       id: 3,
-      image: 'https://images.pexels.com/photos/1024311/pexels-photo-1024311.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', // Anı duvarı - aile fotoğrafları - memory wall
+      image: 'https://images.pexels.com/photos/1024311/pexels-photo-1024311.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
       alt: 'Anı duvarı aile fotoğrafları',
       title: 'Aile Anılarınız',
       subtitle: 'Sevdiklerinizle geçirdiğiniz özel anları çerçeveleyin'
     },
     {
       id: 4,
-      image: 'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', // Çerçeveli fotoğraf koleksiyonu - photo frames collection
+      image: 'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
       alt: 'Çerçeveli fotoğraf koleksiyonu',
       title: 'Fotoğraf Koleksiyonunuz',
       subtitle: 'Farklı boyutlarda profesyonel baskı ve çerçeveleme'
     }
-  ]
+  ], [])
 
-  // Otomatik carousel geçişi
+  // Carousel geçiş fonksiyonları - useCallback ile optimize edildi
+  const goToSlide = useCallback((index) => {
+    setCurrentSlide(index)
+  }, [])
+
+  const nextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev + 1) % carouselImages.length)
+  }, [carouselImages.length])
+
+  const prevSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev - 1 + carouselImages.length) % carouselImages.length)
+  }, [carouselImages.length])
+
+  // Otomatik carousel geçişi - optimize edildi
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % carouselImages.length)
-    }, 5000) // 5 saniyede bir geçiş
+    }, 5000)
 
     return () => clearInterval(interval)
   }, [carouselImages.length])
-
-  // Carousel geçiş fonksiyonları
-  const goToSlide = (index) => {
-    setCurrentSlide(index)
-  }
-
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % carouselImages.length)
-  }
-
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + carouselImages.length) % carouselImages.length)
-  }
 
   // Scroll animasyonları için Intersection Observer
   useEffect(() => {
@@ -106,13 +105,14 @@ function Home() {
     }
   }, [])
 
-  const products = [
+  // Products array - useMemo ile optimize edildi
+  const products = useMemo(() => [
     {
       size: '10x15',
       name: '10x15 cm',
       description: 'Küçük boyut',
-      unitPrice: 16, // 15 adet birim fiyat
-      totalPrice: 240, // 15 adet × 16 TL = 240 TL
+      unitPrice: 16,
+      totalPrice: 240,
       features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat'],
       image: '/images/product-1.png'
     },
@@ -120,8 +120,8 @@ function Home() {
       size: '15x20',
       name: '15x20 cm',
       description: 'Orta boyut',
-      unitPrice: 19, // 15 adet birim fiyat
-      totalPrice: 285, // 15 adet × 19 TL = 285 TL
+      unitPrice: 19,
+      totalPrice: 285,
       features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat'],
       image: '/images/product-2.png'
     },
@@ -129,8 +129,8 @@ function Home() {
       size: '20x30',
       name: '20x30 cm',
       description: 'Popüler boyut',
-      unitPrice: 26, // 15 adet birim fiyat
-      totalPrice: 390, // 15 adet × 26 TL = 390 TL
+      unitPrice: 26,
+      totalPrice: 390,
       features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat'],
       featured: true,
       image: '/images/product-3.png'
@@ -139,18 +139,18 @@ function Home() {
       size: '30x40',
       name: '30x40 cm',
       description: 'Büyük boyut',
-      unitPrice: 36, // 15 adet birim fiyat
-      totalPrice: 540, // 15 adet × 36 TL = 540 TL
+      unitPrice: 36,
+      totalPrice: 540,
       features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat'],
       image: '/images/product-4.png'
     }
-  ]
+  ], [])
 
-  const handleProductClick = (product) => {
+  const handleProductClick = useCallback((product) => {
     navigate('/product', {
       state: { product }
     })
-  }
+  }, [navigate])
 
   return (
     <>
@@ -195,7 +195,7 @@ function Home() {
                   opacity: index === currentSlide ? 1 : 0,
                   transform: `translateX(${(index - currentSlide) * 100}%)`,
                   transition: 'opacity 0.8s ease-in-out, transform 0.8s ease-in-out',
-                  backgroundImage: `url(${slide.image})`,
+                  backgroundImage: index === currentSlide ? `url(${slide.image})` : 'none',
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat',
@@ -461,6 +461,7 @@ function Home() {
                 src="/logos/visa.png" 
                 alt="Visa" 
                 className="payment-security-logo"
+                loading="lazy"
                 onError={(e) => {
                   e.target.style.display = 'none';
                 }}
@@ -469,6 +470,7 @@ function Home() {
                 src="/logos/mastercard.png" 
                 alt="MasterCard" 
                 className="payment-security-logo"
+                loading="lazy"
                 onError={(e) => {
                   e.target.style.display = 'none';
                 }}
@@ -478,6 +480,7 @@ function Home() {
                 alt="iyzico ile Öde" 
                 className="payment-security-logo"
                 style={{ height: '50px' }}
+                loading="lazy"
               />
             </div>
             <div className="security-badge">

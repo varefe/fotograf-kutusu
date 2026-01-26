@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
+import { memo } from 'react'
 import Icon from './Icon'
 
-function Footer() {
+const Footer = memo(function Footer() {
   return (
     <footer className="footer">
       <div className="container">
@@ -57,6 +58,7 @@ function Footer() {
                 src="/logos/visa.png" 
                 alt="Visa" 
                 className="payment-logo"
+                loading="lazy"
                 onError={(e) => {
                   e.target.style.display = 'none';
                 }}
@@ -65,6 +67,7 @@ function Footer() {
                 src="/logos/mastercard.png" 
                 alt="MasterCard" 
                 className="payment-logo"
+                loading="lazy"
                 onError={(e) => {
                   e.target.style.display = 'none';
                 }}
@@ -74,6 +77,7 @@ function Footer() {
                 alt="iyzico ile Öde" 
                 className="payment-logo"
                 style={{ height: '30px' }}
+                loading="lazy"
               />
             </div>
             <div className="ssl-badge">
@@ -115,6 +119,6 @@ function Footer() {
       </div>
     </footer>
   )
-}
+})
 
 export default Footer
