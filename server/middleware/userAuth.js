@@ -1,6 +1,6 @@
 import { verifyToken } from '../utils/jwt.js';
-import User from '../models/UserSchema.js';
 import { connectDB } from '../config/database.js';
+import User from '../models/UserSchema.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -18,9 +18,6 @@ export const requireAuth = async (req, res, next) => {
   console.log('🔍 [DEBUG] requireAuth entry:', { nextType: typeof next, nextIsFunction: typeof next === 'function', method: req.method, path: req.path, hasAuthHeader: !!req.headers.authorization });
   // #endregion
   try {
-    // Veritabanı bağlantısını kontrol et
-    await connectDB();
-    
     // Token'ı header'dan al
     const authHeader = req.headers.authorization;
     
@@ -52,6 +49,9 @@ export const requireAuth = async (req, res, next) => {
       });
     }
 
+    // Veritabanı bağlantısını kontrol et
+    await connectDB();
+    
     // Kullanıcıyı veritabanından bul
     const user = await User.findById(decoded.userId);
     

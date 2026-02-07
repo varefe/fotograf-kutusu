@@ -41,10 +41,11 @@ export const connectPostgres = async (retries = 3) => {
           idle: 10000
         },
         dialectOptions: {
-          ssl: process.env.NODE_ENV === 'production' ? {
+          // Render.com PostgreSQL SSL gerektiriyor
+          ssl: {
             require: true,
             rejectUnauthorized: false
-          } : false
+          }
         }
       });
 

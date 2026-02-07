@@ -49,8 +49,10 @@ const orderSchema = new mongoose.Schema({
     address: { type: String, required: true } // Şifrelenmiş
   },
   price: { type: Number, required: true },
-  status: { type: String, default: 'Yeni' },
+  status: { type: String, default: 'Bekliyor' }, // Bekliyor, Alındı, Basıldı, Kargoya Verildi, Teslim Edildi
   paymentStatus: { type: String, default: 'pending' },
+  trackingNumber: { type: String }, // Kargo takip numarası
+  shippingCompany: { type: String }, // Kargo firması
   notes: { type: String }, // Şifrelenmiş
   isEncrypted: { type: Boolean, default: true },
   // Aynı kullanıcının siparişlerini birbirine bağlamak için
@@ -302,5 +304,8 @@ const OrderModel = {
   }
 };
 
-export default OrderModel;
+// Mongoose modeli export et (admin/order route'ları .find, .countDocuments vb. kullanıyor)
+// formatOrder admin ve liste için kullanılıyor
+Order.formatOrder = OrderModel.formatOrder;
+export default Order;
 

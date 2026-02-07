@@ -1,10 +1,17 @@
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Icon from '../components/Icon'
+import SEO from '../components/SEO'
 
 function Contact() {
   return (
     <>
+      <SEO 
+        title="İletişim"
+        description="Fotoğraf Kutusu ile iletişime geçin. Sorularınız, önerileriniz veya destek talepleriniz için bize ulaşın."
+        keywords="fotoğraf kutusu iletişim, fotoğraf baskı destek, müşteri hizmetleri"
+        url="/contact"
+      />
       <Navbar />
       <main>
         <div className="page-header">
@@ -74,9 +81,39 @@ function Contact() {
                       0 (506) 708 76 84
                     </a>
                   </p>
-                  <p style={{ color: 'var(--text-light)', fontSize: '0.95rem' }}>
+                  <p style={{ color: 'var(--text-light)', fontSize: '0.95rem', marginBottom: '0.5rem' }}>
                     Çalışma Saatleri: Pazartesi - Cuma, 09:00 - 18:00
                   </p>
+                  <a 
+                    href="https://wa.me/905067087684?text=Merhaba, Fotoğraf Kutusu hakkında bilgi almak istiyorum."
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      background: '#25D366',
+                      color: 'white',
+                      textDecoration: 'none',
+                      borderRadius: '6px',
+                      fontSize: '0.95rem',
+                      fontWeight: '600',
+                      marginTop: '0.5rem',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#20BA5A'
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#25D366'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                    }}
+                  >
+                    <Icon name="whatsapp" size={18} />
+                    WhatsApp ile İletişim
+                  </a>
                 </div>
 
                 <div className="contact-item">

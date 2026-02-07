@@ -1,12 +1,17 @@
 import express from 'express';
-import User from '../models/UserSchema.js';
-import OrderModel from '../models/Order.js';
 import mongoose from 'mongoose';
 import { connectDB } from '../config/database.js';
+import User from '../models/UserSchema.js';
+import '../models/OrderSchema.js'; // Modeli kaydet (mongoose.model('Order', ...))
+import Gallery from '../models/GallerySchema.js';
+import Category from '../models/CategorySchema.js';
+import Review from '../models/ReviewSchema.js';
+import Announcement from '../models/AnnouncementSchema.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { requireAuth } from '../middleware/userAuth.js';
 import { verifyToken } from '../utils/jwt.js';
 
+// Order modeli her route handler içinde mongoose.model('Order') ile alınıyor (request-time).
 const router = express.Router();
 
 // Admin kontrolü - JWT token ile
@@ -45,6 +50,7 @@ const requireAdminRole = async (req, res, next) => {
     console.log('🔍 requireAdminRole - User ID from token:', decoded.userId);
 
     // Kullanıcıyı veritabanından bul
+    await connectDB();
     const user = await User.findById(decoded.userId);
     console.log('🔍 requireAdminRole - User found:', user ? 'Yes' : 'No');
     
@@ -95,36 +101,38 @@ const requireAdminRole = async (req, res, next) => {
 router.get('/stats', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
+    const Order = mongoose.model('Order');
 
     // Toplam kullanıcı sayısı
-    const totalUsers = await User.countDocuments();
+    const totalUsers = await User.countDocuments({});
     
-    // Toplam sipariş sayısı - OrderModel kullan
-    const allOrdersForCount = await OrderModel.findAll(true);
-    const totalOrders = allOrdersForCount.length;
+    // Toplam sipariş sayısı
+    const allOrders = await Order.find({}).sort({ createdAt: -1 }).lean();
+    const totalOrders = allOrders.length;
     
     // Ödenen siparişler
-    const paidOrders = allOrdersForCount.filter(order => order.paymentStatus === 'paid').length;
+    const paidOrders = allOrders.filter(order => order.paymentStatus === 'paid').length;
     
     // Bekleyen siparişler
-    const pendingOrders = allOrdersForCount.filter(order => order.paymentStatus === 'pending').length;
+    const pendingOrders = allOrders.filter(order => order.paymentStatus === 'pending').length;
     
     // Toplam gelir (sadece ödenen siparişler)
-    // allOrdersForCount zaten tüm siparişleri içeriyor, tekrar çağırmaya gerek yok
-    const paidOrdersList = allOrdersForCount.filter(order => order.paymentStatus === 'paid');
-    const totalRevenue = paidOrdersList.reduce((sum, order) => sum + (order.price || 0), 0);
+    const paidOrdersList = allOrders.filter(order => order.paymentStatus === 'paid');
+    const totalRevenue = paidOrdersList.reduce((sum, order) => {
+      return sum + (parseFloat(order.price) || 0);
+    }, 0);
     
     // Son 30 gün içindeki siparişler
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentOrders = allOrdersForCount.filter(order => {
+    const recentOrders = allOrders.filter(order => {
       const orderDate = new Date(order.createdAt);
       return orderDate >= thirtyDaysAgo;
     }).length;
     
     // Son 30 gün içindeki yeni kullanıcılar
     const recentUsers = await User.countDocuments({ 
-      createdAt: { $gte: thirtyDaysAgo } 
+      createdAt: { $gte: thirtyDaysAgo }
     });
 
     res.status(200).json({
@@ -155,18 +163,19 @@ router.get('/stats', requireAdminRole, async (req, res) => {
 router.get('/users', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
+    const Order = mongoose.model('Order');
     
     const users = await User.find({})
-      .select('-password') // Şifreyi gösterme
-      .sort({ createdAt: -1 }) // En yeni önce
+      .select('-password')
+      .sort({ createdAt: -1 })
       .lean();
     
     // Her kullanıcının sipariş sayısını ekle
-    const allOrdersForUserCount = await OrderModel.findAll(true);
+    const allOrders = await Order.find({}).lean();
     const usersWithOrders = users.map((user) => {
-      const orderCount = allOrdersForUserCount.filter(order => 
-        order.userId && order.userId.toString() === user._id.toString()
-      ).length;
+      const orderCount = allOrders.filter(order => {
+        return order.userId && order.userId.toString() === user._id.toString();
+      }).length;
       return {
         ...user,
         orderCount
@@ -194,7 +203,6 @@ router.get('/users', requireAdminRole, async (req, res) => {
 router.get('/users/check', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
-    
     const user = await User.findById(req.user.id).select('-password');
     
     if (!user) {
@@ -203,12 +211,12 @@ router.get('/users/check', requireAdminRole, async (req, res) => {
         error: 'Kullanıcı bulunamadı'
       });
     }
-    
     res.status(200).json({
       success: true,
       isAdmin: user.role === 'admin',
       user: {
-        id: user._id,
+        id: user._id.toString(),
+        _id: user._id.toString(),
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -231,10 +239,8 @@ router.get('/users/check', requireAdminRole, async (req, res) => {
 router.get('/users/:id', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
-    
-    const user = await User.findById(req.params.id)
-      .select('-password')
-      .lean();
+    const Order = mongoose.model('Order');
+    const user = await User.findById(req.params.id).select('-password');
     
     if (!user) {
       return res.status(404).json({
@@ -244,13 +250,16 @@ router.get('/users/:id', requireAdminRole, async (req, res) => {
     }
     
     // Kullanıcının siparişlerini getir
-    const orders = await OrderModel.findByUserId(user._id.toString(), true); // Admin için şifreleri çöz
+    const userOrders = await Order.find({ userId: user._id })
+      .sort({ createdAt: -1 })
+      .lean();
     
     res.status(200).json({
       success: true,
       user: {
-        ...user,
-        orders
+        ...user.toObject(),
+        _id: user._id.toString(),
+        orders: userOrders
       }
     });
   } catch (error) {
@@ -269,10 +278,9 @@ router.get('/users/:id', requireAdminRole, async (req, res) => {
 router.delete('/users/:id', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
+    const deleted = await User.findByIdAndDelete(req.params.id);
     
-    const user = await User.findByIdAndDelete(req.params.id);
-    
-    if (!user) {
+    if (!deleted) {
       return res.status(404).json({
         success: false,
         error: 'Kullanıcı bulunamadı'
@@ -280,7 +288,8 @@ router.delete('/users/:id', requireAdminRole, async (req, res) => {
     }
     
     // Kullanıcının siparişlerini de sil (opsiyonel - isteğe bağlı)
-    // await Order.deleteMany({ userId: req.params.id });
+    // const OrderModel = await getOrder();
+    // await OrderModel.destroy({ where: { userId: req.params.id } });
     
     res.status(200).json({
       success: true,
@@ -297,42 +306,145 @@ router.delete('/users/:id', requireAdminRole, async (req, res) => {
 });
 
 /**
+ * Kullanıcı rolü güncelle (Admin) - Başka hesapları admin yapabilir
+ */
+router.patch('/users/:id/role', requireAdminRole, async (req, res) => {
+  try {
+    await connectDB();
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!role || !['admin', 'user'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Geçersiz rol',
+        message: 'role alanı "admin" veya "user" olmalıdır'
+      });
+    }
+
+    const targetUser = await User.findById(id);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    targetUser.role = role;
+    await targetUser.save();
+
+    res.status(200).json({
+      success: true,
+      message: role === 'admin' ? 'Kullanıcı admin yapıldı' : 'Kullanıcı admin yetkisi kaldırıldı',
+      user: {
+        _id: targetUser._id.toString(),
+        email: targetUser.email,
+        firstName: targetUser.firstName,
+        lastName: targetUser.lastName,
+        role: targetUser.role
+      }
+    });
+  } catch (error) {
+    console.error('Rol güncelleme hatası:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Rol güncellenemedi',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Veritabanını temizle (Admin) - Tüm verileri sil
+ * DİKKAT: Bu işlem geri alınamaz!
+ */
+router.post('/database/clear', requireAdminRole, async (req, res) => {
+  try {
+    await connectDB();
+    const Order = mongoose.model('Order');
+    
+    const { confirm } = req.body;
+    
+    if (confirm !== 'TEMIZLE') {
+      return res.status(400).json({
+        success: false,
+        error: 'Onay gerekli',
+        message: 'Veritabanını temizlemek için body\'de { "confirm": "TEMIZLE" } göndermelisiniz'
+      });
+    }
+    
+    // İstatistikleri al
+    const orderCount = await Order.countDocuments({});
+    const userCount = await User.countDocuments({});
+    const galleryCount = await Gallery.countDocuments({});
+    const categoryCount = await Category.countDocuments({});
+    const reviewCount = await Review.countDocuments({});
+    const announcementCount = await Announcement.countDocuments({});
+    
+    const stats = {
+      orders: orderCount,
+      users: userCount,
+      galleries: galleryCount,
+      categories: categoryCount,
+      reviews: reviewCount,
+      announcements: announcementCount
+    };
+    
+    // Tüm koleksiyonları temizle
+    const deletedOrders = await Order.deleteMany({});
+    const deletedUsers = await User.deleteMany({});
+    const deletedGalleries = await Gallery.deleteMany({});
+    const deletedCategories = await Category.deleteMany({});
+    const deletedReviews = await Review.deleteMany({});
+    const deletedAnnouncements = await Announcement.deleteMany({});
+    
+    res.status(200).json({
+      success: true,
+      message: 'Veritabanı başarıyla temizlendi',
+      deleted: {
+        orders: deletedOrders.deletedCount,
+        users: deletedUsers.deletedCount,
+        galleries: deletedGalleries.deletedCount,
+        categories: deletedCategories.deletedCount,
+        reviews: deletedReviews.deletedCount,
+        announcements: deletedAnnouncements.deletedCount
+      },
+      before: stats
+    });
+  } catch (error) {
+    console.error('Veritabanı temizleme hatası:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Veritabanı temizlenemedi',
+      message: error.message
+    });
+  }
+});
+
+/**
  * Veritabanı durumunu kontrol et (Admin) - Debug için
  */
 router.get('/debug/orders', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
-    const Order = mongoose.models.Order || mongoose.model('Order');
+    const mongoose = (await import('mongoose')).default;
+    const Order = mongoose.model('Order');
     
     const dbName = mongoose.connection.db?.databaseName || 'Bilinmiyor';
-    const collectionName = Order.collection?.name || 'Bilinmiyor';
+    const collectionName = 'orders';
     const totalCount = await Order.countDocuments({});
     const sampleOrder = await Order.findOne({}).lean();
     
     // Tüm koleksiyonları listele
-    const collections = await mongoose.connection.db?.listCollections().toArray() || [];
-    
-    // Farklı isimlerle sipariş koleksiyonlarını kontrol et
-    const orderCollections = {};
-    const possibleNames = ['orders', 'order', 'Orders', 'Order'];
-    for (const name of possibleNames) {
-      try {
-        const testCollection = mongoose.connection.db?.collection(name);
-        if (testCollection) {
-          const testCount = await testCollection.countDocuments({});
-          orderCollections[name] = testCount;
-        }
-      } catch (e) {
-        // Koleksiyon yok
-      }
-    }
+    const allCollections = await mongoose.connection.db?.listCollections().toArray() || [];
     
     res.json({
       success: true,
       totalCount,
       hasOrders: totalCount > 0,
       sampleOrder: sampleOrder ? {
-        _id: sampleOrder._id,
+        id: sampleOrder._id.toString(),
+        _id: sampleOrder._id.toString(),
         createdAt: sampleOrder.createdAt,
         price: sampleOrder.price,
         status: sampleOrder.status,
@@ -341,9 +453,7 @@ router.get('/debug/orders', requireAdminRole, async (req, res) => {
       collectionName,
       dbName,
       connectionState: mongoose.connection.readyState,
-      allCollections: collections.map(c => ({ name: c.name, type: c.type })),
-      orderCollections,
-      mongooseModels: Object.keys(mongoose.models)
+      allCollections: allCollections.map(c => ({ name: c.name, type: c.type }))
     });
   } catch (error) {
     console.error('❌ Debug endpoint hatası:', error);
@@ -362,14 +472,12 @@ router.get('/orders', requireAdminRole, async (req, res) => {
   try {
     console.log('📥 Admin sipariş isteği alındı - TÜM siparişler isteniyor');
     await connectDB();
+    const OrderModel = mongoose.model('Order');
     console.log('✅ Veritabanı bağlantısı kontrol edildi');
-    
-    // Direkt MongoDB'den tüm siparişleri çek (HİÇBİR FİLTRE YOK - site açıldığından beri tüm siparişler)
-    const Order = mongoose.models.Order || mongoose.model('Order');
     
     // Veritabanı ve koleksiyon bilgilerini logla
     const dbName = mongoose.connection.db?.databaseName || 'Bilinmiyor';
-    const collectionName = Order.collection?.name || 'Bilinmiyor';
+    const collectionName = 'orders';
     console.log(`🔍 Veritabanı bilgileri:`, {
       dbName,
       collectionName,
@@ -377,32 +485,12 @@ router.get('/orders', requireAdminRole, async (req, res) => {
       readyStateText: mongoose.connection.readyState === 1 ? 'Bağlı' : 'Bağlı değil'
     });
     
-    // Önce ham sayıyı kontrol et
-    const totalCount = await Order.countDocuments({});
+    // Önce ham sayıyı kontrol et (request-time model kullan)
+    const totalCount = await OrderModel.countDocuments({});
     console.log(`🔍 MongoDB'de toplam sipariş sayısı: ${totalCount} (Koleksiyon: ${collectionName}, DB: ${dbName})`);
     
-    // Eğer sipariş yoksa, koleksiyonun var olup olmadığını kontrol et
-    if (totalCount === 0) {
-      const collections = await mongoose.connection.db?.listCollections().toArray() || [];
-      console.log(`⚠️ Sipariş bulunamadı. Mevcut koleksiyonlar:`, collections.map(c => c.name));
-      
-      // Farklı isimlerle sipariş koleksiyonunu ara
-      const possibleNames = ['orders', 'order', 'Orders', 'Order'];
-      for (const name of possibleNames) {
-        try {
-          const testCollection = mongoose.connection.db?.collection(name);
-          if (testCollection) {
-            const testCount = await testCollection.countDocuments({});
-            console.log(`🔍 "${name}" koleksiyonunda ${testCount} doküman bulundu`);
-          }
-        } catch (e) {
-          // Koleksiyon yok, devam et
-        }
-      }
-    }
-    
     // TÜM siparişleri çek - HİÇBİR TARİH FİLTRESİ YOK (ESKİ VE YENİ TÜM SİPARİŞLER)
-    const rawOrders = await Order.find({})
+    const rawOrders = await OrderModel.find({})
       .sort({ createdAt: -1 }) // En yeni önce
       .lean();
     
@@ -410,8 +498,13 @@ router.get('/orders', requireAdminRole, async (req, res) => {
     
     // Eğer sipariş varsa, tarih aralığını logla
     if (rawOrders.length > 0) {
-      const oldestOrder = rawOrders[rawOrders.length - 1];
-      const newestOrder = rawOrders[0];
+      const sortedByDate = [...rawOrders].sort((a, b) => {
+        const aDate = new Date(a.createdAt);
+        const bDate = new Date(b.createdAt);
+        return aDate - bDate;
+      });
+      const oldestOrder = sortedByDate[0];
+      const newestOrder = sortedByDate[sortedByDate.length - 1];
       console.log(`📅 Sipariş tarih aralığı:`, {
         enEski: oldestOrder.createdAt ? new Date(oldestOrder.createdAt).toISOString() : 'Tarih yok',
         enYeni: newestOrder.createdAt ? new Date(newestOrder.createdAt).toISOString() : 'Tarih yok',
@@ -422,8 +515,8 @@ router.get('/orders', requireAdminRole, async (req, res) => {
     // Siparişleri formatla ve şifreleri çöz
     const formattedOrders = rawOrders.map((order) => {
       try {
-        // Admin için şifreleri çöz
-        const formatted = OrderModel.formatOrder(order, true);
+        // Admin için şifreleri çöz (OrderModel.formatOrder OrderSchema'da eklenir)
+        const formatted = OrderModel.formatOrder ? OrderModel.formatOrder(order, true) : order;
         
         // Eksik alanları ekle
         return {
@@ -439,13 +532,13 @@ router.get('/orders', requireAdminRole, async (req, res) => {
         return {
           id: order._id?.toString(),
           _id: order._id?.toString(),
-          price: order.price,
-          status: order.status || 'Yeni',
-          paymentStatus: order.paymentStatus || 'pending',
-          createdAt: order.createdAt,
-          updatedAt: order.updatedAt,
-          size: order.size,
-          quantity: order.quantity || 1,
+          price: orderData.price,
+          status: orderData.status || 'Yeni',
+          paymentStatus: orderData.paymentStatus || 'pending',
+          createdAt: orderData.createdAt,
+          updatedAt: orderData.updatedAt,
+          size: orderData.size,
+          quantity: orderData.quantity || 1,
           customerInfo: {
             email: 'Format hatası',
             firstName: '',
@@ -492,7 +585,7 @@ router.get('/orders', requireAdminRole, async (req, res) => {
     // Eğer sipariş yoksa, bunu açıkça logla
     if (totalCount === 0) {
       console.warn('⚠️ VERİTABANINDA HİÇ SİPARİŞ YOK!');
-      console.warn('⚠️ MongoDB collection boş veya bağlantı sorunu olabilir');
+      console.warn('⚠️ PostgreSQL tablo boş veya bağlantı sorunu olabilir');
     } else if (totalCount > 0 && formattedOrders.length === 0) {
       console.error('❌ KRİTİK: Veritabanında sipariş var ama formatlama başarısız!');
       console.error(`❌ Ham sipariş sayısı: ${totalCount}, Formatlanan: ${formattedOrders.length}`);
@@ -554,6 +647,7 @@ router.post('/orders/manual', requireAdminRole, async (req, res) => {
         mimetype: 'image/jpeg',
         size: 0
       },
+      photos: [],
       size: size,
       customSize: undefined,
       quantity: parseInt(quantity) || 15,
@@ -583,14 +677,19 @@ router.post('/orders/manual', requireAdminRole, async (req, res) => {
       status: orderData.status
     });
 
-    const savedOrder = await OrderModel.create(orderData);
+    const Order = mongoose.model('Order');
+    const savedOrder = await Order.create(orderData);
 
-    console.log('✅ Manuel sipariş başarıyla kaydedildi:', savedOrder._id || savedOrder.id);
+    console.log('✅ Manuel sipariş başarıyla kaydedildi:', savedOrder._id);
 
     res.status(201).json({
       success: true,
       message: 'Sipariş başarıyla eklendi',
-      order: savedOrder
+      order: {
+        ...savedOrder.toObject(),
+        _id: savedOrder._id.toString(),
+        id: savedOrder._id.toString()
+      }
     });
   } catch (error) {
     console.error('❌ Manuel sipariş ekleme hatası:', error);
@@ -609,6 +708,7 @@ router.post('/orders/sync-from-iyzico', requireAdminRole, async (req, res) => {
   try {
     console.log('📥 Iyzico sipariş senkronizasyonu başlatılıyor...');
     await connectDB();
+    const Order = mongoose.model('Order');
     
     const { paymentId, conversationId } = req.body;
     
@@ -680,17 +780,20 @@ router.post('/orders/sync-from-iyzico', requireAdminRole, async (req, res) => {
     const orderId = orderIdMatch ? orderIdMatch[1] : null;
 
     // Sipariş zaten veritabanında var mı kontrol et
-    const Order = mongoose.models.Order || mongoose.model('Order');
     let existingOrder = null;
     
     if (orderId) {
       // orderId ile ara (localStorage'daki timestamp ID)
-      existingOrder = await Order.findOne({
-        $or: [
-          { _id: orderId },
-          { 'customerInfo.email': paymentResult.buyer?.email }
-        ]
-      }).lean();
+      existingOrder = await Order.findById(orderId);
+      if (!existingOrder && paymentResult.buyer?.email) {
+        // Email ile de ara
+        const ordersByEmail = await Order.find({
+          'customerInfo.email': paymentResult.buyer.email
+        }).lean();
+        if (ordersByEmail.length > 0) {
+          existingOrder = ordersByEmail[0];
+        }
+      }
     }
 
     // Eğer sipariş yoksa, Iyzico bilgilerinden oluştur
@@ -704,6 +807,7 @@ router.post('/orders/sync-from-iyzico', requireAdminRole, async (req, res) => {
           mimetype: 'image/jpeg',
           size: 0
         },
+        photos: [],
         size: '10x15', // Varsayılan (Iyzico'da detay yok)
         customSize: undefined,
         quantity: 15, // Varsayılan
@@ -732,14 +836,18 @@ router.post('/orders/sync-from-iyzico', requireAdminRole, async (req, res) => {
         paymentStatus: orderData.paymentStatus
       });
 
-      const savedOrder = await OrderModel.create(orderData);
+      const savedOrder = await Order.create(orderData);
 
-      console.log('✅ Iyzico siparişi veritabanına eklendi:', savedOrder._id || savedOrder.id);
+      console.log('✅ Iyzico siparişi veritabanına eklendi:', savedOrder._id);
 
       return res.status(201).json({
         success: true,
         message: 'Sipariş Iyzico\'dan başarıyla eklendi',
-        order: savedOrder,
+        order: {
+          ...savedOrder.toObject(),
+          _id: savedOrder._id.toString(),
+          id: savedOrder._id.toString()
+        },
         iyzicoData: {
           paymentId: paymentResult.paymentId,
           conversationId: paymentResult.conversationId,
@@ -749,21 +857,24 @@ router.post('/orders/sync-from-iyzico', requireAdminRole, async (req, res) => {
       });
     } else {
       // Sipariş varsa, ödeme durumunu güncelle
-      const updatedOrder = await Order.findByIdAndUpdate(
+      const existingNotes = existingOrder.notes || '';
+      await Order.findByIdAndUpdate(
         existingOrder._id,
         {
           paymentStatus: paymentResult.paymentStatus === 'SUCCESS' ? 'paid' : existingOrder.paymentStatus,
           status: paymentResult.paymentStatus === 'SUCCESS' ? 'Ödeme Alındı' : existingOrder.status,
-          notes: existingOrder.notes ? `${existingOrder.notes}\nIyzico senkronizasyonu: ${new Date().toISOString()}` : `Iyzico senkronizasyonu: ${new Date().toISOString()}`,
+          notes: existingNotes ? `${existingNotes}\nIyzico senkronizasyonu: ${new Date().toISOString()}` : `Iyzico senkronizasyonu: ${new Date().toISOString()}`,
           updatedAt: new Date()
         },
         { new: true }
       );
 
+      const updatedOrder = await Order.findById(existingOrder._id);
+
       return res.status(200).json({
         success: true,
         message: 'Sipariş güncellendi',
-        order: OrderModel.formatOrder(updatedOrder.toObject(), true),
+        order: updatedOrder,
         iyzicoData: {
           paymentId: paymentResult.paymentId,
           conversationId: paymentResult.conversationId,
@@ -789,7 +900,8 @@ router.post('/orders/sync-from-iyzico', requireAdminRole, async (req, res) => {
 router.post('/orders/sync-all-from-iyzico', requireAdminRole, async (req, res) => {
   try {
     console.log('📥 Iyzico\'dan otomatik olarak TÜM siparişler çekiliyor...');
-    await connectDB();
+    await connectPostgres();
+    const OrderModel = await getOrder();
     
     const { days = 90 } = req.body; // Son kaç günün ödemeleri çekilecek (varsayılan: 90 gün)
     
@@ -812,7 +924,6 @@ router.post('/orders/sync-all-from-iyzico', requireAdminRole, async (req, res) =
       uri: process.env.IYZICO_URI || 'https://api.iyzipay.com'
     });
 
-    const Order = mongoose.models.Order || mongoose.model('Order');
     const syncedOrders = [];
     const skippedOrders = [];
     const errors = [];
@@ -930,12 +1041,19 @@ router.post('/orders/sync-all-from-iyzico', requireAdminRole, async (req, res) =
             let existingOrder = null;
             
             if (orderId) {
-              existingOrder = await Order.findOne({
-                $or: [
-                  { _id: orderId },
-                  { 'customerInfo.email': paymentDetail.buyer?.email }
-                ]
-              }).lean();
+              existingOrder = await OrderModel.findByPk(orderId);
+              if (!existingOrder && paymentDetail.buyer?.email) {
+                const ordersByEmail = await OrderModel.findAll({
+                  where: {
+                    [Op.or]: [
+                      Sequelize.literal(`customer_info->>'email' = '${paymentDetail.buyer.email}'`)
+                    ]
+                  }
+                });
+                if (ordersByEmail.length > 0) {
+                  existingOrder = ordersByEmail[0];
+                }
+              }
             }
             
             // Sipariş yoksa oluştur
@@ -949,6 +1067,7 @@ router.post('/orders/sync-all-from-iyzico', requireAdminRole, async (req, res) =
                   mimetype: 'image/jpeg',
                   size: 0
                 },
+                photos: [],
                 size: '10x15',
                 customSize: undefined,
                 quantity: 15,
@@ -972,16 +1091,18 @@ router.post('/orders/sync-all-from-iyzico', requireAdminRole, async (req, res) =
               };
               
               const savedOrder = await OrderModel.create(orderData);
+              const savedOrderData = savedOrder.toJSON ? savedOrder.toJSON() : savedOrder;
               syncedOrders.push({
                 paymentId: paymentDetail.paymentId,
-                orderId: savedOrder._id || savedOrder.id,
+                orderId: savedOrderData.id || savedOrderData._id,
                 email: orderData.customerInfo.email,
                 price: orderData.price
               });
               
-              console.log(`✅ Sipariş eklendi: ${savedOrder._id} (Payment: ${paymentDetail.paymentId})`);
+              console.log(`✅ Sipariş eklendi: ${savedOrderData.id} (Payment: ${paymentDetail.paymentId})`);
             } else {
-              console.log(`ℹ️ Sipariş zaten var: ${existingOrder._id}`);
+              const existingOrderData = existingOrder.toJSON ? existingOrder.toJSON() : existingOrder;
+              console.log(`ℹ️ Sipariş zaten var: ${existingOrderData.id}`);
             }
           } catch (error) {
             console.error(`❌ Payment ${paymentId} işlenirken hata:`, error);
@@ -1030,6 +1151,7 @@ router.post('/orders/sync-batch-from-iyzico', requireAdminRole, async (req, res)
   try {
     console.log('📥 Iyzico\'dan toplu sipariş senkronizasyonu başlatılıyor...');
     await connectDB();
+    const Order = mongoose.model('Order');
     
     const { paymentIds } = req.body; // Array of payment IDs
     
@@ -1051,7 +1173,6 @@ router.post('/orders/sync-batch-from-iyzico', requireAdminRole, async (req, res)
       uri: process.env.IYZICO_URI || 'https://api.iyzipay.com'
     });
 
-    const Order = mongoose.models.Order || mongoose.model('Order');
     const syncedOrders = [];
     const skippedOrders = [];
     const errors = [];
@@ -1103,23 +1224,29 @@ router.post('/orders/sync-batch-from-iyzico', requireAdminRole, async (req, res)
         let existingOrder = null;
         
         if (orderId) {
-          existingOrder = await Order.findOne({
-            $or: [
-              { _id: orderId },
-              { 'customerInfo.email': paymentDetail.buyer?.email }
-            ]
-          }).lean();
+          existingOrder = await Order.findById(orderId);
+          if (!existingOrder && paymentDetail.buyer?.email) {
+            const ordersByEmail = await Order.find({
+              'customerInfo.email': paymentDetail.buyer.email
+            }).lean();
+            if (ordersByEmail.length > 0) {
+              existingOrder = ordersByEmail[0];
+            }
+          }
         } else {
           // OrderId yoksa email ile kontrol et
           if (paymentDetail.buyer?.email) {
-            existingOrder = await Order.findOne({
+            const emailOrders = await Order.find({
               'customerInfo.email': paymentDetail.buyer.email,
               price: parseFloat(paymentDetail.paidPrice || paymentDetail.price || 0),
               createdAt: {
-                $gte: new Date(paymentDetail.createdDate).getTime() - 24 * 60 * 60 * 1000, // 24 saat öncesi
-                $lte: new Date(paymentDetail.createdDate).getTime() + 24 * 60 * 60 * 1000  // 24 saat sonrası
+                $gte: new Date(new Date(paymentDetail.createdDate).getTime() - 24 * 60 * 60 * 1000),
+                $lte: new Date(new Date(paymentDetail.createdDate).getTime() + 24 * 60 * 60 * 1000)
               }
             }).lean();
+            if (emailOrders.length > 0) {
+              existingOrder = emailOrders[0];
+            }
           }
         }
 
@@ -1134,6 +1261,7 @@ router.post('/orders/sync-batch-from-iyzico', requireAdminRole, async (req, res)
               mimetype: 'image/jpeg',
               size: 0
             },
+            photos: [],
             size: '10x15', // Varsayılan (Iyzico'da detay yok)
             customSize: undefined,
             quantity: 15, // Varsayılan
@@ -1156,10 +1284,10 @@ router.post('/orders/sync-batch-from-iyzico', requireAdminRole, async (req, res)
             updatedAt: new Date()
           };
 
-          const savedOrder = await OrderModel.create(orderData);
+          const savedOrder = await Order.create(orderData);
           syncedOrders.push({
             paymentId: paymentDetail.paymentId,
-            orderId: savedOrder._id || savedOrder.id,
+            orderId: savedOrder._id.toString(),
             email: orderData.customerInfo.email,
             price: orderData.price,
             createdAt: orderData.createdAt
@@ -1168,12 +1296,13 @@ router.post('/orders/sync-batch-from-iyzico', requireAdminRole, async (req, res)
           console.log(`✅ Sipariş eklendi: ${savedOrder._id} (Payment: ${paymentDetail.paymentId}, Email: ${orderData.customerInfo.email})`);
         } else {
           // Sipariş varsa güncelle
-          const updatedOrder = await Order.findByIdAndUpdate(
+          const existingNotes = existingOrder.notes || '';
+          await Order.findByIdAndUpdate(
             existingOrder._id,
             {
               paymentStatus: 'paid',
               status: 'Ödeme Alındı',
-              notes: existingOrder.notes ? `${existingOrder.notes}\nIyzico toplu senkronizasyon: ${new Date().toISOString()}` : `Iyzico toplu senkronizasyon: ${new Date().toISOString()}`,
+              notes: existingNotes ? `${existingNotes}\nIyzico toplu senkronizasyon: ${new Date().toISOString()}` : `Iyzico toplu senkronizasyon: ${new Date().toISOString()}`,
               updatedAt: new Date()
             },
             { new: true }
@@ -1182,7 +1311,7 @@ router.post('/orders/sync-batch-from-iyzico', requireAdminRole, async (req, res)
           console.log(`🔄 Sipariş güncellendi: ${existingOrder._id}`);
           syncedOrders.push({
             paymentId: paymentDetail.paymentId,
-            orderId: existingOrder._id,
+            orderId: existingOrder._id.toString(),
             email: paymentDetail.buyer?.email,
             price: paymentDetail.paidPrice,
             action: 'updated'
@@ -1226,11 +1355,10 @@ router.post('/orders/sync-batch-from-iyzico', requireAdminRole, async (req, res)
 router.delete('/orders/:id', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
+    const Order = mongoose.model('Order');
+    const deleted = await Order.findByIdAndDelete(req.params.id);
     
-    const Order = mongoose.models.Order || mongoose.model('Order');
-    const order = await Order.findByIdAndDelete(req.params.id);
-    
-    if (!order) {
+    if (!deleted) {
       return res.status(404).json({
         success: false,
         error: 'Sipariş bulunamadı'

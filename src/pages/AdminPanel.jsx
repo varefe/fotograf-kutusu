@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Icon from '../components/Icon'
+import StarRating from '../components/StarRating'
+import GalleryForm from '../components/GalleryForm'
+import AnnouncementForm from '../components/AnnouncementForm'
 import { useAuth } from '../context/AuthContext'
 import { API_URL } from '../config/api'
 
@@ -12,13 +15,25 @@ function AdminPanel() {
   const [activeTab, setActiveTab] = useState('orders')
   const [orders, setOrders] = useState([])
   const [users, setUsers] = useState([])
+  const [reviews, setReviews] = useState([])
+  const [galleries, setGalleries] = useState([])
+  const [announcements, setAnnouncements] = useState([])
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [selectedUser, setSelectedUser] = useState(null)
+  const [selectedReview, setSelectedReview] = useState(null)
+  const [selectedGallery, setSelectedGallery] = useState(null)
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null)
+  const [showGalleryForm, setShowGalleryForm] = useState(false)
+  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [reviewFilter, setReviewFilter] = useState('all')
+  const [galleryFilter, setGalleryFilter] = useState('all')
+  const [announcementTypeFilter, setAnnouncementTypeFilter] = useState('all')
+  const [announcementStatusFilter, setAnnouncementStatusFilter] = useState('all')
   
   // Order Tracking state
   const [trackingPaymentIds, setTrackingPaymentIds] = useState('')
@@ -32,6 +47,21 @@ function AdminPanel() {
   
   // Silme işlemleri için state
   const [deleteConfirm, setDeleteConfirm] = useState(null) // { type: 'order' | 'user', id: string, name: string }
+  
+  // Rol güncelleme (Admin yap / Admin kaldır)
+  const [roleUpdateLoading, setRoleUpdateLoading] = useState(null) // userId veya null
+  
+  // Veritabanı temizleme
+  const [clearDatabaseLoading, setClearDatabaseLoading] = useState(false)
+  const [clearDatabaseConfirm, setClearDatabaseConfirm] = useState(false)
+  
+  // Sipariş durumu güncelleme için state
+  const [statusUpdateForm, setStatusUpdateForm] = useState({
+    status: '',
+    trackingNumber: '',
+    shippingCompany: ''
+  })
+  const [statusUpdateLoading, setStatusUpdateLoading] = useState(false)
 
   useEffect(() => {
     // Admin kontrolü
@@ -122,6 +152,36 @@ function AdminPanel() {
           console.error('❌ Stats hatası:', response.status, data.message || data.error)
           throw new Error(data.message || data.error || 'İstatistikler yüklenemedi')
         }
+      } else if (activeTab === 'reviews') {
+        const response = await fetch(`${apiUrl}/reviews/admin/all`, { headers })
+        const data = await response.json()
+        
+        if (response.ok && data.success) {
+          setReviews(data.reviews || [])
+        } else {
+          throw new Error(data.message || 'Yorumlar yüklenemedi')
+        }
+      } else if (activeTab === 'gallery') {
+        const filter = galleryFilter !== 'all' ? `?category=${galleryFilter}` : ''
+        const response = await fetch(`${apiUrl}/gallery/admin/all${filter}`, { headers })
+        const data = await response.json()
+        
+        if (response.ok && data.success) {
+          setGalleries(data.galleries || [])
+        } else {
+          throw new Error(data.message || 'Galeri yüklenemedi')
+        }
+      } else if (activeTab === 'announcements') {
+        const typeFilter = announcementTypeFilter !== 'all' ? `?type=${announcementTypeFilter}` : ''
+        const statusFilter = announcementStatusFilter !== 'all' ? `${typeFilter ? '&' : '?'}isActive=${announcementStatusFilter === 'active'}` : ''
+        const response = await fetch(`${apiUrl}/announcements/admin/all${typeFilter}${statusFilter}`, { headers })
+        const data = await response.json()
+        
+        if (response.ok && data.success) {
+          setAnnouncements(data.announcements || [])
+        } else {
+          throw new Error(data.message || 'Popup\'lar yüklenemedi')
+        }
       }
     } catch (err) {
       console.error('❌ Veri yükleme hatası:', err.message)
@@ -196,6 +256,67 @@ function AdminPanel() {
                     console.error('❌ Silme hatası:', err.message)
       setError('Silme işlemi sırasında bir hata oluştu')
       setDeleteConfirm(null)
+    }
+  }
+
+  // Kullanıcı rolü güncelle (Admin yap / Admin kaldır)
+  const handleRoleUpdate = async (userId, newRole) => {
+    try {
+      setRoleUpdateLoading(userId)
+      const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+      const headers = getAuthHeaders()
+      const response = await fetch(`${apiUrl}/admin/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        setUsers(prev => prev.map(u => (u._id === userId || u.id === userId) ? { ...u, role: newRole } : u))
+        setError(null)
+      } else {
+        setError(data.message || data.error || 'Rol güncellenemedi')
+      }
+    } catch (err) {
+      console.error('❌ Rol güncelleme hatası:', err.message)
+      setError('Rol güncellenirken bir hata oluştu')
+    } finally {
+      setRoleUpdateLoading(null)
+    }
+  }
+
+  // Veritabanını temizle
+  const handleClearDatabase = async () => {
+    if (!clearDatabaseConfirm) {
+      setClearDatabaseConfirm(true)
+      return
+    }
+    
+    try {
+      setClearDatabaseLoading(true)
+      setError(null)
+      const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+      const headers = getAuthHeaders()
+      const response = await fetch(`${apiUrl}/admin/database/clear`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'TEMIZLE' })
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        alert(`✅ Veritabanı temizlendi!\n\nSilinen:\n- ${data.deleted.orders} sipariş\n- ${data.deleted.users} kullanıcı\n- ${data.deleted.galleries} galeri\n- ${data.deleted.categories} kategori\n- ${data.deleted.reviews} yorum\n- ${data.deleted.announcements} duyuru`)
+        setClearDatabaseConfirm(false)
+        await fetchData()
+      } else {
+        setError(data.message || data.error || 'Veritabanı temizlenemedi')
+        setClearDatabaseConfirm(false)
+      }
+    } catch (err) {
+      console.error('❌ Veritabanı temizleme hatası:', err.message)
+      setError('Veritabanı temizlenirken bir hata oluştu')
+      setClearDatabaseConfirm(false)
+    } finally {
+      setClearDatabaseLoading(false)
     }
   }
 
@@ -360,6 +481,54 @@ function AdminPanel() {
             }}
           >
             Sipariş Takibi
+          </button>
+          <button
+            onClick={() => setActiveTab('reviews')}
+            style={{
+              padding: '1rem 2rem',
+              background: activeTab === 'reviews' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'reviews' ? '#000000' : '#666',
+              border: 'none',
+              borderBottom: activeTab === 'reviews' ? '3px solid #000000' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Icon name="check-circle" size={16} /> Yorumlar ({reviews.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('gallery')}
+            style={{
+              padding: '1rem 2rem',
+              background: activeTab === 'gallery' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'gallery' ? '#000000' : '#666',
+              border: 'none',
+              borderBottom: activeTab === 'gallery' ? '3px solid #000000' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Icon name="image" size={16} /> Ürünler ({galleries.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('announcements')}
+            style={{
+              padding: '1rem 2rem',
+              background: activeTab === 'announcements' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'announcements' ? '#000000' : '#666',
+              border: 'none',
+              borderBottom: activeTab === 'announcements' ? '3px solid #000000' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Icon name="megaphone" size={16} /> Popup'lar ({announcements.length})
           </button>
         </div>
 
@@ -825,7 +994,42 @@ function AdminPanel() {
                             )}
                           </span>
                         </td>
-                        <td style={{ padding: '1rem' }}>
+                        <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {userItem.role === 'admin' ? (
+                            <button
+                              onClick={() => handleRoleUpdate(userItem._id || userItem.id, 'user')}
+                              disabled={roleUpdateLoading === (userItem._id || userItem.id)}
+                              style={{
+                                padding: '0.5rem 0.75rem',
+                                background: roleUpdateLoading === (userItem._id || userItem.id) ? '#ccc' : '#6c757d',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: roleUpdateLoading ? 'not-allowed' : 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              {roleUpdateLoading === (userItem._id || userItem.id) ? '...' : <><Icon name="user" size={14} /> Admin kaldır</>}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleRoleUpdate(userItem._id || userItem.id, 'admin')}
+                              disabled={roleUpdateLoading === (userItem._id || userItem.id)}
+                              style={{
+                                padding: '0.5rem 0.75rem',
+                                background: roleUpdateLoading === (userItem._id || userItem.id) ? '#ccc' : '#10b981',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: roleUpdateLoading ? 'not-allowed' : 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              {roleUpdateLoading === (userItem._id || userItem.id) ? '...' : <><Icon name="shield" size={14} /> Admin yap</>}
+                            </button>
+                          )}
                           {userItem.role !== 'admin' && (
                             <button
                               onClick={() => setDeleteConfirm({
@@ -1194,6 +1398,416 @@ function AdminPanel() {
         )}
 
         {/* Stats Tab - Admin.jsx'teki gibi aynı içerik */}
+        {/* Reviews Tab */}
+        {activeTab === 'reviews' && (
+          <>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap'
+            }}>
+              <select
+                value={reviewFilter}
+                onChange={(e) => {
+                  setReviewFilter(e.target.value)
+                  fetchData()
+                }}
+                style={{
+                  padding: '0.75rem',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '1rem'
+                }}
+              >
+                <option value="all">Tümü</option>
+                <option value="pending">Onay Bekleyenler</option>
+                <option value="approved">Onaylananlar</option>
+                <option value="rejected">Reddedilenler</option>
+              </select>
+            </div>
+
+            {reviews.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <p>Yorum bulunmamaktadır.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {reviews.map((review) => (
+                  <div
+                    key={review._id}
+                    style={{
+                      background: 'white',
+                      borderRadius: '12px',
+                      padding: '1.5rem',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      border: review.isApproved ? '2px solid #10b981' : '2px solid #f59e0b'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div>
+                        <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+                          {review.userName}
+                        </div>
+                        <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>
+                          {review.userEmail}
+                        </div>
+                        <div style={{ fontSize: '1.5rem', color: '#fbbf24' }}>
+                          {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{
+                          padding: '0.5rem 1rem',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: 'bold',
+                          background: review.isApproved ? '#d1fae5' : '#fef3c7',
+                          color: review.isApproved ? '#065f46' : '#92400e',
+                          marginBottom: '0.5rem',
+                          display: 'inline-block'
+                        }}>
+                          {review.isApproved ? 'Onaylandı' : 'Onay Bekliyor'}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                          {new Date(review.createdAt).toLocaleDateString('tr-TR')}
+                        </div>
+                      </div>
+                    </div>
+                    <p style={{ color: '#333', lineHeight: '1.8', marginBottom: '1rem' }}>
+                      {review.comment}
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {!review.isApproved && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                              const headers = getAuthHeaders()
+                              const response = await fetch(`${apiUrl}/reviews/admin/${review._id}/approve`, {
+                                method: 'PATCH',
+                                headers: {
+                                  ...headers,
+                                  'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ isApproved: true, isVisible: true })
+                              })
+                              const data = await response.json()
+                              if (data.success) {
+                                alert('Yorum onaylandı')
+                                fetchData()
+                              }
+                            } catch (error) {
+                              console.error('Yorum onaylama hatası:', error)
+                            }
+                          }}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Onayla
+                        </button>
+                      )}
+                      {review.isApproved && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                              const headers = getAuthHeaders()
+                              const response = await fetch(`${apiUrl}/reviews/admin/${review._id}/approve`, {
+                                method: 'PATCH',
+                                headers: {
+                                  ...headers,
+                                  'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ isApproved: false, isVisible: false })
+                              })
+                              const data = await response.json()
+                              if (data.success) {
+                                alert('Yorum reddedildi')
+                                fetchData()
+                              }
+                            } catch (error) {
+                              console.error('Yorum reddetme hatası:', error)
+                            }
+                          }}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Reddet
+                        </button>
+                      )}
+                      <button
+                        onClick={async () => {
+                          if (confirm('Bu yorumu silmek istediğinizden emin misiniz?')) {
+                            try {
+                              const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                              const headers = getAuthHeaders()
+                              const response = await fetch(`${apiUrl}/reviews/admin/${review._id}`, {
+                                method: 'DELETE',
+                                headers
+                              })
+                              const data = await response.json()
+                              if (data.success) {
+                                alert('Yorum silindi')
+                                fetchData()
+                              }
+                            } catch (error) {
+                              console.error('Yorum silme hatası:', error)
+                            }
+                          }
+                        }}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        Sil
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Gallery Tab */}
+        {activeTab === 'gallery' && (
+          <>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <select
+                value={galleryFilter}
+                onChange={(e) => {
+                  setGalleryFilter(e.target.value)
+                  fetchData()
+                }}
+                style={{
+                  padding: '0.75rem',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '1rem'
+                }}
+              >
+                <option value="all">Tüm Kategoriler</option>
+                <option value="10x15">10x15 cm</option>
+                <option value="15x20">15x20 cm</option>
+                <option value="20x30">20x30 cm</option>
+                <option value="30x40">30x40 cm</option>
+                <option value="30x45">30x45 cm</option>
+                <option value="40x50">40x50 cm</option>
+                <option value="50x70">50x70 cm</option>
+                <option value="70x100">70x100 cm</option>
+                <option value="custom">Özel Boyut</option>
+              </select>
+              <button
+                onClick={() => {
+                  setSelectedGallery(null)
+                  setShowGalleryForm(true)
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="plus" size={16} style={{ marginRight: '0.5rem' }} />
+                Yeni Ürün Ekle
+              </button>
+            </div>
+
+            {/* Galeri Form Modal */}
+            {showGalleryForm && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10000,
+                padding: '2rem'
+              }}
+              onClick={() => {
+                setShowGalleryForm(false)
+                setSelectedGallery(null)
+              }}
+              >
+                <div
+                  style={{
+                    background: 'white',
+                    borderRadius: '12px',
+                    padding: '2rem',
+                    maxWidth: '600px',
+                    width: '100%',
+                    maxHeight: '90vh',
+                    overflowY: 'auto'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h2 style={{ marginTop: 0 }}>
+                    {selectedGallery ? 'Ürünü Düzenle' : 'Yeni Ürün Ekle'}
+                  </h2>
+                  <GalleryForm
+                    gallery={selectedGallery}
+                    onSuccess={() => {
+                      setShowGalleryForm(false)
+                      setSelectedGallery(null)
+                      fetchData()
+                    }}
+                    onCancel={() => {
+                      setShowGalleryForm(false)
+                      setSelectedGallery(null)
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {galleries.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <p>Henüz ürün yok.</p>
+                <p style={{ color: '#666', marginTop: '0.5rem' }}>Yukarıdaki &quot;Yeni Ürün Ekle&quot; butonu ile ürün ekleyebilirsiniz.</p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {galleries.map((gallery) => (
+                  <div
+                    key={gallery._id}
+                    style={{
+                      background: 'white',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      border: gallery.isVisible ? '2px solid #10b981' : '2px solid #f59e0b'
+                    }}
+                  >
+                    <div style={{
+                      width: '100%',
+                      height: '200px',
+                      overflow: 'hidden',
+                      background: '#f3f4f6'
+                    }}>
+                      {gallery.image?.base64 && (
+                        <img
+                          src={`data:${gallery.image.mimetype || 'image/jpeg'};base64,${gallery.image.base64}`}
+                          alt={gallery.title}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div style={{ padding: '1rem' }}>
+                      <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>
+                        {gallery.title}
+                      </h3>
+                      <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>
+                        <div>Kategori: {gallery.category}</div>
+                        <div>Boyut: {gallery.size}</div>
+                        <div>Görünür: {gallery.isVisible ? 'Evet' : 'Hayır'}</div>
+                        <div>Öne Çıkan: {gallery.isFeatured ? 'Evet' : 'Hayır'}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => {
+                            setSelectedGallery(gallery)
+                            setShowGalleryForm(true)
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '0.5rem',
+                            background: '#667eea',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem'
+                          }}
+                        >
+                          Düzenle
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm('Bu galeri öğesini silmek istediğinizden emin misiniz?')) {
+                              try {
+                                const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                                const headers = getAuthHeaders()
+                                const response = await fetch(`${apiUrl}/gallery/admin/${gallery._id}`, {
+                                  method: 'DELETE',
+                                  headers
+                                })
+                                const data = await response.json()
+                                if (data.success) {
+                                  alert('Galeri öğesi silindi')
+                                  fetchData()
+                                }
+                              } catch (error) {
+                                console.error('Galeri silme hatası:', error)
+                              }
+                            }
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '0.5rem',
+                            background: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem'
+                          }}
+                        >
+                          Sil
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
         {activeTab === 'stats' && stats && (
           <div style={{
             display: 'grid',
@@ -1308,6 +1922,81 @@ function AdminPanel() {
           </div>
         )}
 
+        {/* Veritabanı Temizleme - İstatistikler sekmesinde */}
+        {activeTab === 'stats' && (
+          <div style={{
+            background: '#fff3cd',
+            border: '2px solid #ffc107',
+            borderRadius: '12px',
+            padding: '2rem',
+            marginTop: '2rem'
+          }}>
+            <h3 style={{ marginTop: 0, color: '#856404', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Icon name="alert-triangle" size={20} /> Veritabanı Yönetimi
+            </h3>
+            <p style={{ color: '#856404', marginBottom: '1rem' }}>
+              ⚠️ <strong>DİKKAT:</strong> Bu işlem tüm verileri siler (siparişler, kullanıcılar, galeri, kategoriler, yorumlar, duyurular). Bu işlem geri alınamaz!
+            </p>
+            {clearDatabaseConfirm ? (
+              <div>
+                <p style={{ color: '#dc3545', fontWeight: 'bold', marginBottom: '1rem' }}>
+                  Son onay: Veritabanını temizlemek istediğinizden emin misiniz?
+                </p>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button
+                    onClick={handleClearDatabase}
+                    disabled={clearDatabaseLoading}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: clearDatabaseLoading ? '#ccc' : '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: clearDatabaseLoading ? 'not-allowed' : 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {clearDatabaseLoading ? 'Temizleniyor...' : '✅ Evet, Temizle'}
+                  </button>
+                  <button
+                    onClick={() => setClearDatabaseConfirm(false)}
+                    disabled={clearDatabaseLoading}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: clearDatabaseLoading ? 'not-allowed' : 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    İptal
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setClearDatabaseConfirm(true)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <Icon name="trash" size={16} /> Veritabanını Temizle
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Order Detail Modal - Admin.jsx'teki gibi */}
         {selectedOrder && (
           <div 
@@ -1382,6 +2071,13 @@ function AdminPanel() {
                       selectedOrder.shippingType === 'standard' ? 'Standart' :
                       selectedOrder.shippingType === 'express' ? 'Express' : '-'
                     }</div>
+                    <div><strong>Durum:</strong> {selectedOrder.status || 'Bekliyor'}</div>
+                    {selectedOrder.trackingNumber && (
+                      <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem', padding: '0.75rem', background: '#f0f9ff', borderRadius: '6px' }}>
+                        <strong>Kargo Takip:</strong> {selectedOrder.trackingNumber}
+                        {selectedOrder.shippingCompany && ` (${selectedOrder.shippingCompany})`}
+                      </div>
+                    )}
                   </div>
                   <div style={{ marginTop: '1rem', padding: '1rem', background: '#e8f5e9', borderRadius: '6px' }}>
                     <strong style={{ fontSize: '1.2rem' }}>Toplam: {formatPrice(selectedOrder.price || 0)}</strong>
@@ -1534,9 +2230,169 @@ function AdminPanel() {
                   </div>
                 )}
 
+                {/* Sipariş Durumu Güncelleme Formu */}
+                <div style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px', border: '2px solid #667eea' }}>
+                  <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Icon name="refresh-cw" size={18} /> Sipariş Durumu Güncelle
+                  </h3>
+                  
+                  <form onSubmit={async (e) => {
+                    e.preventDefault()
+                    setStatusUpdateLoading(true)
+                    try {
+                      const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                      const headers = getAuthHeaders()
+                      
+                      // Form değerlerini kullan, yoksa mevcut değerleri kullan
+                      const updateData = {
+                        status: statusUpdateForm.status || selectedOrder.status || 'Bekliyor'
+                      }
+                      
+                      // Kargo takip numarası varsa ekle
+                      if (statusUpdateForm.trackingNumber) {
+                        updateData.trackingNumber = statusUpdateForm.trackingNumber
+                      } else if (selectedOrder.trackingNumber) {
+                        updateData.trackingNumber = selectedOrder.trackingNumber
+                      }
+                      
+                      // Kargo firması varsa ekle
+                      if (statusUpdateForm.shippingCompany) {
+                        updateData.shippingCompany = statusUpdateForm.shippingCompany
+                      } else if (selectedOrder.shippingCompany) {
+                        updateData.shippingCompany = selectedOrder.shippingCompany
+                      }
+                      
+                      const response = await fetch(`${apiUrl}/orders/${selectedOrder._id || selectedOrder.id}/status`, {
+                        method: 'PATCH',
+                        headers: {
+                          ...headers,
+                          'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(updateData)
+                      })
+
+                      const data = await response.json()
+
+                      if (response.ok && data.success) {
+                        alert('Sipariş durumu başarıyla güncellendi!')
+                        setSelectedOrder(null)
+                        fetchData()
+                      } else {
+                        alert(data.message || 'Sipariş durumu güncellenemedi')
+                      }
+                    } catch (error) {
+                      console.error('Sipariş durumu güncelleme hatası:', error)
+                      alert('Sipariş durumu güncellenirken bir hata oluştu')
+                    } finally {
+                      setStatusUpdateLoading(false)
+                    }
+                  }}>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                        Sipariş Durumu
+                      </label>
+                      <select
+                        value={statusUpdateForm.status || selectedOrder.status || 'Bekliyor'}
+                        onChange={(e) => setStatusUpdateForm({ ...statusUpdateForm, status: e.target.value })}
+                        onFocus={() => {
+                          if (!statusUpdateForm.status) {
+                            setStatusUpdateForm({
+                              ...statusUpdateForm,
+                              status: selectedOrder.status || 'Bekliyor',
+                              trackingNumber: selectedOrder.trackingNumber || '',
+                              shippingCompany: selectedOrder.shippingCompany || ''
+                            })
+                          }
+                        }}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '8px',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        <option value="Bekliyor">Bekliyor</option>
+                        <option value="Alındı">Alındı</option>
+                        <option value="Basıldı">Basıldı</option>
+                        <option value="Kargoya Verildi">Kargoya Verildi</option>
+                        <option value="Teslim Edildi">Teslim Edildi</option>
+                      </select>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                        Kargo Takip Numarası (Opsiyonel)
+                      </label>
+                      <input
+                        type="text"
+                        value={statusUpdateForm.trackingNumber || selectedOrder.trackingNumber || ''}
+                        onChange={(e) => setStatusUpdateForm({ ...statusUpdateForm, trackingNumber: e.target.value })}
+                        placeholder="Örn: TR1234567890"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '8px',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                        Kargo Firması (Opsiyonel)
+                      </label>
+                      <select
+                        value={statusUpdateForm.shippingCompany || selectedOrder.shippingCompany || ''}
+                        onChange={(e) => setStatusUpdateForm({ ...statusUpdateForm, shippingCompany: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '8px',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        <option value="">Seçiniz</option>
+                        <option value="Yurtiçi Kargo">Yurtiçi Kargo</option>
+                        <option value="Aras Kargo">Aras Kargo</option>
+                        <option value="MNG Kargo">MNG Kargo</option>
+                        <option value="PTT Kargo">PTT Kargo</option>
+                        <option value="Sürat Kargo">Sürat Kargo</option>
+                        <option value="UPS Kargo">UPS Kargo</option>
+                        <option value="DHL">DHL</option>
+                        <option value="Diğer">Diğer</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={statusUpdateLoading}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        background: statusUpdateLoading ? '#ccc' : '#667eea',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontWeight: 'bold',
+                        cursor: statusUpdateLoading ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {statusUpdateLoading ? 'Güncelleniyor...' : 'Durumu Güncelle'}
+                    </button>
+                  </form>
+                </div>
+
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                   <button
-                    onClick={() => setSelectedOrder(null)}
+                    onClick={() => {
+                      setSelectedOrder(null)
+                      setStatusUpdateForm({ status: '', trackingNumber: '', shippingCompany: '' })
+                    }}
                     style={{
                       padding: '0.75rem 2rem',
                       background: '#95a5a6',
@@ -1553,6 +2409,346 @@ function AdminPanel() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Announcements Tab */}
+        {activeTab === 'announcements' && (
+          <>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <select
+                  value={announcementTypeFilter}
+                  onChange={(e) => {
+                    setAnnouncementTypeFilter(e.target.value)
+                    fetchData()
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '0.95rem'
+                  }}
+                >
+                  <option value="all">Tüm Tipler</option>
+                  <option value="campaign">Kampanya</option>
+                  <option value="new_product">Yeni Ürün</option>
+                  <option value="special_offer">Özel Teklif</option>
+                  <option value="info">Bilgi</option>
+                </select>
+                <select
+                  value={announcementStatusFilter}
+                  onChange={(e) => {
+                    setAnnouncementStatusFilter(e.target.value)
+                    fetchData()
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '0.95rem'
+                  }}
+                >
+                  <option value="all">Tüm Durumlar</option>
+                  <option value="active">Aktif</option>
+                  <option value="inactive">Pasif</option>
+                </select>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedAnnouncement(null)
+                  setShowAnnouncementForm(true)
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <Icon name="plus" size={16} />
+                Yeni Popup Ekle
+              </button>
+            </div>
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <p>Yükleniyor...</p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {announcements.map(announcement => {
+                    const style = {
+                      campaign: { bg: '#667eea', icon: 'megaphone' },
+                      new_product: { bg: '#10b981', icon: 'plus' },
+                      special_offer: { bg: '#f59e0b', icon: 'alert-circle' },
+                      info: { bg: '#3b82f6', icon: 'info' }
+                    }[announcement.type] || { bg: '#667eea', icon: 'info' }
+
+                    return (
+                      <div
+                        key={announcement._id || announcement.id}
+                        style={{
+                          background: 'white',
+                          borderRadius: '12px',
+                          padding: '1.5rem',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          border: `2px solid ${announcement.isActive ? style.bg : '#d1d5db'}`,
+                          opacity: announcement.isActive ? 1 : 0.7
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          marginBottom: '1rem'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              marginBottom: '0.5rem'
+                            }}>
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: style.bg,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white'
+                              }}>
+                                <Icon name={style.icon} size={16} />
+                              </div>
+                              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#1f2937' }}>
+                                {announcement.title}
+                              </h3>
+                            </div>
+                            <p style={{
+                              margin: '0.5rem 0',
+                              fontSize: '0.9rem',
+                              color: '#6b7280',
+                              lineHeight: '1.5'
+                            }}>
+                              {announcement.message}
+                            </p>
+                            <div style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: '0.5rem',
+                              marginTop: '1rem',
+                              fontSize: '0.85rem',
+                              color: '#9ca3af'
+                            }}>
+                              <span>Tip: {announcement.type}</span>
+                              <span>•</span>
+                              <span>Görüntülenme: {announcement.viewCount || 0}</span>
+                              <span>•</span>
+                              <span>Tıklama: {announcement.clickCount || 0}</span>
+                            </div>
+                            {announcement.startDate && (
+                              <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#9ca3af' }}>
+                                {new Date(announcement.startDate).toLocaleDateString('tr-TR')}
+                                {announcement.endDate && ` - ${new Date(announcement.endDate).toLocaleDateString('tr-TR')}`}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          marginTop: '1rem'
+                        }}>
+                          <button
+                            onClick={() => {
+                              setSelectedAnnouncement(announcement)
+                              setShowAnnouncementForm(true)
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '0.5rem 1rem',
+                              background: '#f3f4f6',
+                              color: '#374151',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '0.9rem',
+                              fontWeight: '600',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Icon name="edit" size={14} /> Düzenle
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (confirm('Bu popup\'ı silmek istediğinizden emin misiniz?')) {
+                                try {
+                                  const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                                  const headers = getAuthHeaders()
+                                  const response = await fetch(`${apiUrl}/announcements/admin/${announcement._id || announcement.id}`, {
+                                    method: 'DELETE',
+                                    headers
+                                  })
+                                  const data = await response.json()
+                                  if (data.success) {
+                                    await fetchData()
+                                  } else {
+                                    setError(data.message || 'Silme başarısız')
+                                  }
+                                } catch (error) {
+                                  setError('Silme hatası: ' + error.message)
+                                }
+                              }
+                            }}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: '#ef4444',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '0.9rem',
+                              fontWeight: '600',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Icon name="trash" size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+
+            {/* Announcement Form Modal */}
+            {showAnnouncementForm && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10000,
+                padding: '1rem',
+                overflow: 'auto'
+              }}
+              onClick={() => {
+                setShowAnnouncementForm(false)
+                setSelectedAnnouncement(null)
+              }}
+              >
+                <div
+                  style={{
+                    background: 'white',
+                    borderRadius: '16px',
+                    padding: '2rem',
+                    maxWidth: '800px',
+                    width: '100%',
+                    maxHeight: '90vh',
+                    overflow: 'auto',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <h2 style={{ margin: 0 }}>
+                      {selectedAnnouncement ? 'Popup Düzenle' : 'Yeni Popup Oluştur'}
+                    </h2>
+                    <button
+                      onClick={() => {
+                        setShowAnnouncementForm(false)
+                        setSelectedAnnouncement(null)
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.5rem',
+                        borderRadius: '8px'
+                      }}
+                    >
+                      <Icon name="close" size={24} />
+                    </button>
+                  </div>
+
+                  <AnnouncementForm
+                    announcement={selectedAnnouncement}
+                    onSave={async (formData) => {
+                      try {
+                        const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                        const headers = getAuthHeaders()
+                        
+                        let response
+                        if (selectedAnnouncement) {
+                          // Update
+                          response = await fetch(`${apiUrl}/announcements/admin/${selectedAnnouncement._id || selectedAnnouncement.id}`, {
+                            method: 'PUT',
+                            headers: {
+                              ...headers,
+                              'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(formData)
+                          })
+                        } else {
+                          // Create
+                          response = await fetch(`${apiUrl}/announcements/admin`, {
+                            method: 'POST',
+                            headers: {
+                              ...headers,
+                              'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(formData)
+                          })
+                        }
+
+                        const data = await response.json()
+                        if (data.success) {
+                          setShowAnnouncementForm(false)
+                          setSelectedAnnouncement(null)
+                          await fetchData()
+                        } else {
+                          setError(data.message || 'Kayıt başarısız')
+                        }
+                      } catch (error) {
+                        setError('Kayıt hatası: ' + error.message)
+                      }
+                    }}
+                    onCancel={() => {
+                      setShowAnnouncementForm(false)
+                      setSelectedAnnouncement(null)
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Silme Onay Dialogu */}

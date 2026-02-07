@@ -15,7 +15,10 @@ function Navbar() {
         <div className="container">
           <div className="navbar-top-links">
             <Link to="/about">Hakkımızda</Link>
+            <Link to="/gallery">Galeri</Link>
             <Link to="/contact">İletişim</Link>
+            <Link to="/reviews">Yorumlar</Link>
+            <Link to="/faq">SSS</Link>
             <Link to="/delivery-returns">Teslimat ve İade</Link>
           </div>
           <div style={{ fontSize: '0.875rem' }}>

@@ -20,6 +20,7 @@ export const AuthProvider = ({ children }) => {
   // Token ve kullanıcı bilgilerini yükle (tarayıcıya özel)
   useEffect(() => {
     const browserId = getBrowserId()
+    console.log('🔍 Browser ID:', browserId)
     
     // Önce localStorage'dan kontrol et (Beni Hatırla seçiliyse)
     const rememberedToken = localStorage.getItem(`authToken_${browserId}`)
@@ -28,6 +29,13 @@ export const AuthProvider = ({ children }) => {
     // Sonra sessionStorage'dan kontrol et (Beni Hatırla seçili değilse)
     const sessionToken = sessionStorage.getItem(`authToken_${browserId}`)
     const sessionUser = sessionStorage.getItem(`user_${browserId}`)
+    
+    console.log('💾 Token kontrolü:', {
+      hasRememberedToken: !!rememberedToken,
+      hasSessionToken: !!sessionToken,
+      hasRememberedUser: !!rememberedUser,
+      hasSessionUser: !!sessionUser
+    })
     
     // Öncelik: localStorage (Beni Hatırla), sonra sessionStorage
     const savedToken = rememberedToken || sessionToken
@@ -51,10 +59,16 @@ export const AuthProvider = ({ children }) => {
           return
         }
         
+        // Token ve kullanıcıyı set et (doğrulama öncesi)
         setToken(savedToken)
         setUser(userData)
-        // Token'ı doğrula
-        verifyToken(savedToken)
+        
+        // Token'ı doğrula (asenkron - await etmeden devam et)
+        verifyToken(savedToken).catch((error) => {
+          console.error('Token doğrulama hatası:', error)
+          // Token geçersizse temizle
+          logout()
+        })
       } catch (error) {
         console.error('Token yükleme hatası:', error)
         logout()
@@ -140,17 +154,35 @@ export const AuthProvider = ({ children }) => {
         
         // "Beni Hatırla" seçiliyse localStorage, değilse sessionStorage kullan
         if (rememberMe) {
+          console.log('✅ Beni Hatırla seçili - localStorage\'a kaydediliyor')
           localStorage.setItem(`authToken_${browserId}`, data.token)
           localStorage.setItem(`user_${browserId}`, JSON.stringify(userData))
           // sessionStorage'daki eski verileri temizle
           sessionStorage.removeItem(`authToken_${browserId}`)
           sessionStorage.removeItem(`user_${browserId}`)
         } else {
+          console.log('📝 Beni Hatırla seçili değil - sessionStorage\'a kaydediliyor')
           sessionStorage.setItem(`authToken_${browserId}`, data.token)
           sessionStorage.setItem(`user_${browserId}`, JSON.stringify(userData))
           // localStorage'daki eski verileri temizle
           localStorage.removeItem(`authToken_${browserId}`)
           localStorage.removeItem(`user_${browserId}`)
+        }
+        
+        // Push notification'ı başlat (kullanıcı tercihlerine göre)
+        if (userData.notificationPreferences?.push?.enabled) {
+          try {
+            const { initializePushNotifications } = await import('../utils/pushNotification.js')
+            const getAuthHeaders = () => ({
+              'Authorization': `Bearer ${data.token}`,
+              'Content-Type': 'application/json'
+            })
+            const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+            await initializePushNotifications(apiUrl, getAuthHeaders)
+          } catch (error) {
+            console.warn('Push notification başlatma hatası:', error)
+            // Hata olsa bile login devam eder
+          }
         }
         
         return { success: true, user: userData }

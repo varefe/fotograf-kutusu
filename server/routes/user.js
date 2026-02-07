@@ -1,20 +1,11 @@
 import express from 'express';
 import crypto from 'crypto';
-import { connectPostgres } from '../config/postgres.js';
-import { defineUser } from '../models/User.js';
-
-// User model'ini lazy load et
-let User = null;
-const getUser = async () => {
-  if (!User) {
-    const sequelize = await connectPostgres();
-    User = defineUser(sequelize);
-  }
-  return User;
-};
+import { connectDB } from '../config/database.js';
+import User from '../models/UserSchema.js';
 import { generateToken } from '../utils/jwt.js';
 import { requireAuth } from '../middleware/userAuth.js';
 import { validateOrderData, sanitizeInput } from '../utils/validation.js';
+import { sendWelcomeEmail, sendPasswordResetEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
@@ -23,8 +14,6 @@ const router = express.Router();
  */
 router.post('/register', async (req, res) => {
   try {
-    await connectPostgres();
-
     const { email, password, firstName, lastName, phone, address } = req.body;
 
     // Validasyon
@@ -64,9 +53,11 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    // Veritabanı bağlantısını kontrol et
+    await connectDB();
+
     // E-posta kontrolü
-    const UserModel = await getUser();
-    const existingUser = await UserModel.findOne({ where: { email: email.toLowerCase() } });
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -76,7 +67,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Yeni kullanıcı oluştur
-    const user = await UserModel.create({
+    const user = await User.create({
       email: email.toLowerCase(),
       password,
       firstName: sanitizeInput(firstName),
@@ -86,14 +77,28 @@ router.post('/register', async (req, res) => {
     });
 
     // Token oluştur
-    const token = generateToken(user.id, user.email, user.role);
+    const token = generateToken(user._id.toString(), user.email, user.role);
+
+    // Hoş geldin e-postası gönder (asenkron - hata olsa bile kayıt başarılı)
+    sendWelcomeEmail(user.email, user.firstName, user.lastName)
+      .then((emailResult) => {
+        if (emailResult.success) {
+          console.log(`✅ Hoş geldin e-postası gönderildi: ${user.email}`);
+        } else {
+          console.warn(`⚠️ Hoş geldin e-postası gönderilemedi: ${user.email}`, emailResult.error);
+        }
+      })
+      .catch((error) => {
+        console.error(`❌ E-posta gönderme hatası: ${user.email}`, error);
+        // E-posta hatası kayıt işlemini engellememeli
+      });
 
     res.status(201).json({
       success: true,
       message: 'Kayıt başarılı',
       token,
       user: {
-        id: user.id,
+        id: user._id.toString(),
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -117,18 +122,6 @@ router.post('/register', async (req, res) => {
  */
 router.post('/login', async (req, res) => {
   try {
-    // PostgreSQL bağlantısını kontrol et
-    try {
-      await connectPostgres(2);
-    } catch (dbError) {
-      console.error('❌ PostgreSQL bağlantı hatası (login):', dbError.message);
-      return res.status(503).json({
-        success: false,
-        error: 'Veritabanı bağlantı hatası',
-        message: 'Veritabanına bağlanılamıyor. Lütfen daha sonra tekrar deneyin.'
-      });
-    }
-
     const { email, password } = req.body;
 
     // Validasyon
@@ -139,6 +132,9 @@ router.post('/login', async (req, res) => {
         message: 'E-posta ve şifre gereklidir'
       });
     }
+
+    // Veritabanı bağlantısını kontrol et
+    await connectDB();
 
     // Kullanıcıyı bul
     const user = await User.findOne({ email: email.toLowerCase() });
@@ -163,14 +159,14 @@ router.post('/login', async (req, res) => {
     }
 
     // Token oluştur
-    const token = generateToken(user.id, user.email, user.role);
+    const token = generateToken(user._id.toString(), user.email, user.role);
 
     res.json({
       success: true,
       message: 'Giriş başarılı',
       token,
       user: {
-        id: user.id,
+        id: user._id.toString(),
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -194,8 +190,6 @@ router.post('/login', async (req, res) => {
  */
 router.post('/admin/login', async (req, res) => {
   try {
-    await connectPostgres();
-
     const { username, password, adminCode } = req.body;
 
     // Validasyon
@@ -221,16 +215,18 @@ router.post('/admin/login', async (req, res) => {
       });
     }
 
+    // Veritabanı bağlantısını kontrol et
+    await connectDB();
+
     // Admin kullanıcısını bul veya oluştur
     // Admin email'i environment variable'dan al veya varsayılan kullan
     const adminEmail = process.env.ADMIN_EMAIL || `${ADMIN_USERNAME}@admin.local`;
     
-    const UserModel = await getUser();
-    let adminUser = await UserModel.findOne({ where: { email: adminEmail.toLowerCase() } });
+    let adminUser = await User.findOne({ email: adminEmail.toLowerCase() });
     
     if (!adminUser) {
       // Admin kullanıcısı yoksa oluştur
-      adminUser = await UserModel.create({
+      adminUser = await User.create({
         email: adminEmail.toLowerCase(),
         password: password, // Şifre hash'lenecek (pre-save hook)
         firstName: 'Admin',
@@ -242,8 +238,8 @@ router.post('/admin/login', async (req, res) => {
       // Admin kullanıcısı varsa, şifresini kontrol et
       const isPasswordValid = await adminUser.comparePassword(password);
       if (!isPasswordValid) {
-        // Şifre yanlışsa güncelle
-        adminUser.password = password; // Pre-save hook hash'leyecek
+        // Şifre yanlışsa güncelle (pre-save hook hash'leyecek)
+        adminUser.password = password;
         await adminUser.save();
         console.log('✅ Admin şifresi güncellendi');
       }
@@ -257,14 +253,14 @@ router.post('/admin/login', async (req, res) => {
     }
 
     // Token oluştur
-    const token = generateToken(adminUser.id, adminUser.email, adminUser.role);
+    const token = generateToken(adminUser._id.toString(), adminUser.email, adminUser.role);
 
     res.json({
       success: true,
       message: 'Admin girişi başarılı',
       token,
       user: {
-        id: adminUser.id,
+        id: adminUser._id.toString(),
         email: adminUser.email,
         firstName: adminUser.firstName,
         lastName: adminUser.lastName,
@@ -288,10 +284,8 @@ router.post('/admin/login', async (req, res) => {
  */
 router.get('/profile', requireAuth, async (req, res) => {
   try {
-    await connectPostgres();
-
-    const UserModel = await getUser();
-    const user = await UserModel.findByPk(req.user.id);
+    await connectDB();
+    const user = await User.findById(req.user.id);
     
     if (!user) {
       return res.status(404).json({
@@ -303,7 +297,7 @@ router.get('/profile', requireAuth, async (req, res) => {
     res.json({
       success: true,
       user: {
-        id: user.id,
+        id: user._id.toString(),
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -328,12 +322,10 @@ router.get('/profile', requireAuth, async (req, res) => {
  */
 router.put('/profile', requireAuth, async (req, res) => {
   try {
-    await connectPostgres();
-
+    await connectDB();
     const { firstName, lastName, phone, address } = req.body;
 
-    const UserModel = await getUser();
-    const user = await UserModel.findByPk(req.user.id);
+    const user = await User.findById(req.user.id);
     
     if (!user) {
       return res.status(404).json({
@@ -363,7 +355,7 @@ router.put('/profile', requireAuth, async (req, res) => {
       success: true,
       message: 'Profil güncellendi',
       user: {
-        id: user.id,
+        id: user._id.toString(),
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -387,8 +379,7 @@ router.put('/profile', requireAuth, async (req, res) => {
  */
 router.post('/forgot-password', async (req, res) => {
   try {
-    await connectPostgres();
-
+    await connectDB();
     const { email } = req.body;
 
     if (!email) {
@@ -420,16 +411,45 @@ router.post('/forgot-password', async (req, res) => {
     user.resetTokenExpiry = resetTokenExpiry;
     await user.save();
 
-    // Geliştirme ortamı için token'ı response'da döndür
-    // Production'da bu kaldırılmalı ve e-posta gönderilmeli
-    console.log(`🔑 Şifre sıfırlama token'ı (${user.email}): ${resetToken}`);
+    // Şifre sıfırlama e-postası gönder
+    const resetUrl = `${process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`}/reset-password?token=${resetToken}`;
+    
+    // E-postayı gönder (asenkron - hata olsa bile response döndür)
+    const emailResult = await sendPasswordResetEmail(user.email, resetToken, user.firstName).catch((error) => {
+      console.error(`❌ E-posta gönderme hatası: ${user.email}`, error);
+      return { success: false, error: error.message };
+    });
+    
+    if (emailResult.success && !emailResult.skipped) {
+      console.log(`✅ Şifre sıfırlama e-postası başarıyla gönderildi: ${user.email}`);
+    } else if (emailResult.skipped) {
+      console.log(`📧 E-posta gönderme atlandı (development modu): ${user.email}`);
+      // Development modunda token'ı console'a yazdır
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🔑 Şifre sıfırlama token'ı (${user.email}): ${resetToken}`);
+        console.log(`🔗 Reset URL: ${resetUrl}`);
+      }
+    } else {
+      console.warn(`⚠️ Şifre sıfırlama e-postası gönderilemedi: ${user.email}`, emailResult.error);
+      // Development modunda token'ı console'a yazdır
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🔑 Şifre sıfırlama token'ı (${user.email}): ${resetToken}`);
+        console.log(`🔗 Reset URL: ${resetUrl}`);
+      }
+    }
 
+    // E-posta gönderildi mi kontrol et
+    const emailSent = emailResult.success && !emailResult.skipped;
+    
     res.json({
       success: true,
-      message: 'Şifre sıfırlama bağlantısı oluşturuldu',
+      message: emailSent 
+        ? 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Lütfen e-postanızı kontrol ediniz.'
+        : 'Eğer bu e-posta adresi ile kayıtlı bir hesap varsa, şifre sıfırlama bağlantısı gönderildi',
       // Geliştirme için token'ı döndür (production'da kaldırılmalı)
-      resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined,
-      resetUrl: `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`
+      resetToken: (process.env.NODE_ENV === 'development' && !emailSent) ? resetToken : undefined,
+      resetUrl: (process.env.NODE_ENV === 'development' && !emailSent) ? resetUrl : undefined,
+      emailSent: emailSent
     });
   } catch (error) {
     console.error('Şifre sıfırlama isteği hatası:', error);
@@ -446,8 +466,6 @@ router.post('/forgot-password', async (req, res) => {
  */
 router.post('/reset-password', async (req, res) => {
   try {
-    await connectPostgres();
-
     const { token, newPassword } = req.body;
 
     if (!token || !newPassword) {
@@ -476,6 +494,9 @@ router.post('/reset-password', async (req, res) => {
         message: 'Şifre en az 8 karakter olmalı ve büyük harf, küçük harf, rakam ve özel karakter (@$!%*?&) içermelidir'
       });
     }
+
+    // Veritabanı bağlantısını kontrol et
+    await connectDB();
 
     // Token ile kullanıcıyı bul
     const user = await User.findOne({
@@ -516,8 +537,6 @@ router.post('/reset-password', async (req, res) => {
  */
 router.put('/change-password', requireAuth, async (req, res) => {
   try {
-    await connectPostgres();
-
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -546,8 +565,8 @@ router.put('/change-password', requireAuth, async (req, res) => {
       });
     }
 
-    const UserModel = await getUser();
-    const user = await UserModel.findByPk(req.user.id);
+    await connectDB();
+    const user = await User.findById(req.user.id);
     
     if (!user) {
       return res.status(404).json({

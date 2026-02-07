@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin-panel
+Disallow: /admin/login
+Disallow: /api
+Disallow: /cart
+Disallow: /payment
+Disallow: /profile
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /order-tracking
+
+# Sitemap
+Sitemap: https://fotograf-kutusu.onrender.com/sitemap.xml

@@ -1,6 +1,6 @@
 import express from 'express';
-import { connectPostgres } from '../config/postgres.js';
-import { defineOrder } from '../models/Order.js';
+import { connectDB } from '../config/database.js';
+import Order from '../models/OrderSchema.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { requireAuth, optionalAuth } from '../middleware/userAuth.js';
 import { validateOrderData, sanitizeInput } from '../utils/validation.js';
@@ -12,16 +12,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEBUG_LOG_PATH = path.join(__dirname, '../../.cursor/debug.log');
 const logDebug = (data) => { try { fs.appendFileSync(DEBUG_LOG_PATH, JSON.stringify({...data,timestamp:Date.now()})+'\n'); } catch(e) {} };
-
-// Order model'ini lazy load et
-let Order = null;
-const getOrder = async () => {
-  if (!Order) {
-    const sequelize = await connectPostgres();
-    Order = defineOrder(sequelize);
-  }
-  return Order;
-};
 
 const router = express.Router();
 
@@ -138,17 +128,10 @@ const calculatePrice = (size, quantity, shippingType, customSize) => {
 // Kullanıcının siparişlerini getir
 router.get('/user', requireAuth, async (req, res) => {
   try {
-    await connectPostgres();
-    const OrderModel = await getOrder();
-    const orders = await OrderModel.findAll({ 
-      where: { userId: req.user.id },
-      order: [['createdAt', 'DESC']]
-    });
-    // Format orders (admin değil, hassas bilgileri gizle)
-    const formattedOrders = orders.map(order => {
-      const orderData = order.toJSON ? order.toJSON() : order;
-      return OrderModel.formatOrder(orderData, false);
-    });
+    await connectDB();
+    const orders = await Order.find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .lean();
     res.json({
       success: true,
       orders: orders
@@ -213,8 +196,7 @@ const asyncHandler = (fn) => {
 router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next) => {
   // MongoDB bağlantısını kontrol et
   try {
-    await connectPostgres();
-    const OrderModel = await getOrder();
+    await connectDB();
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -446,56 +428,38 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
     
     if (finalEmail && isTestMode) {
       // Test modunda: Aynı email ile son 1 saat içinde oluşturulmuş ve henüz ödeme alınmamış bir sipariş var mı?
-      const OrderModel = await getOrder();
       const oneHourAgo = new Date();
       oneHourAgo.setHours(oneHourAgo.getHours() - 1);
       
-      // PostgreSQL'de JSONB sorgusu için Sequelize.Op kullan
-      const { Op } = await import('sequelize');
-      existingOrderToUpdate = await OrderModel.findOne({
-        where: {
-          [Op.or]: [
-            { customerInfo: { email: finalEmail } }, // JSONB içinde email kontrolü
-            { userId: userId }
-          ],
-          createdAt: { [Op.gte]: oneHourAgo },
-          paymentStatus: { [Op.in]: ['test', 'pending'] },
-          status: { [Op.ne]: 'Ödeme Alındı' }
-        },
-        order: [['createdAt', 'DESC']],
-        raw: true
-      });
+      existingOrderToUpdate = await Order.findOne({
+        $or: [
+          { 'customerInfo.email': finalEmail },
+          { userId: userId }
+        ],
+        createdAt: { $gte: oneHourAgo },
+        paymentStatus: { $in: ['test', 'pending'] },
+        status: { $ne: 'Ödeme Alındı' }
+      }).sort({ createdAt: -1 }).lean();
       
       if (existingOrderToUpdate) {
         // Mevcut siparişi güncelle, yeni sipariş oluşturma
         orderGroupId = existingOrderToUpdate.orderGroupId;
-        console.log('🔄 Mevcut test siparişi bulundu, güncellenecek:', existingOrderToUpdate.id || existingOrderToUpdate.id);
+        console.log('🔄 Mevcut test siparişi bulundu, güncellenecek:', existingOrderToUpdate._id);
       }
     }
     
     if (!orderGroupId && finalEmail) {
       // Aynı email ile son 30 gün içinde oluşturulmuş bir sipariş var mı?
-      const OrderModel = await getOrder();
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
-      const { Op } = await import('sequelize');
-      const existingOrder = await OrderModel.findOne({
-        where: {
-          orderGroupId: orderGroupId
-        },
-        order: [['createdAt', 'DESC']],
-        raw: true
-      });
-      
-      // Eski kod (Mongoose) - kaldırıldı
-      /* const existingOrder = await OrderModel.findOne({
+      let existingOrder = await Order.findOne({
         $or: [
-          { 'customerInfo.email': finalEmail },
-          { userId: userId }
+          { userId: userId },
+          { 'customerInfo.email': finalEmail }
         ],
         createdAt: { $gte: thirtyDaysAgo },
-        orderGroupId: { $exists: true, $ne: null }
+        orderGroupId: { $ne: null }
       }).sort({ createdAt: -1 }).lean();
       
       if (existingOrder && existingOrder.orderGroupId) {
@@ -538,9 +502,9 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
     };
 
     // Veritabanı ve koleksiyon bilgilerini logla
-    const OrderModel = await getOrder();
-    const dbName = 'fotografkutusu_com'; // PostgreSQL database name
-    const tableName = OrderModel.tableName || 'orders';
+    const mongoose = (await import('mongoose')).default;
+    const dbName = mongoose.connection.db?.databaseName || 'Bilinmiyor';
+    const collectionName = 'orders';
     
     console.log('📦 Yeni sipariş kaydediliyor:', {
       email: sanitizedData.customerInfo.email,
@@ -558,33 +522,32 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
     // Eğer test modunda ve mevcut bir sipariş varsa, onu güncelle
     if (existingOrderToUpdate && isTestMode) {
       // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:update-existing-order',message:'Attempting to update existing order',data:{existingOrderId:existingOrderToUpdate.id,orderType:typeof Order,orderHasFindByIdAndUpdate:typeof Order?.findByIdAndUpdate,orderModelType:typeof OrderModel,orderModelHasFindByIdAndUpdate:typeof OrderModel?.findByIdAndUpdate}});
+      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:update-existing-order',message:'Attempting to update existing order',data:{existingOrderId:existingOrderToUpdate._id}});
       // #endregion
-      console.log('🔄 Mevcut test siparişi güncelleniyor:', existingOrderToUpdate.id);
+      console.log('🔄 Mevcut test siparişi güncelleniyor:', existingOrderToUpdate._id);
       
-      // PostgreSQL'de update
-      const OrderModel = await getOrder();
-      await OrderModel.update(
+      // MongoDB'de update
+      await Order.findByIdAndUpdate(
+        existingOrderToUpdate._id,
         { ...orderData, orderGroupId: orderGroupId, updatedAt: new Date() },
-        { where: { id: existingOrderToUpdate.id } }
+        { new: true }
       );
-      savedOrder = await OrderModel.findByPk(existingOrderToUpdate.id);
+      savedOrder = await Order.findById(existingOrderToUpdate._id);
       // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:update-existing-order',message:'Order updated successfully',data:{updatedOrderId:savedOrder?.id}});
+      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:update-existing-order',message:'Order updated successfully',data:{updatedOrderId:savedOrder?._id}});
       // #endregion
-      console.log('✅ Mevcut sipariş güncellendi:', savedOrder.id);
+      console.log('✅ Mevcut sipariş güncellendi:', savedOrder._id);
     } else {
       // Yeni sipariş oluştur
       // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:create-new-order',message:'Creating new order',data:{orderType:typeof Order,orderHasCreate:typeof Order?.create}});
+      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:create-new-order',message:'Creating new order',data:{orderType:typeof Order}});
       // #endregion
-      // Order.create kullan (Sequelize)
-      savedOrder = await OrderModel.create(orderData);
+      savedOrder = await Order.create(orderData);
       // #region agent log
       logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:create-new-order',message:'Order created successfully',data:{createdOrderId:savedOrder?._id}});
       // #endregion
       console.log('✅ Yeni sipariş başarıyla kaydedildi:', {
-        orderId: savedOrder.id || savedOrder.id,
+        orderId: savedOrder._id,
         dbName,
         collectionName,
         savedAt: new Date().toISOString()
@@ -593,7 +556,7 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
     
     // Kaydedilen siparişin veritabanında olup olmadığını doğrula
     try {
-      const verifyOrder = await OrderModel.findByPk(savedOrder.id);
+      const verifyOrder = await Order.findById(savedOrder._id);
       if (verifyOrder) {
         console.log('✅ Sipariş veritabanında doğrulandı:', verifyOrder._id);
       } else {
@@ -618,13 +581,10 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
 // Tüm siparişleri getir (Admin)
 router.get('/', requireAdmin, async (req, res) => {
   try {
-    await connectPostgres();
-    const OrderModel = await getOrder();
-    const OrderModel = await getOrder();
-    const orders = await OrderModel.findAll({ order: [['createdAt', 'DESC']] });
+    await connectDB();
+    const orders = await Order.find({}).sort({ createdAt: -1 }).lean();
     const formattedOrders = orders.map(order => {
-      const orderData = order.toJSON ? order.toJSON() : order;
-      return OrderModel.formatOrder(orderData, true); // Admin için decrypt
+      return Order.formatOrder ? Order.formatOrder(order, true) : order; // Admin için decrypt
     });
     res.json({
       success: true,
@@ -643,18 +603,8 @@ router.get('/', requireAdmin, async (req, res) => {
 // Tek sipariş getir (Admin)
 router.get('/:id', requireAdmin, async (req, res) => {
   try {
-    await connectPostgres();
-    const OrderModel = await getOrder();
-    const OrderModel = await getOrder();
-    const order = await OrderModel.findByPk(req.params.id);
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: 'Sipariş bulunamadı'
-      });
-    }
-    const orderData = order.toJSON ? order.toJSON() : order;
-    const formattedOrder = OrderModel.formatOrder(orderData, true); // Admin için decrypt
+    await connectDB();
+    const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -678,16 +628,63 @@ router.get('/:id', requireAdmin, async (req, res) => {
 // Sipariş durumu güncelle (Admin)
 router.patch('/:id/status', requireAdmin, async (req, res) => {
   try {
-    await connectPostgres();
-    const OrderModel = await getOrder();
-    const { status } = req.body;
-    const updatedOrder = await Order.updateStatus(req.params.id, status);
-    if (!updatedOrder) {
+    await connectDB();
+    const { status, trackingNumber, shippingCompany } = req.body;
+    
+    const order = await Order.findById(req.params.id);
+    if (!order) {
       return res.status(404).json({
         success: false,
         error: 'Sipariş bulunamadı'
       });
     }
+
+    const oldStatus = order.status;
+    const updateData = {
+      updatedAt: new Date()
+    };
+    
+    if (status) updateData.status = status;
+    if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber;
+    if (shippingCompany !== undefined) updateData.shippingCompany = shippingCompany;
+    
+    const updatedOrder = await Order.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    );
+
+    // Bildirim gönder (durum değiştiyse ve kullanıcı varsa)
+    if (status && status !== oldStatus && order.userId) {
+      try {
+        const { sendOrderStatusNotification, sendOrderShippedNotification, sendOrderDeliveredNotification } = await import('../utils/notificationService.js');
+        
+        if (status === 'Kargoya Verildi' && trackingNumber) {
+          await sendOrderShippedNotification(
+            order.userId.toString(),
+            order._id.toString(),
+            trackingNumber,
+            shippingCompany
+          );
+        } else if (status === 'Teslim Edildi') {
+          await sendOrderDeliveredNotification(
+            order.userId.toString(),
+            order._id.toString()
+          );
+        } else {
+          await sendOrderStatusNotification(
+            order.userId.toString(),
+            order._id.toString(),
+            status,
+            { price: order.price }
+          );
+        }
+      } catch (notifError) {
+        console.error('Bildirim gönderme hatası (sipariş güncelleme devam ediyor):', notifError);
+        // Bildirim hatası sipariş güncellemesini engellemez
+      }
+    }
+
     res.json({
       success: true,
       message: 'Sipariş durumu güncellendi',
@@ -706,14 +703,12 @@ router.patch('/:id/status', requireAdmin, async (req, res) => {
 // Sipariş ödeme durumu güncelle (Kullanıcı - kendi siparişini güncelleyebilir)
 router.patch('/:id/payment-status', optionalAuth, async (req, res) => {
   try {
-    await connectPostgres();
-    const OrderModel = await getOrder();
+    await connectDB();
     const { paymentStatus, status } = req.body;
     const orderId = req.params.id;
     
     // Siparişi bul
-    const OrderModel = await getOrder();
-    const order = await OrderModel.findByPk(orderId);
+    const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -734,16 +729,10 @@ router.patch('/:id/payment-status', optionalAuth, async (req, res) => {
     }
     
     // Sipariş durumunu güncelle
-    // Order bir Mongoose modeli değil, OrderModel wrapper. Gerçek Mongoose modelini kullan
-    await OrderModel.update(
-      {
-        paymentStatus: paymentStatus || order.paymentStatus,
-        status: status || order.status,
-        updatedAt: new Date()
-      },
-      { where: { id: orderId } }
-    );
-    const updatedOrder = await OrderModel.findByPk(orderId);
+    order.paymentStatus = paymentStatus || order.paymentStatus;
+    order.status = status || order.status;
+    await order.save();
+    const updatedOrder = await Order.findById(orderId);
     
     res.json({
       success: true,
@@ -766,8 +755,7 @@ router.patch('/:id', optionalAuth, asyncHandler(async (req, res) => {
     // #region agent log
     logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:PATCH /:id',message:'PATCH endpoint called',data:{orderId:req.params.id,hasPhotos:!!req.body.photos,photosCount:req.body.photos?.length,hasPhoto:!!req.body.photo}});
     // #endregion
-    await connectPostgres();
-    const OrderModel = await getOrder();
+    await connectDB();
     const orderId = req.params.id;
     const { photos, photo, ...updateData } = req.body;
     
@@ -775,20 +763,9 @@ router.patch('/:id', optionalAuth, asyncHandler(async (req, res) => {
     logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:PATCH /:id',message:'Extracted photos data',data:{photosArrayLength:photos?.length,hasPhoto:!!photo}});
     // #endregion
     
-    // Siparişi bul - PostgreSQL
-    const OrderModel = await getOrder();
-    const order = await OrderModel.findByPk(orderId);
+    // Siparişi bul - MongoDB
+    const order = await Order.findById(orderId);
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: 'Sipariş bulunamadı'
-      });
-    }
-    const orderData = order.toJSON ? order.toJSON() : order;
-    if (!order) {
-      // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:PATCH /:id',message:'Order not found',data:{orderId}});
-      // #endregion
       return res.status(404).json({
         success: false,
         error: 'Sipariş bulunamadı'
@@ -807,43 +784,35 @@ router.patch('/:id', optionalAuth, asyncHandler(async (req, res) => {
       }
     }
     
-    // Güncelleme verilerini hazırla
-    const updateFields = {
-      updatedAt: new Date()
-    };
-    
     // Fotoğrafları ekle
     if (photos && Array.isArray(photos)) {
       // #region agent log
       logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:PATCH /:id',message:'Adding photos array',data:{photosCount:photos.length,firstPhotoHasBase64:!!photos[0]?.base64}});
       // #endregion
-      updateFields.photos = photos;
+      order.photos = photos;
       if (photos.length > 0) {
-        updateFields.photo = photo || photos[0];
+        order.photo = photo || photos[0];
       }
     } else if (photo) {
       // #region agent log
       logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:PATCH /:id',message:'Adding single photo',data:{hasBase64:!!photo.base64}});
       // #endregion
-      updateFields.photo = photo;
-      updateFields.photos = [photo];
+      order.photo = photo;
+      order.photos = [photo];
     }
     
     // Diğer alanları güncelle
-    if (updateData.notes) updateFields.notes = updateData.notes;
-    if (updateData.paymentStatus) updateFields.paymentStatus = updateData.paymentStatus;
-    if (updateData.status) updateFields.status = updateData.status;
+    if (updateData.notes) order.notes = updateData.notes;
+    if (updateData.paymentStatus) order.paymentStatus = updateData.paymentStatus;
+    if (updateData.status) order.status = updateData.status;
     
     // #region agent log
-    logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:PATCH /:id',message:'Updating order',data:{updateFieldsPhotosCount:updateFields.photos?.length,hasPhoto:!!updateFields.photo}});
+    logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:PATCH /:id',message:'Updating order',data:{updateFieldsPhotosCount:order.photos?.length,hasPhoto:!!order.photo}});
     // #endregion
     
-    // Siparişi güncelle (PostgreSQL)
-    await OrderModel.update(
-      updateFields,
-      { where: { id: orderId } }
-    );
-    const updatedOrder = await OrderModel.findByPk(orderId);
+    // Siparişi güncelle (MongoDB)
+    await order.save();
+    const updatedOrder = await Order.findById(orderId);
     
     // #region agent log
     logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:PATCH /:id',message:'Order updated',data:{updatedOrderPhotosCount:updatedOrder?.photos?.length,hasPhoto:!!updatedOrder?.photo}});
@@ -867,9 +836,8 @@ router.patch('/:id', optionalAuth, asyncHandler(async (req, res) => {
 // Sipariş sil (Admin)
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
-    await connectPostgres();
-    const OrderModel = await getOrder();
-    const deleted = await Order.delete(req.params.id);
+    await connectDB();
+    const deleted = await Order.findByIdAndDelete(req.params.id);
     if (!deleted) {
       return res.status(404).json({
         success: false,
@@ -893,9 +861,8 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 // Tüm siparişleri sil (Admin)
 router.delete('/', requireAdmin, async (req, res) => {
   try {
-    await connectPostgres();
-    const OrderModel = await getOrder();
-    await Order.deleteAll();
+    await connectDB();
+    await Order.deleteMany({});
     res.json({
       success: true,
       message: 'Tüm siparişler silindi'

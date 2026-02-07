@@ -39,15 +39,17 @@ function ForgotPassword() {
       const data = await response.json()
 
       if (data.success) {
-        setSuccess('Şifre sıfırlama bağlantısı oluşturuldu!')
-        
-        // Geliştirme ortamında token'ı göster
-        if (data.resetToken) {
+        // E-posta gönderildi mi kontrol et
+        if (data.emailSent) {
+          setSuccess('Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Lütfen e-postanızı kontrol ediniz. (Spam klasörünü de kontrol etmeyi unutmayın!)')
+        } else if (data.resetToken) {
+          // Development modunda token göster
+          setSuccess('Şifre sıfırlama bağlantısı oluşturuldu! (Development modu)')
           setResetToken(data.resetToken)
           setResetUrl(data.resetUrl)
         } else {
-          // Production'da e-posta gönderilmiş olacak
-          setSuccess('E-posta adresinize şifre sıfırlama bağlantısı gönderildi. Lütfen e-postanızı kontrol ediniz.')
+          // E-posta gönderilemedi ama başarılı mesajı göster
+          setSuccess(data.message || 'Şifre sıfırlama bağlantısı oluşturuldu. E-posta gönderilemedi, lütfen yönetici ile iletişime geçin.')
         }
       } else {
         setError(data.message || 'Bir hata oluştu')

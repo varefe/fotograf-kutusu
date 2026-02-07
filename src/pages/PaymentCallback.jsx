@@ -17,7 +17,7 @@ function PaymentCallback() {
     const getBackendUrl = () => {
       // Production'da Railway backend URL'i
       if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        return 'https://heartfelt-embrace-production-3c74.up.railway.app'
+        return 'https://heartfelt-embrace-production-8a92.up.railway.app'
       }
       // Development'da localhost
       return 'http://localhost:5001'

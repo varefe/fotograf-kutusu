@@ -1,36 +1,78 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { HelmetProvider } from 'react-helmet-async'
+import { lazy, Suspense } from 'react'
 import { CartProvider } from './context/CartContext'
 import { AuthProvider } from './context/AuthContext'
-import Home from './pages/Home'
-import Order from './pages/Order'
-import ProductUpload from './pages/ProductUpload'
-import Cart from './pages/Cart'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import ForgotPassword from './pages/ForgotPassword'
-import ResetPassword from './pages/ResetPassword'
-import Profile from './pages/Profile'
-import OrderTracking from './pages/OrderTracking'
-import Admin from './pages/Admin'
-import AdminLogin from './pages/AdminLogin'
-import AdminPanel from './pages/AdminPanel'
-import Payment from './pages/Payment'
-import PaymentSuccess from './pages/PaymentSuccess'
-import PaymentFailed from './pages/PaymentFailed'
-import PaymentCallback from './pages/PaymentCallback'
-import About from './pages/About'
-import DeliveryReturns from './pages/DeliveryReturns'
-import Privacy from './pages/Privacy'
-import DistanceSelling from './pages/DistanceSelling'
-import Contact from './pages/Contact'
+import WhatsAppButton from './components/WhatsAppButton'
+import AnnouncementPopup from './components/AnnouncementPopup'
 import './App.css'
+
+// Lazy load pages for code splitting
+const Home = lazy(() => import('./pages/Home'))
+const Order = lazy(() => import('./pages/Order'))
+const ProductUpload = lazy(() => import('./pages/ProductUpload'))
+const Cart = lazy(() => import('./pages/Cart'))
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Profile = lazy(() => import('./pages/Profile'))
+const OrderTracking = lazy(() => import('./pages/OrderTracking'))
+const Admin = lazy(() => import('./pages/Admin'))
+const AdminLogin = lazy(() => import('./pages/AdminLogin'))
+const AdminPanel = lazy(() => import('./pages/AdminPanel'))
+const Payment = lazy(() => import('./pages/Payment'))
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
+const PaymentFailed = lazy(() => import('./pages/PaymentFailed'))
+const PaymentCallback = lazy(() => import('./pages/PaymentCallback'))
+const About = lazy(() => import('./pages/About'))
+const DeliveryReturns = lazy(() => import('./pages/DeliveryReturns'))
+const Privacy = lazy(() => import('./pages/Privacy'))
+const DistanceSelling = lazy(() => import('./pages/DistanceSelling'))
+const Contact = lazy(() => import('./pages/Contact'))
+const FAQ = lazy(() => import('./pages/FAQ'))
+const Reviews = lazy(() => import('./pages/Reviews'))
+const Gallery = lazy(() => import('./pages/Gallery'))
+const NotificationSettings = lazy(() => import('./pages/NotificationSettings'))
+
+// Loading component
+const LoadingSpinner = () => (
+  <div style={{
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '50vh',
+    flexDirection: 'column',
+    gap: '1rem'
+  }}>
+    <div style={{
+      width: '40px',
+      height: '40px',
+      border: '4px solid #f3f4f6',
+      borderTop: '4px solid #667eea',
+      borderRadius: '50%',
+      animation: 'spin 1s linear infinite'
+    }}></div>
+    <p style={{ color: '#6b7280' }}>Yükleniyor...</p>
+    <style>{`
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `}</style>
+  </div>
+)
 
 function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <Router>
-          <div className="App">
+    <HelmetProvider>
+      <AuthProvider>
+        <CartProvider>
+          <Router>
+            <div className="App">
+            <WhatsAppButton />
+            <AnnouncementPopup />
+            <Suspense fallback={<LoadingSpinner />}>
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/order" element={<Order />} />
@@ -55,11 +97,17 @@ function App() {
               <Route path="/delivery-returns" element={<DeliveryReturns />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/distance-selling" element={<DistanceSelling />} />
-            </Routes>
-          </div>
-        </Router>
-      </CartProvider>
-    </AuthProvider>
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="/reviews" element={<Reviews />} />
+              <Route path="/gallery" element={<Gallery />} />
+              <Route path="/notification-settings" element={<NotificationSettings />} />
+          </Routes>
+          </Suspense>
+        </div>
+      </Router>
+    </CartProvider>
+  </AuthProvider>
+    </HelmetProvider>
   )
 }
 

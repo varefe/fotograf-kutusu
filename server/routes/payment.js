@@ -1,8 +1,5 @@
 import express from 'express';
 import Iyzipay from 'iyzipay';
-import { connectDB } from '../config/database.js';
-import OrderModel from '../models/OrderSchema.js';
-import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import https from 'https';
 
@@ -88,7 +85,7 @@ router.post('/create', async (req, res) => {
     if (!backendUrl) {
       // Production için Railway backend URL'ini kullan
       if (process.env.NODE_ENV === 'production' || !req.headers.host?.includes('localhost')) {
-        backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
+        backendUrl = 'https://heartfelt-embrace-production-8a92.up.railway.app';
       } else {
         // Development: localhost:5001 (PORT environment variable'dan alınır)
         backendUrl = `http://localhost:${process.env.PORT || 5001}`;
@@ -97,7 +94,7 @@ router.post('/create', async (req, res) => {
     
     // Eğer backendUrl frontend domain'i içeriyorsa, Railway URL'ini kullan
     if (backendUrl.includes('fotografkutusu.com')) {
-      backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
+      backendUrl = 'https://heartfelt-embrace-production-8a92.up.railway.app';
     }
     
     const callbackUrl = `${backendUrl}/api/payment/callback`;
@@ -452,7 +449,7 @@ router.post('/direct', async (req, res) => {
     let backendUrl = process.env.BACKEND_URL;
     if (!backendUrl) {
       if (process.env.NODE_ENV === 'production' || !req.headers.host?.includes('localhost')) {
-        backendUrl = 'https://heartfelt-embrace-production-3c74.up.railway.app';
+        backendUrl = 'https://heartfelt-embrace-production-8a92.up.railway.app';
       } else {
         backendUrl = `http://localhost:${process.env.PORT || 5001}`;
       }

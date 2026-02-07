@@ -2,6 +2,23 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import { initAnalytics } from './utils/analytics'
+
+// Initialize Google Analytics if measurement ID is provided
+if (import.meta.env.VITE_GA_MEASUREMENT_ID) {
+  initAnalytics(import.meta.env.VITE_GA_MEASUREMENT_ID)
+}
+
+// Push Notification Service Worker'ı kaydet
+if ('serviceWorker' in navigator && 'PushManager' in window) {
+  navigator.serviceWorker.register('/sw.js')
+    .then((registration) => {
+      console.log('✅ Push Notification Service Worker kaydedildi:', registration.scope);
+    })
+    .catch((error) => {
+      console.warn('⚠️ Push Notification Service Worker kaydedilemedi:', error);
+    });
+}
 
 // Service Worker'ı kaydet - Font yükleme engelleme için
 if ('serviceWorker' in navigator) {

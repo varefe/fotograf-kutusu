@@ -6,6 +6,7 @@ import Icon from '../components/Icon'
 import PaymentForm from '../components/PaymentForm'
 import AlertPopup from '../components/AlertPopup'
 import ConfirmPopup from '../components/ConfirmPopup'
+import PhotoEditor from '../components/PhotoEditor'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import { calculatePrice } from '../utils/priceCalculator'
@@ -42,6 +43,8 @@ function Cart() {
   const [alertType, setAlertType] = useState('info')
   const [confirmMessage, setConfirmMessage] = useState(null)
   const [confirmCallback, setConfirmCallback] = useState(null)
+  const [editingPhoto, setEditingPhoto] = useState(null) // Düzenlenen fotoğraf
+  const [editingPhotoItemId, setEditingPhotoItemId] = useState(null) // Düzenlenen fotoğrafın item ID'si
   // ProductUpload'dan gelen File objelerini memory'de tut
   // Önce location.state'ten al, yoksa cartItems içindeki file objelerini topla
   const [photoFiles, setPhotoFiles] = useState(() => {
@@ -2949,6 +2952,39 @@ function Cart() {
                     backdropFilter: 'blur(2px)'
                   }}
                   >
+                    {/* Düzenle butonu */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingPhoto(item.photo)
+                        setEditingPhotoItemId(item.id)
+                      }}
+                      style={{
+                        background: '#8b5cf6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.5rem 1rem',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#7c3aed'
+                        e.currentTarget.style.transform = 'scale(1.05)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#8b5cf6'
+                        e.currentTarget.style.transform = 'scale(1)'
+                      }}
+                    >
+                      <Icon name="edit" size={16} />
+                      Düzenle
+                    </button>
                     {/* Değiştir butonu */}
                     <button
                       onClick={(e) => {
@@ -3442,6 +3478,43 @@ function Cart() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Photo Editor Modal */}
+      {editingPhoto && (
+        <PhotoEditor
+          photo={editingPhoto}
+          onSave={(editedPhoto) => {
+            if (editingPhotoItemId) {
+              // Düzenlenen fotoğrafı cart item'a kaydet
+              updateCartItemPhoto(editingPhotoItemId, editedPhoto)
+              
+              // selectedItemGroup'u güncelle
+              if (selectedItemGroup) {
+                const updatedItems = selectedItemGroup.items.map(groupItem => 
+                  groupItem.id === editingPhotoItemId 
+                    ? {
+                        ...groupItem,
+                        photo: editedPhoto
+                      }
+                    : groupItem
+                )
+                setSelectedItemGroup({
+                  ...selectedItemGroup,
+                  items: updatedItems
+                })
+              }
+              
+              showAlert('Fotoğraf başarıyla düzenlendi', 'success')
+            }
+            setEditingPhoto(null)
+            setEditingPhotoItemId(null)
+          }}
+          onCancel={() => {
+            setEditingPhoto(null)
+            setEditingPhotoItemId(null)
+          }}
+        />
       )}
     </>
   )

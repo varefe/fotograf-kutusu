@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Icon from '../components/Icon'
+import SEO from '../components/SEO'
 import { useCart } from '../context/CartContext'
 import { calculatePrice, getBulkPrice } from '../utils/priceCalculator'
 
@@ -190,8 +191,29 @@ function ProductUpload() {
     }, 100)
   }
 
+  // SEO için ürün bilgileri
+  const sizeNames = {
+    '10x15': '10x15 cm',
+    '13x18': '13x18 cm',
+    '15x21': '15x21 cm',
+    '20x30': '20x30 cm',
+    '30x40': '30x40 cm',
+    '30x45': '30x45 cm',
+    '40x50': '40x50 cm',
+    '50x70': '50x70 cm',
+    '70x100': '70x100 cm'
+  };
+
+  const sizeName = sizeNames[product.size] || product.size;
+
   return (
     <>
+      <SEO 
+        title={`${sizeName} Fotoğraf Baskı - Fotoğraf Kutusu`}
+        description={`${sizeName} boyutunda profesyonel fotoğraf baskı hizmeti. Yüksek kaliteli baskı, hızlı teslimat. Minimum 15 adet sipariş ile özel fiyatlar.`}
+        keywords={`${sizeName} fotoğraf baskı, ${product.size} fotoğraf, fotoğraf basım, fotoğraf siparişi`}
+        url={`/product/${product.size}`}
+      />
       <Navbar />
       <main style={{ padding: '2rem 0', minHeight: '80vh' }}>
         <div className="container">

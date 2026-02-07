@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Icon from '../components/Icon'
+import SEO from '../components/SEO'
+import ProductComparison from '../components/ProductComparison'
 
 function Home() {
   const navigate = useNavigate()
@@ -16,6 +18,7 @@ function Home() {
     steps: false,
     pricing: false
   })
+  const [showComparison, setShowComparison] = useState(false)
 
   // Carousel fotoğrafları - Fotoğraf baskı hizmetine uygun görseller
   // Pexels'tan ücretsiz yüksek kaliteli fotoğraflar
@@ -154,6 +157,12 @@ function Home() {
 
   return (
     <>
+      <SEO 
+        title="Fotoğraf Kutusu - Profesyonel Fotoğraf Baskı ve Çerçeveleme"
+        description="Yüksek kaliteli fotoğraf baskı, çerçeveleme ve özel boyut fotoğraf hizmetleri. 10x15'ten 70x100'e kadar tüm boyutlarda profesyonel baskı. Hızlı teslimat, uygun fiyatlar. Anılarınızı ölümsüzleştirin!"
+        keywords="fotoğraf baskı, fotoğraf çerçeveleme, fotoğraf basım, fotoğraf kutusu, fotoğraf siparişi, online fotoğraf baskı, fotoğraf boyutları, özel boyut fotoğraf, profesyonel fotoğraf baskı"
+        url="/"
+      />
       <Navbar />
       <main>
         <div 
@@ -488,6 +497,24 @@ function Home() {
         </section>
       </main>
       <Footer />
+
+      {/* Product Comparison Modal */}
+      {showComparison && (
+        <ProductComparison
+          onAddToCart={(productData) => {
+            // Navigate to product upload with pre-filled data
+            navigate('/product-upload', {
+              state: {
+                prefillSize: productData.size,
+                prefillQuantity: productData.quantity,
+                prefillShipping: productData.shippingType
+              }
+            })
+            setShowComparison(false)
+          }}
+          onClose={() => setShowComparison(false)}
+        />
+      )}
     </>
   )
 }

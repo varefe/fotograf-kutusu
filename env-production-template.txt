@@ -1,6 +1,10 @@
 NODE_ENV=production
 PORT=5000
 FRONTEND_URL=https://fotografkutusu.com
+
+# Backend'in production URL'i (Railway/cPanel vb.). Ödeme callback ve API istekleri bu adrese gider.
+BACKEND_URL=https://heartfelt-embrace-production-8a92.up.railway.app
+
 MONGODB_URI=mongodb://mongo:DpZZNKhEweSoBgjnsTmwjOpjpmtRlSqP@yamanote.proxy.rlwy.net:38288
 IYZIPAY_API_KEY=TZY4COlRiQDLL7ERFUK5FzGW3rNBDLio
 IYZIPAY_SECRET_KEY=Eu1eRgVCgE3EKU90DpoKZdgiRNsIDZXN

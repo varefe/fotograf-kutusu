@@ -1,7 +1,6 @@
 import express from 'express';
 import { connectDB } from '../config/database.js';
-import OrderModel from '../models/OrderSchema.js';
-import mongoose from 'mongoose';
+import Order from '../models/OrderSchema.js';
 import { requireAuth } from '../middleware/userAuth.js';
 import { requireAdminRole } from '../middleware/auth.js';
 import Iyzipay from 'iyzipay';
@@ -24,8 +23,6 @@ router.post('/sync', requireAdminRole, async (req, res) => {
       secretKey: process.env.IYZICO_SECRET_KEY || process.env.IYZIPAY_SECRET_KEY,
       uri: process.env.IYZICO_URI || process.env.IYZIPAY_URI || 'https://api.iyzipay.com'
     });
-
-    const Order = mongoose.models.Order;
     const syncedOrders = [];
     const errors = [];
     const skippedOrders = [];
@@ -73,12 +70,16 @@ router.post('/sync', requireAdminRole, async (req, res) => {
           let existingOrder = null;
           
           if (orderId) {
-            existingOrder = await Order.findOne({
-              $or: [
-                { _id: orderId },
-                { 'customerInfo.email': paymentDetail.buyer?.email }
-              ]
-            }).lean();
+            existingOrder = await Order.findById(orderId);
+            if (!existingOrder && paymentDetail.buyer?.email) {
+              // Email ile de ara
+              const ordersByEmail = await Order.find({
+                'customerInfo.email': paymentDetail.buyer.email
+              }).lean();
+              if (ordersByEmail.length > 0) {
+                existingOrder = ordersByEmail[0];
+              }
+            }
           }
 
           // Sipariş yoksa oluştur
@@ -92,6 +93,7 @@ router.post('/sync', requireAdminRole, async (req, res) => {
                 mimetype: 'image/jpeg',
                 size: 0
               },
+              photos: [],
               size: '10x15', // Varsayılan
               customSize: undefined,
               quantity: 15, // Varsayılan
@@ -116,10 +118,10 @@ router.post('/sync', requireAdminRole, async (req, res) => {
               updatedAt: new Date()
             };
 
-            const savedOrder = await OrderModel.create(orderData);
+            const savedOrder = await Order.create(orderData);
             syncedOrders.push({
               paymentId: paymentDetail.paymentId,
-              orderId: savedOrder._id || savedOrder.id,
+              orderId: savedOrder._id.toString(),
               email: orderData.customerInfo.email,
               price: orderData.price,
               action: 'created'
@@ -128,13 +130,14 @@ router.post('/sync', requireAdminRole, async (req, res) => {
             console.log(`✅ Sipariş eklendi: ${savedOrder._id} (Payment: ${paymentDetail.paymentId})`);
           } else {
             // Sipariş varsa güncelle
-            const updatedOrder = await Order.findByIdAndUpdate(
+            const existingNotes = existingOrder.notes || '';
+            await Order.findByIdAndUpdate(
               existingOrder._id,
               {
                 paymentStatus: 'paid',
                 status: 'Ödeme Alındı',
-                notes: existingOrder.notes ? 
-                  `${existingOrder.notes}\nIyzico takip güncellemesi: ${new Date().toISOString()}` : 
+                notes: existingNotes ? 
+                  `${existingNotes}\nIyzico takip güncellemesi: ${new Date().toISOString()}` : 
                   `Iyzico takip güncellemesi: ${new Date().toISOString()}`,
                 updatedAt: new Date()
               },
@@ -143,7 +146,7 @@ router.post('/sync', requireAdminRole, async (req, res) => {
             
             syncedOrders.push({
               paymentId: paymentDetail.paymentId,
-              orderId: existingOrder._id,
+              orderId: existingOrder._id.toString(),
               email: paymentDetail.buyer?.email,
               price: paymentDetail.paidPrice,
               action: 'updated'
@@ -202,7 +205,6 @@ router.post('/sync', requireAdminRole, async (req, res) => {
  */
 router.post('/search', requireAdminRole, async (req, res) => {
   try {
-    await connectDB();
     
     const { conversationId, paymentId, page = 1, pageSize = 10 } = req.body;
     
@@ -301,8 +303,6 @@ router.post('/sync-user-orders', requireAuth, async (req, res) => {
       secretKey: process.env.IYZICO_SECRET_KEY || process.env.IYZIPAY_SECRET_KEY,
       uri: process.env.IYZICO_URI || process.env.IYZIPAY_URI || 'https://api.iyzipay.com'
     });
-
-    const Order = mongoose.models.Order;
     const userId = req.user.id;
     const syncedOrders = [];
     const errors = [];
@@ -343,12 +343,20 @@ router.post('/sync-user-orders', requireAuth, async (req, res) => {
         let existingOrder = null;
         
         if (orderId) {
-          existingOrder = await Order.findOne({
-            $or: [
-              { _id: orderId, userId: userId },
-              { 'customerInfo.email': orderEmail, userId: userId }
-            ]
-          }).lean();
+          existingOrder = await Order.findById(orderId);
+          if (existingOrder && existingOrder.userId && existingOrder.userId.toString() !== userId.toString()) {
+            existingOrder = null; // Farklı kullanıcı, sıfırla
+          }
+          if (!existingOrder && orderEmail) {
+            // Email ile de ara
+            const ordersByEmail = await Order.find({
+              userId: userId,
+              'customerInfo.email': orderEmail
+            }).lean();
+            if (ordersByEmail.length > 0) {
+              existingOrder = ordersByEmail[0];
+            }
+          }
         }
 
         // Sipariş yoksa oluştur
@@ -362,6 +370,7 @@ router.post('/sync-user-orders', requireAuth, async (req, res) => {
               mimetype: 'image/jpeg',
               size: 0
             },
+            photos: [],
             size: '10x15',
             customSize: undefined,
             quantity: 15,
@@ -386,10 +395,10 @@ router.post('/sync-user-orders', requireAuth, async (req, res) => {
             updatedAt: new Date()
           };
 
-          const savedOrder = await OrderModel.create(orderData);
+          const savedOrder = await Order.create(orderData);
           syncedOrders.push({
             paymentId: paymentDetail.paymentId,
-            orderId: savedOrder._id || savedOrder.id,
+            orderId: savedOrder._id.toString(),
             email: orderData.customerInfo.email,
             price: orderData.price
           });
@@ -407,7 +416,7 @@ router.post('/sync-user-orders', requireAuth, async (req, res) => {
           
           syncedOrders.push({
             paymentId: paymentDetail.paymentId,
-            orderId: existingOrder._id,
+            orderId: existingOrder._id.toString(),
             action: 'updated'
           });
         }

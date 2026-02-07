@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Icon from '../components/Icon'
+import OrderStatusProgress from '../components/OrderStatusProgress'
 import { useAuth } from '../context/AuthContext'
 import { API_URL } from '../config/api'
 
@@ -279,6 +280,26 @@ function Profile() {
                 }}
               >
                 <Icon name="pin" size={16} /> Sipariş Takibi
+              </button>
+              <button
+                onClick={() => navigate('/notification-settings')}
+                style={{
+                  width: window.innerWidth < 768 ? 'auto' : '100%',
+                  minWidth: window.innerWidth < 768 ? '120px' : 'auto',
+                  padding: '0.75rem',
+                  marginBottom: window.innerWidth < 768 ? '0' : '0.5rem',
+                  marginRight: window.innerWidth < 768 ? '0.5rem' : '0',
+                  background: '#8b5cf6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Icon name="bell" size={16} /> Bildirimler
               </button>
               <button
                 onClick={() => {
@@ -655,10 +676,17 @@ function Profile() {
                             </div>
                           </div>
                           
+                          {/* Sipariş Durum Progress Bar */}
+                          <OrderStatusProgress 
+                            status={order.status || 'Bekliyor'} 
+                            paymentStatus={order.paymentStatus}
+                          />
+                          
                           <div style={{ 
                             display: 'grid',
                             gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr',
                             gap: '1rem',
+                            marginTop: '1.5rem',
                             marginBottom: '1rem'
                           }}>
                             <div>
@@ -681,13 +709,72 @@ function Profile() {
                             </div>
                             <div>
                               <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
-                                Kargo
+                                <Icon name="truck" size={14} /> Kargo
                               </div>
                               <div style={{ fontWeight: '600', color: '#2c3e50' }}>
                                 {order.shippingType === 'express' ? 'Express' : 'Standart'}
                               </div>
                             </div>
                           </div>
+
+                          {/* Kargo Takip Numarası */}
+                          {order.trackingNumber && (
+                            <div style={{
+                              background: '#f0f9ff',
+                              border: '1px solid #bae6fd',
+                              borderRadius: '8px',
+                              padding: '1rem',
+                              marginBottom: '1rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem'
+                            }}>
+                              <Icon name="truck" size={20} style={{ color: '#0284c7' }} />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.25rem' }}>
+                                  Kargo Takip Numarası
+                                </div>
+                                <div style={{ 
+                                  fontSize: '1.1rem', 
+                                  fontWeight: 'bold', 
+                                  color: '#0284c7',
+                                  fontFamily: 'monospace'
+                                }}>
+                                  {order.trackingNumber}
+                                </div>
+                                {order.shippingCompany && (
+                                  <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
+                                    {order.shippingCompany}
+                                  </div>
+                                )}
+                              </div>
+                              {order.trackingNumber && (
+                                <a
+                                  href={`https://www.google.com/search?q=${encodeURIComponent(order.shippingCompany || 'kargo')}+${encodeURIComponent(order.trackingNumber)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    padding: '0.5rem 1rem',
+                                    background: '#0284c7',
+                                    color: 'white',
+                                    textDecoration: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '0.85rem',
+                                    fontWeight: '600',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#0369a1'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#0284c7'
+                                  }}
+                                >
+                                  Takip Et
+                                </a>
+                              )}
+                            </div>
+                          )}
                           
                           <div style={{ 
                             display: 'flex', 
@@ -712,11 +799,11 @@ function Profile() {
                               padding: '0.25rem 0.75rem',
                               borderRadius: '12px',
                               fontSize: '0.85rem',
-                              background: order.paymentStatus === 'paid' ? '#d1fae5' : '#fef3c7',
-                              color: order.paymentStatus === 'paid' ? '#065f46' : '#92400e',
+                              background: order.paymentStatus === 'paid' || order.paymentStatus === 'success' ? '#d1fae5' : '#fef3c7',
+                              color: order.paymentStatus === 'paid' || order.paymentStatus === 'success' ? '#065f46' : '#92400e',
                               fontWeight: 'bold'
                             }}>
-                              {order.paymentStatus === 'paid' ? 'Ödendi' : 'Bekliyor'}
+                              {order.paymentStatus === 'paid' || order.paymentStatus === 'success' ? 'Ödendi' : 'Bekliyor'}
                             </div>
                           </div>
                         </div>
@@ -778,10 +865,19 @@ function Profile() {
                     </div>
 
                     <div style={{ display: 'grid', gap: '1.5rem' }}>
+                      {/* Sipariş Durum Progress */}
+                      <div style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#2c3e50' }}>Sipariş Durumu</h3>
+                        <OrderStatusProgress 
+                          status={selectedOrder.status || 'Bekliyor'} 
+                          paymentStatus={selectedOrder.paymentStatus}
+                        />
+                      </div>
+
                       <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
                         <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Sipariş Bilgileri</h3>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                          <div><strong>Sipariş No:</strong> #{selectedOrder._id || selectedOrder.id}</div>
+                          <div><strong>Sipariş No:</strong> #{String(selectedOrder._id || selectedOrder.id).substring(0, 12)}</div>
                           <div><strong>Tarih:</strong> {new Date(selectedOrder.createdAt).toLocaleDateString('tr-TR', { 
                             year: 'numeric', 
                             month: 'long', 
@@ -799,8 +895,68 @@ function Profile() {
                             selectedOrder.shippingType === 'standard' ? 'Standart' :
                             selectedOrder.shippingType === 'express' ? 'Express' : '-'
                           }</div>
-                          <div><strong>Durum:</strong> {selectedOrder.status || 'Yeni'}</div>
+                          <div><strong>Durum:</strong> {selectedOrder.status || 'Bekliyor'}</div>
                         </div>
+                        
+                        {/* Kargo Takip Numarası */}
+                        {selectedOrder.trackingNumber && (
+                          <div style={{
+                            marginTop: '1rem',
+                            padding: '1rem',
+                            background: '#f0f9ff',
+                            border: '1px solid #bae6fd',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '1rem'
+                          }}>
+                            <Icon name="truck" size={24} style={{ color: '#0284c7' }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.25rem' }}>
+                                Kargo Takip Numarası
+                              </div>
+                              <div style={{ 
+                                fontSize: '1.2rem', 
+                                fontWeight: 'bold', 
+                                color: '#0284c7',
+                                fontFamily: 'monospace'
+                              }}>
+                                {selectedOrder.trackingNumber}
+                              </div>
+                              {selectedOrder.shippingCompany && (
+                                <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
+                                  {selectedOrder.shippingCompany}
+                                </div>
+                              )}
+                            </div>
+                            {selectedOrder.trackingNumber && (
+                              <a
+                                href={`https://www.google.com/search?q=${encodeURIComponent(selectedOrder.shippingCompany || 'kargo')}+${encodeURIComponent(selectedOrder.trackingNumber)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  padding: '0.75rem 1.5rem',
+                                  background: '#0284c7',
+                                  color: 'white',
+                                  textDecoration: 'none',
+                                  borderRadius: '8px',
+                                  fontSize: '0.9rem',
+                                  fontWeight: '600',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#0369a1'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = '#0284c7'
+                                }}
+                              >
+                                Takip Et
+                              </a>
+                            )}
+                          </div>
+                        )}
+                        
                         <div style={{ marginTop: '1rem', padding: '1rem', background: '#e8f5e9', borderRadius: '6px' }}>
                           <strong style={{ fontSize: '1.2rem' }}>Toplam: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(selectedOrder.price || 0)}</strong>
                         </div>

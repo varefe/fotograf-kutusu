@@ -27,13 +27,24 @@ export const getBrowserFingerprint = () => {
     const fingerprintString = JSON.stringify(fingerprint)
     const browserId = `browser_${hashString(fingerprintString)}_${Date.now()}`
     
-    // sessionStorage'da sakla (tarayıcı kapanınca silinir, her oturum için yeni)
-    // Ama aynı tarayıcıda aynı ID'yi kullan
-    const existingId = sessionStorage.getItem('browserFingerprint')
-    if (existingId) {
-      return existingId
+    // Önce localStorage'dan kontrol et (kalıcı)
+    const existingLocalId = localStorage.getItem('browserFingerprint')
+    if (existingLocalId) {
+      // sessionStorage'a da kaydet (hızlı erişim için)
+      sessionStorage.setItem('browserFingerprint', existingLocalId)
+      return existingLocalId
     }
     
+    // Sonra sessionStorage'dan kontrol et
+    const existingSessionId = sessionStorage.getItem('browserFingerprint')
+    if (existingSessionId) {
+      // localStorage'a da kaydet (kalıcı olması için)
+      localStorage.setItem('browserFingerprint', existingSessionId)
+      return existingSessionId
+    }
+    
+    // Yeni ID oluştur - hem localStorage hem sessionStorage'a kaydet
+    localStorage.setItem('browserFingerprint', browserId)
     sessionStorage.setItem('browserFingerprint', browserId)
     return browserId
   } catch (error) {
@@ -47,6 +58,22 @@ export const getBrowserFingerprint = () => {
 
 // Tarayıcı ID'sini al
 export const getBrowserId = () => {
-  return sessionStorage.getItem('browserFingerprint') || getBrowserFingerprint()
+  // Önce localStorage'dan kontrol et (Beni Hatırla için kalıcı)
+  const storedId = localStorage.getItem('browserFingerprint')
+  if (storedId) {
+    return storedId
+  }
+  
+  // Sonra sessionStorage'dan kontrol et
+  const sessionId = sessionStorage.getItem('browserFingerprint')
+  if (sessionId) {
+    return sessionId
+  }
+  
+  // Yoksa yeni oluştur ve localStorage'a kaydet (kalıcı olması için)
+  const newId = getBrowserFingerprint()
+  localStorage.setItem('browserFingerprint', newId)
+  sessionStorage.setItem('browserFingerprint', newId)
+  return newId
 }
 

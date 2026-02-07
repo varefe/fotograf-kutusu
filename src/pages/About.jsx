@@ -1,9 +1,16 @@
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import SEO from '../components/SEO'
 
 function About() {
   return (
     <>
+      <SEO 
+        title="Hakkımızda"
+        description="Fotoğraf Kutusu hakkında bilgi edinin. Profesyonel fotoğraf baskı ve çerçeveleme hizmetlerimiz, kalite standartlarımız ve müşteri memnuniyeti odaklı yaklaşımımız."
+        keywords="fotoğraf kutusu hakkında, fotoğraf baskı firması, çerçeveleme hizmeti"
+        url="/about"
+      />
       <Navbar />
       <main>
         <div className="page-header">

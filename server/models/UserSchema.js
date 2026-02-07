@@ -51,6 +51,34 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
+  // Bildirim tercihleri
+  notificationPreferences: {
+    email: {
+      orderStatus: { type: Boolean, default: true },
+      orderShipped: { type: Boolean, default: true },
+      orderDelivered: { type: Boolean, default: true },
+      promotions: { type: Boolean, default: true },
+      newsletter: { type: Boolean, default: false }
+    },
+    sms: {
+      orderStatus: { type: Boolean, default: false },
+      orderShipped: { type: Boolean, default: false },
+      orderDelivered: { type: Boolean, default: false }
+    },
+    push: {
+      enabled: { type: Boolean, default: true },
+      orderStatus: { type: Boolean, default: true },
+      promotions: { type: Boolean, default: true }
+    }
+  },
+  // Push notification subscription
+  pushSubscription: {
+    endpoint: { type: String },
+    keys: {
+      p256dh: { type: String },
+      auth: { type: String }
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now

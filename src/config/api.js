@@ -17,21 +17,12 @@ const getApiUrl = () => {
     return url
   }
   
-  // Production ortamında (localhost değilse)
+  // Production ortamında (localhost değilse) — backend production'da (Railway) çalışıyor, tüm API/dosyalar oradan alınır
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    // Render backend URL'i
-    const renderUrl = 'https://fotograf-kutusu.onrender.com'
-    console.log('🌐 Production API URL:', renderUrl)
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'api.js:getApiUrl',message:'Using production Render URL',data:{renderUrl}})}).catch(()=>{});
-    // #endregion
-    return renderUrl
-    
-    // Eğer backend aynı sunucudaysa (mod_proxy ile):
-    // return '/api'
-    
-    // Eğer backend ayrı subdomain'deyse (örn: api.fotografkutusu.com):
-    // return 'https://api.fotografkutusu.com'
+    // Production backend URL (Railway). Build sırasında VITE_API_URL ile override edilebilir.
+    const productionUrl = 'https://heartfelt-embrace-production-8a92.up.railway.app'
+    console.log('🌐 Production API URL (backend oradan alınıyor):', productionUrl)
+    return productionUrl
   }
   
   // Development ortamında

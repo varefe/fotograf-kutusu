@@ -59,6 +59,12 @@ body {
     stroke-linejoin: round;
 }
 
+/* Filled icons (e.g. WhatsApp) - override stroke style */
+.icon--fill svg {
+    fill: currentColor;
+    stroke: none;
+}
+
 /* Navbar - Modern E-ticaret Stili */
 .navbar {
     background-color: var(--bg-color);
