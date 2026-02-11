@@ -5,12 +5,14 @@ import Footer from '../components/Footer'
 import Icon from '../components/Icon'
 import SEO from '../components/SEO'
 import { useCart } from '../context/CartContext'
+import { useToast } from '../context/ToastContext'
 import { calculatePrice, getBulkPrice } from '../utils/priceCalculator'
 
 function ProductUpload() {
   const navigate = useNavigate()
   const location = useLocation()
   const { addToCart, addMultipleToCart } = useCart()
+  const toast = useToast()
   
   // URL'den ürün bilgilerini al
   const product = location.state?.product || {
@@ -85,7 +87,7 @@ function ProductUpload() {
     
     if (imageFiles.length === 0) {
       if (files.length > 0) {
-        alert('Lütfen geçerli resim dosyaları seçin (JPEG, PNG, GIF, WebP)')
+        toast.show('Lütfen geçerli resim dosyaları seçin (JPEG, PNG, GIF, WebP)', 'error')
       }
       return
     }
@@ -117,17 +119,17 @@ function ProductUpload() {
 
   const handleAddToCart = () => {
     if (photos.length === 0) {
-      alert('Lütfen en az 15 fotoğraf seçin')
+      toast.show('Lütfen en az 15 fotoğraf seçin', 'error')
       return
     }
 
     if (photos.length < 15) {
-      alert('Sepete eklemek için en az 15 fotoğraf seçmelisiniz')
+      toast.show('Sepete eklemek için en az 15 fotoğraf seçmelisiniz', 'error')
       return
     }
 
     if (quantity < 15) {
-      alert('Minimum 15 adet seçmelisiniz')
+      toast.show('Minimum 15 adet seçmelisiniz', 'error')
       return
     }
 
@@ -151,10 +153,6 @@ function ProductUpload() {
     
     // Her fotoğraf için fiyat (quantity adet × birim fiyat - kargo hariç)
     const pricePerPhoto = basePrice * quantity
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProductUpload.jsx:151',message:'Price calculation in ProductUpload',data:{quantity,photosCount:photos.length,basePrice,pricePerPhoto,totalQuantity:quantity*photos.length,calculation:`${basePrice} TL/adet × ${quantity} adet = ${pricePerPhoto} TL/fotoğraf`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     
     // Fiyat hesaplama log kaldırıldı (gereksiz)
 
@@ -226,12 +224,15 @@ function ProductUpload() {
             </p>
           </div>
 
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '2rem',
-            marginBottom: '2rem'
-          }}>
+          <div
+            className="product-upload-layout"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '2rem',
+              marginBottom: '2rem'
+            }}
+          >
             {/* Fotoğraf Yükleme */}
             <div style={{
               background: '#f9fafb',
@@ -471,26 +472,40 @@ function ProductUpload() {
 
               <button
                 onClick={handleAddToCart}
-                disabled={photos.length < 15 || quantity < 15}
+                disabled={photos.length < 15 || quantity < 15 || photos.length !== previews.length}
                 style={{
                   width: '100%',
                   padding: '1rem',
                   fontSize: '1.1rem',
                   fontWeight: 'bold',
-                  background: photos.length >= 15 && quantity >= 15 ? 'var(--primary-color)' : '#ccc',
-                  color: photos.length >= 15 && quantity >= 15 ? '#ffffff' : '#64748b',
+                  background: photos.length >= 15 && quantity >= 15 && photos.length === previews.length ? 'var(--primary-color)' : '#ccc',
+                  color: photos.length >= 15 && quantity >= 15 && photos.length === previews.length ? '#ffffff' : '#64748b',
                   border: 'none',
                   borderRadius: '8px',
-                  cursor: photos.length >= 15 && quantity >= 15 ? 'pointer' : 'not-allowed',
+                  cursor: photos.length >= 15 && quantity >= 15 && photos.length === previews.length ? 'pointer' : 'not-allowed',
                   transition: 'color 0.2s, background-color 0.2s',
-                  boxShadow: photos.length >= 15 && quantity >= 15 ? 'var(--shadow)' : 'none'
+                  boxShadow: photos.length >= 15 && quantity >= 15 && photos.length === previews.length ? 'var(--shadow)' : 'none'
                 }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Icon name="cart" size={18} /> Sepete Ekle
+                  <Icon name="cart" size={18} /> {photos.length !== previews.length ? 'Yükleniyor...' : 'Sepete Ekle'}
                 </span>
               </button>
-              {photos.length > 0 && photos.length < 15 && (
+              {photos.length !== previews.length && photos.length > 0 && (
+                <div style={{
+                  marginTop: '0.5rem',
+                  padding: '0.75rem',
+                  background: '#e0f2fe',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem',
+                  color: '#0369a1',
+                  textAlign: 'center',
+                  border: '1px solid #bae6fd'
+                }}>
+                  Fotoğraflar yükleniyor... {previews.length}/{photos.length} hazır. Lütfen bekleyin.
+                </div>
+              )}
+              {photos.length > 0 && photos.length < 15 && photos.length === previews.length && (
                 <div style={{
                   marginTop: '0.5rem',
                   padding: '0.75rem',

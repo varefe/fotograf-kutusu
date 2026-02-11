@@ -25,6 +25,23 @@ function PaymentFailed() {
     return urlParams.get('orderId')
   })
   const [orderSaved, setOrderSaved] = useState(false)
+  const [orderData, setOrderData] = useState(() => {
+    if (location.state?.orderData) return location.state.orderData
+    return null
+  })
+
+  // Sipariş bilgisini localStorage'dan yükle (müşteri bilgilerini göstermek için)
+  useEffect(() => {
+    if (orderData) return
+    const orders = getDecryptedOrders()
+    if (orderId) {
+      const found = orders.find(o => o.id === orderId || o.id?.toString() === orderId)
+      if (found) setOrderData(found)
+    } else if (orders.length > 0) {
+      const sorted = [...orders].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0))
+      setOrderData(sorted[0])
+    }
+  }, [orderId, orderData])
 
   useEffect(() => {
     // İptal edilen siparişi backend'e kaydet
@@ -47,6 +64,7 @@ function PaymentFailed() {
       const localOrder = orders.find(o => o.id === orderId || o.id?.toString() === orderId)
       
       if (localOrder) {
+        setOrderData(localOrder)
         console.log('✅ İptal edilen sipariş backend\'e kaydediliyor, orderId:', orderId)
         
         // Backend'e siparişi kaydet (kullanıcı giriş yapmışsa token ile)
@@ -135,6 +153,57 @@ function PaymentFailed() {
             }}>
               {getMessage()}
             </p>
+
+            {orderData && (orderData.customerInfo || orderData.email || orderData.address) && (
+              <div style={{
+                marginBottom: '2rem',
+                textAlign: 'left',
+                background: '#f9fafb',
+                padding: '1.25rem',
+                borderRadius: '10px',
+                border: '1px solid #e5e7eb'
+              }}>
+                <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#374151', fontSize: '1.1rem' }}>
+                  Sipariş ve İletişim Bilgileriniz
+                </h3>
+                <div style={{ display: 'grid', gap: '0.75rem', fontSize: '0.95rem' }}>
+                  {(orderData.customerInfo?.firstName || orderData.customerInfo?.lastName) && (
+                    <div>
+                      <strong style={{ color: '#6b7280' }}>Ad Soyad:</strong>{' '}
+                      {orderData.customerInfo.firstName || ''} {orderData.customerInfo.lastName || ''}
+                    </div>
+                  )}
+                  <div>
+                    <strong style={{ color: '#6b7280' }}>E-posta:</strong>{' '}
+                    {orderData.customerInfo?.email || orderData.email || '-'}
+                  </div>
+                  {(orderData.customerInfo?.phone || orderData.phone) && (
+                    <div>
+                      <strong style={{ color: '#6b7280' }}>Telefon:</strong>{' '}
+                      {orderData.customerInfo?.phone || orderData.phone}
+                    </div>
+                  )}
+                  <div>
+                    <strong style={{ color: '#6b7280' }}>Adres:</strong>{' '}
+                    <span style={{ color: '#374151' }}>{orderData.customerInfo?.address || orderData.address || '-'}</span>
+                  </div>
+                  {(orderData.size || orderData.quantity || orderData.price) && (
+                    <>
+                      {orderData.size && (
+                        <div><strong style={{ color: '#6b7280' }}>Boyut:</strong> {orderData.size}</div>
+                      )}
+                      {orderData.quantity != null && (
+                        <div><strong style={{ color: '#6b7280' }}>Adet:</strong> {orderData.quantity}</div>
+                      )}
+                      {orderData.price != null && (
+                        <div><strong style={{ color: '#6b7280' }}>Tutar:</strong> {typeof orderData.price === 'number' ? `${orderData.price.toFixed(2)} ₺` : orderData.price}</div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             <p style={{
               color: '#999',
               fontSize: '0.9rem',

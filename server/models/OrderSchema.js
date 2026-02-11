@@ -48,6 +48,14 @@ const orderSchema = new mongoose.Schema({
     phone: { type: String }, // Şifrelenmiş
     address: { type: String, required: true } // Şifrelenmiş
   },
+  // Admin panelde görüntüleme için şifresiz kopya (şifre çözülemezse kullanılır)
+  customerInfoDisplay: {
+    firstName: { type: String },
+    lastName: { type: String },
+    email: { type: String },
+    phone: { type: String },
+    address: { type: String }
+  },
   price: { type: Number, required: true },
   status: { type: String, default: 'Bekliyor' }, // Bekliyor, Alındı, Basıldı, Kargoya Verildi, Teslim Edildi
   paymentStatus: { type: String, default: 'pending' },
@@ -69,6 +77,20 @@ orderSchema.pre('save', async function() {
   // Eğer zaten şifrelenmişse ve değişiklik yoksa, tekrar şifreleme
   const hasPhotoChanges = this.isModified('photo.base64') || (this.photos && this.photos.length > 0 && this.isModified('photos'));
   if (!this.isEncrypted || this.isModified('customerInfo') || hasPhotoChanges || this.isModified('notes')) {
+    // Admin görüntüleme için şifresiz kopyayı sakla (şifre çözülemezse gösterilir)
+    if (this.customerInfo && typeof this.customerInfo === 'object') {
+      const ci = this.customerInfo;
+      const isPlain = (v) => typeof v === 'string' && v.length > 0 && v.length < 200 && !/^[A-Za-z0-9+/]+=*$/.test(v.replace(/\s/g, ''));
+      if (isPlain(ci.email) || isPlain(ci.firstName) || isPlain(ci.address)) {
+        this.customerInfoDisplay = {
+          firstName: String(ci.firstName ?? '').trim(),
+          lastName: String(ci.lastName ?? '').trim(),
+          email: String(ci.email ?? '').trim(),
+          phone: String(ci.phone ?? '').trim(),
+          address: String(ci.address ?? '').trim()
+        };
+      }
+    }
     // Hassas bilgileri şifrele
     const orderData = {
       photo: this.photo,
@@ -212,30 +234,14 @@ const OrderModel = {
   // Sipariş formatını düzenle (sadece admin için çözülmüş)
   formatOrder: (order, isAdmin = false) => {
     try {
-      // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'OrderSchema.js:formatOrder',message:'formatOrder called',data:{isAdmin,isEncrypted:order.isEncrypted,hasCustomerInfo:!!order.customerInfo,hasPhotos:!!order.photos,photosLength:order.photos?.length,hasPhoto:!!order.photo}});
-      // #endregion
-      
-      // Admin ise şifreleri çöz (isEncrypted kontrolü yapmadan - veriler şifrelenmiş olabilir)
       if (isAdmin) {
-        // #region agent log
-        logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'OrderSchema.js:formatOrder',message:'Decrypting order (admin)',data:{customerInfoEmail:order.customerInfo?.email,photosCount:order.photos?.length,isEncrypted:order.isEncrypted}});
-        // #endregion
-        // Admin için her zaman şifre çözme dene (isEncrypted false olsa bile veriler şifrelenmiş olabilir)
         const decrypted = decryptSensitiveFields(order);
-        // #region agent log
-        logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'OrderSchema.js:formatOrder',message:'Decryption complete',data:{decryptedEmail:decrypted?.customerInfo?.email,decryptedPhotosCount:decrypted?.photos?.length,decryptedPhotoBase64:decrypted?.photo?.base64?.substring(0,50)}});
-        // #endregion
         return {
           ...decrypted,
           id: order._id?.toString() || order.id,
           _id: order._id?.toString() || order.id
         };
       }
-      
-      // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'OrderSchema.js:formatOrder',message:'Not decrypting',data:{reason:'notAdmin'}});
-      // #endregion
 
       // Admin değilse hassas bilgileri gizle
       if (!isAdmin) {
@@ -270,11 +276,21 @@ const OrderModel = {
       };
     } catch (error) {
       console.error('❌ formatOrder hatası:', error);
-      // Hata durumunda en azından temel bilgileri döndür
+      // Hata durumunda hassas veriyi istemciye gönderme
       return {
         ...order,
         id: order._id?.toString() || order.id,
         _id: order._id?.toString() || order.id,
+        customerInfo: {
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          address: ''
+        },
+        photo: order.photo ? { ...order.photo, base64: null } : undefined,
+        photos: undefined,
+        notes: null,
         error: 'Format hatası: ' + error.message
       };
     }

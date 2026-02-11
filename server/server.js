@@ -21,6 +21,11 @@ import galleryRoutes from './routes/gallery.js';
 import notificationRoutes from './routes/notifications.js';
 import announcementRoutes from './routes/announcements.js';
 import categoryRoutes from './routes/categories.js';
+import productRoutes from './routes/products.js';
+import carouselRoutes from './routes/carousel.js';
+import pageRoutes from './routes/pages.js';
+import themeRoutes from './routes/theme.js';
+import { requireAdminRole } from './middleware/auth.js';
 import { securityLogger, securityHeaders, ipWhitelist } from './middleware/security.js';
 
 dotenv.config();
@@ -201,6 +206,12 @@ if (NODE_ENV !== 'development') {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Yüklenen ürün görselleri (server-uploads/products)
+const serverUploadsPath = path.join(process.cwd(), 'server-uploads');
+if (fs.existsSync(serverUploadsPath)) {
+  app.use('/uploads', express.static(serverUploadsPath));
+}
+
 // MongoDB database bağlantısı
 connectDB(5).then(() => {
   console.log('✅ MongoDB bağlantısı hazır');
@@ -247,6 +258,100 @@ app.use('/api/gallery', generalLimiter, galleryRoutes);
 app.use('/api/notifications', generalLimiter, notificationRoutes);
 app.use('/api/announcements', generalLimiter, announcementRoutes);
 app.use('/api/categories', generalLimiter, categoryRoutes);
+app.use('/api/products', generalLimiter, productRoutes);
+
+// #region agent log
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/carousel')) {
+    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:carousel-incoming',message:'carousel request',data:{method:req.method,path:req.path},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+  }
+  next();
+});
+// #endregion
+
+// Carousel: Daha spesifik route önce (admin/all), sonra genel GET (404 önleme)
+app.get('/api/carousel/admin/all', generalLimiter, requireAdminRole, async (req, res) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:GET /api/carousel/admin/all',message:'handler entered',data:{path:req.path},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
+  try {
+    await connectDB();
+    const CarouselSlide = (await import('./models/CarouselSchema.js')).default;
+    const slides = await CarouselSlide.find({}).sort({ order: 1, createdAt: 1 }).lean();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:carousel-admin-all',message:'sending 200',data:{slidesCount:slides.length},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
+    res.json({
+      success: true,
+      slides: slides.map(s => ({
+        id: s._id.toString(),
+        _id: s._id.toString(),
+        image: s.image,
+        alt: s.alt || '',
+        title: s.title || '',
+        subtitle: s.subtitle || '',
+        order: s.order ?? 0,
+        isActive: s.isActive !== false,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt
+      }))
+    });
+  } catch (err) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:carousel-admin-all-catch',message:'sending 500',data:{err:err.message},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
+    console.error('Carousel admin/all hatası:', err.message);
+    res.status(500).json({ success: false, error: 'Carousel listelenemedi', message: err.message });
+  }
+});
+
+app.get('/api/carousel', generalLimiter, async (req, res) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:GET /api/carousel',message:'public handler entered',data:{path:req.path},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
+  try {
+    await connectDB();
+    const CarouselSlide = (await import('./models/CarouselSchema.js')).default;
+    const slides = await CarouselSlide.find({ isActive: true }).sort({ order: 1, createdAt: 1 }).lean();
+    res.json({
+      success: true,
+      slides: slides.map((s, i) => ({
+        id: s._id.toString(),
+        image: s.image,
+        alt: s.alt || '',
+        title: s.title || '',
+        subtitle: s.subtitle || '',
+        order: s.order ?? i
+      }))
+    });
+  } catch (err) {
+    console.error('Carousel GET hatası:', err.message);
+    res.status(500).json({ success: false, error: 'Carousel yüklenemedi', message: err.message });
+  }
+});
+
+app.use('/api/carousel', generalLimiter, carouselRoutes);
+app.use('/api/pages', generalLimiter, pageRoutes);
+// #region agent log
+app.use((req, res, next) => {
+  if (req.path === '/api/theme' || req.path.startsWith('/api/theme/')) {
+    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:before-theme-mount',message:'incoming /api/theme',data:{method:req.method,path:req.path},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+  }
+  next();
+});
+// #endregion
+app.use('/api/theme', generalLimiter, themeRoutes);
+// #region agent log
+try {
+  fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:theme-mount-done',message:'theme routes registered',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+} catch (e) {}
+// #endregion
+
+// #region agent log
+try {
+  fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:after-carousel-register',message:'carousel routes registered',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+} catch (e) {}
+// #endregion
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -307,8 +412,16 @@ app.get('/api/debug/db', async (req, res) => {
 
 // 404 handler - Tüm route'lardan sonra
 app.use((req, res, next) => {
+  // #region agent log
+  if (req.path.startsWith('/api/carousel')) {
+    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:404-handler',message:'404 for carousel',data:{method:req.method,path:req.path},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+  }
+  if (req.path === '/api/theme' || req.path.startsWith('/api/theme/')) {
+    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:404-handler',message:'404 for theme',data:{method:req.method,path:req.path},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+  }
+  // #endregion
   console.log('⚠️ 404 - Route bulunamadı:', req.method, req.path);
-  console.log('⚠️ Kayıtlı route\'lar: /api/orders, /api/payment, /api/user, /api/admin');
+  console.log('⚠️ Kayıtlı route\'lar: /api/orders, /api/payment, /api/user, /api/admin, /api/products, ...');
   res.status(404).json({ 
     error: 'Route bulunamadı', 
     method: req.method,
@@ -330,11 +443,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   // #region agent log
-  try {
-    const logPath = path.join(__dirname, '..', '.cursor', 'debug.log');
-    const logLine = JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'server.js:app.listen',message:'Server started successfully',data:{port:PORT,nodeEnv:NODE_ENV},timestamp:Date.now()}) + '\n';
-    fs.appendFileSync(logPath, logLine);
-  } catch (e) {}
+  fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:app.listen',message:'Server started',data:{port:PORT,nodeEnv:NODE_ENV},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
   // #endregion
   console.log(`✅ Server ${PORT} portunda çalışıyor`);
   console.log(`🌐 Environment: ${NODE_ENV}`);

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Icon from './Icon'
 import { API_URL } from '../config/api'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 
 const FALLBACK_CATEGORIES = [
   { value: 'all', label: 'Tümü' },
@@ -18,6 +19,7 @@ const FALLBACK_CATEGORIES = [
 
 function GalleryForm({ gallery, onSuccess, onCancel }) {
   const { getAuthHeaders } = useAuth()
+  const toast = useToast()
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -200,7 +202,7 @@ function GalleryForm({ gallery, onSuccess, onCancel }) {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        alert(gallery ? 'Ürün güncellendi' : 'Ürün eklendi')
+        toast.show(gallery ? 'Ürün güncellendi' : 'Ürün eklendi', 'success')
         onSuccess()
       } else {
         setError(data.error || 'İşlem başarısız')

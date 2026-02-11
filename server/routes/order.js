@@ -1,7 +1,7 @@
 import express from 'express';
 import { connectDB } from '../config/database.js';
 import Order from '../models/OrderSchema.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAdminRole } from '../middleware/auth.js';
 import { requireAuth, optionalAuth } from '../middleware/userAuth.js';
 import { validateOrderData, sanitizeInput } from '../utils/validation.js';
 import fs from 'fs';
@@ -494,6 +494,14 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
         phone: sanitizedData.customerInfo.phone,
         address: sanitizedData.customerInfo.address
       },
+      // Admin panelde ad/soyad/e-posta/telefon/adres her zaman görünsün (şifre çözülemese bile)
+      customerInfoDisplay: {
+        firstName: String(sanitizedData.customerInfo.firstName ?? '').trim(),
+        lastName: String(sanitizedData.customerInfo.lastName ?? '').trim(),
+        email: String(sanitizedData.customerInfo.email ?? '').trim(),
+        phone: String(sanitizedData.customerInfo.phone ?? '').trim(),
+        address: String(sanitizedData.customerInfo.address ?? '').trim()
+      },
       price,
       status: finalStatus, // Request'ten gelen veya varsayılan 'Yeni'
       paymentStatus: finalPaymentStatus, // Request'ten gelen veya varsayılan 'pending'
@@ -579,7 +587,7 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
 }));
 
 // Tüm siparişleri getir (Admin)
-router.get('/', requireAdmin, async (req, res) => {
+router.get('/', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
     const orders = await Order.find({}).sort({ createdAt: -1 }).lean();
@@ -601,7 +609,7 @@ router.get('/', requireAdmin, async (req, res) => {
 });
 
 // Tek sipariş getir (Admin)
-router.get('/:id', requireAdmin, async (req, res) => {
+router.get('/:id', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
     const order = await Order.findById(req.params.id);
@@ -626,7 +634,7 @@ router.get('/:id', requireAdmin, async (req, res) => {
 });
 
 // Sipariş durumu güncelle (Admin)
-router.patch('/:id/status', requireAdmin, async (req, res) => {
+router.patch('/:id/status', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
     const { status, trackingNumber, shippingCompany } = req.body;
@@ -834,7 +842,7 @@ router.patch('/:id', optionalAuth, asyncHandler(async (req, res) => {
 }));
 
 // Sipariş sil (Admin)
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
     const deleted = await Order.findByIdAndDelete(req.params.id);
@@ -859,7 +867,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 });
 
 // Tüm siparişleri sil (Admin)
-router.delete('/', requireAdmin, async (req, res) => {
+router.delete('/', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
     await Order.deleteMany({});

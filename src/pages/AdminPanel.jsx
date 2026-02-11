@@ -4,34 +4,196 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Icon from '../components/Icon'
 import StarRating from '../components/StarRating'
-import GalleryForm from '../components/GalleryForm'
 import AnnouncementForm from '../components/AnnouncementForm'
+import ProductFormModal from '../components/ProductFormModal'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { API_URL } from '../config/api'
+import { applyTheme } from '../hooks/useSiteTheme'
+
+// Ana sayfayla aynı varsayılan carousel görselleri (sitede slayt yokken gösterilen)
+const DEFAULT_CAROUSEL_IMAGES = [
+  { id: 'def1', image: 'https://images.pexels.com/photos/1024311/pexels-photo-1024311.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', alt: 'Duvarda çerçeveli anı fotoğrafları', title: 'Anılarınızı Ölümsüzleştirin', subtitle: 'En değerli anılarınızı profesyonel çerçevelerle süsleyin' },
+  { id: 'def2', image: 'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', alt: 'Polo kartlar ve küçük fotoğraflar', title: 'Polo Kartlar ve Küçük Baskılar', subtitle: '10x15 ve 15x20 boyutlarında özel polo kartlar' },
+  { id: 'def3', image: 'https://images.pexels.com/photos/1024311/pexels-photo-1024311.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', alt: 'Anı duvarı aile fotoğrafları', title: 'Aile Anılarınız', subtitle: 'Sevdiklerinizle geçirdiğiniz özel anları çerçeveleyin' },
+  { id: 'def4', image: 'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop', alt: 'Çerçeveli fotoğraf koleksiyonu', title: 'Fotoğraf Koleksiyonunuz', subtitle: 'Farklı boyutlarda profesyonel baskı ve çerçeveleme' }
+]
+
+const CAROUSEL_HIDDEN_DEFAULTS_KEY = 'carousel_hidden_default_ids'
+
+function getHiddenDefaultIds() {
+  try {
+    return JSON.parse(localStorage.getItem(CAROUSEL_HIDDEN_DEFAULTS_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+function setHiddenDefaultIds(ids) {
+  localStorage.setItem(CAROUSEL_HIDDEN_DEFAULTS_KEY, JSON.stringify(ids))
+}
+
+function CarouselSlideForm({ slide, apiUrl, headers, onSuccess, onCancel }) {
+  const [image, setImage] = useState(slide?.image || '')
+  const [alt, setAlt] = useState(slide?.alt || '')
+  const [title, setTitle] = useState(slide?.title || '')
+  const [subtitle, setSubtitle] = useState(slide?.subtitle || '')
+  const [saving, setSaving] = useState(false)
+  const [localFile, setLocalFile] = useState(null)
+  const isEdit = !!slide?.id || !!slide?._id
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      alert('Lütfen bir görsel dosyası seçin (JPG, PNG, vb.)')
+      return
+    }
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImage(reader.result)
+      setLocalFile(file.name)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const clearFile = () => {
+    setLocalFile(null)
+    if (slide?.image) setImage(slide.image)
+    else setImage('')
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const imageToSend = image?.trim()
+    if (!imageToSend) {
+      alert('Görsel URL girin veya bilgisayardan bir görsel yükleyin.')
+      return
+    }
+    setSaving(true)
+    try {
+      const body = { image: imageToSend, alt: alt.trim(), title: title.trim(), subtitle: subtitle.trim() }
+      const url = isEdit ? `${apiUrl}/carousel/admin/${slide.id || slide._id}` : `${apiUrl}/carousel/admin`
+      const method = isEdit ? 'PUT' : 'POST'
+      const res = await fetch(url, { method, headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        onSuccess()
+      } else {
+        alert(data.error || data.message || 'Kaydedilemedi')
+      }
+    } catch (err) {
+      alert(err.message || 'Kaydedilemedi')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputStyle = { width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.95rem' }
+  return (
+    <div style={{ padding: '1.25rem', background: '#f5f6f8', borderRadius: '12px', marginBottom: '1.5rem', maxWidth: '480px' }}>
+      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem' }}>{isEdit ? 'Slayt düzenle' : 'Yeni slayt'}</h3>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem', fontWeight: '600', color: '#444' }}>Görsel *</label>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="url"
+              value={localFile ? '' : (image?.startsWith?.('data:') ? '' : (image || ''))}
+              onChange={(e) => { setLocalFile(null); setImage(e.target.value) }}
+              placeholder="URL veya dosya seçin"
+              style={{ ...inputStyle, flex: '1', minWidth: '180px' }}
+            />
+            <label style={{ padding: '0.5rem 0.75rem', background: '#fff', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
+              Dosya seç
+              <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+            </label>
+          </div>
+          {localFile && (
+            <span style={{ fontSize: '0.85rem', color: '#2e7d32', marginTop: '0.25rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              ✓ {localFile}
+              <button type="button" onClick={clearFile} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '0.8rem', padding: 0 }}>Kaldır</button>
+            </span>
+          )}
+          {(image && (image.startsWith('data:') || image.startsWith('http'))) && (
+            <div style={{ marginTop: '0.5rem', width: '100px', height: '56px', borderRadius: '8px', overflow: 'hidden', background: '#eee' }}>
+              <img src={image} alt="Önizleme" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem', fontWeight: '600', color: '#444' }}>Başlık</label>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Başlık" style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem', fontWeight: '600', color: '#444' }}>Alt başlık</label>
+            <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="Alt başlık" style={inputStyle} />
+          </div>
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem', fontWeight: '600', color: '#444' }}>Alt metin (opsiyonel)</label>
+          <input type="text" value={alt} onChange={(e) => setAlt(e.target.value)} placeholder="Görsel açıklaması" style={inputStyle} />
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+          <button type="submit" disabled={saving} style={{ padding: '0.5rem 1rem', background: 'var(--primary-color)', color: '#000', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem' }}>
+            {saving ? 'Kaydediliyor…' : (isEdit ? 'Güncelle' : 'Ekle')}
+          </button>
+          <button type="button" onClick={onCancel} style={{ padding: '0.5rem 1rem', background: '#95a5a6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+            İptal
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
 
 function AdminPanel() {
   const navigate = useNavigate()
-  const { user, isAuthenticated, isAdmin, getAuthHeaders, token } = useAuth()
+  const { user, isAuthenticated, isAdmin, getAuthHeaders, token, loading: authLoading } = useAuth()
+  const toast = useToast()
   const [activeTab, setActiveTab] = useState('orders')
   const [orders, setOrders] = useState([])
   const [users, setUsers] = useState([])
   const [reviews, setReviews] = useState([])
-  const [galleries, setGalleries] = useState([])
+  const [products, setProducts] = useState([])
   const [announcements, setAnnouncements] = useState([])
+  const [carouselSlides, setCarouselSlides] = useState([])
+  const [hiddenDefaultCarouselIds, setHiddenDefaultCarouselIds] = useState(() => getHiddenDefaultIds())
+  const [selectedCarouselSlide, setSelectedCarouselSlide] = useState(null)
+  const [showCarouselForm, setShowCarouselForm] = useState(false)
+  const [pageContents, setPageContents] = useState([])
+  const [selectedPageSlug, setSelectedPageSlug] = useState(null)
+  const [pageEditTitle, setPageEditTitle] = useState('')
+  const [pageEditContent, setPageEditContent] = useState('')
+  const [pageContentLoading, setPageContentLoading] = useState(false)
+  const [pageSaving, setPageSaving] = useState(false)
+  const [themeColors, setThemeColors] = useState({
+    primaryColor: '#2563eb',
+    primaryDark: '#1d4ed8',
+    primaryLight: '#93c5fd',
+    secondaryColor: '#14b8a6',
+    textColor: '#0f172a',
+    textLight: '#64748b',
+    bgColor: '#ffffff',
+    bgLight: '#f8fafc',
+    bgGray: '#f1f5f9',
+    borderColor: '#e2e8f0'
+  })
+  const [themeSaving, setThemeSaving] = useState(false)
   const [stats, setStats] = useState(null)
+  const [selectedProduct, setSelectedProduct] = useState(null)
+  const [showProductForm, setShowProductForm] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [selectedUser, setSelectedUser] = useState(null)
   const [selectedReview, setSelectedReview] = useState(null)
-  const [selectedGallery, setSelectedGallery] = useState(null)
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null)
-  const [showGalleryForm, setShowGalleryForm] = useState(false)
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [reviewFilter, setReviewFilter] = useState('all')
-  const [galleryFilter, setGalleryFilter] = useState('all')
   const [announcementTypeFilter, setAnnouncementTypeFilter] = useState('all')
   const [announcementStatusFilter, setAnnouncementStatusFilter] = useState('all')
   
@@ -64,15 +226,75 @@ function AdminPanel() {
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(false)
 
   useEffect(() => {
-    // Admin kontrolü
+    if (authLoading) return
     if (!isAuthenticated || !isAdmin || !token) {
       navigate('/')
       return
     }
-    
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate, activeTab, isAuthenticated, isAdmin, token])
+  }, [navigate, isAuthenticated, isAdmin, token, authLoading])
+
+  // Renkler sekmesine girildiğinde mevcut temayı çek
+  useEffect(() => {
+    if (activeTab !== 'theme') return
+    const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+    fetch(`${apiUrl}/theme`)
+      .then(res => res.json())
+      .then(data => { if (data.success && data.theme) setThemeColors(prev => ({ ...prev, ...data.theme })) })
+      .catch(() => {})
+  }, [activeTab])
+
+  // Sayfa içerikleri sekmesine girildiğinde listeyi çek ve ilk sayfayı seç (mevcut yazılar görünsün)
+  useEffect(() => {
+    if (activeTab !== 'pages' || !token) return
+    const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+    fetch(`${apiUrl}/pages`, { headers: getAuthHeaders() })
+      .then(res => res.json())
+      .then(data => { if (data.success && data.pages) setPageContents(data.pages) })
+      .catch(() => {})
+    if (!selectedPageSlug) setSelectedPageSlug('about')
+  }, [activeTab, token])
+
+  // Seçili sayfa içeriğini yükle (sitedeki mevcut / varsayılan yazılar gelir)
+  useEffect(() => {
+    if (!selectedPageSlug || !token) return
+    setPageContentLoading(true)
+    const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+    fetch(`${apiUrl}/pages/admin/${selectedPageSlug}`, { headers: getAuthHeaders() })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.page) {
+          setPageEditTitle(data.page.pageTitle || '')
+          setPageEditContent(data.page.content || '')
+        }
+      })
+      .catch(() => {})
+      .finally(() => setPageContentLoading(false))
+  }, [selectedPageSlug, token])
+
+  // Carousel sekmesine girildiğinde carousel verisini tekrar çek (görünür olsun)
+  useEffect(() => {
+    if (activeTab !== 'carousel') return
+    const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+    const headers = token ? getAuthHeaders() : {}
+    fetch(`${apiUrl}/carousel/admin/all`, { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.slides)) {
+          setCarouselSlides(data.slides)
+          return
+        }
+        // Admin API slayt dönmediyse sitede gösterilenleri public API ile al
+        return fetch(`${apiUrl}/carousel`).then(r => r.json())
+      })
+      .then(data => {
+        if (data && data.success && Array.isArray(data.slides) && data.slides.length > 0) {
+          setCarouselSlides(data.slides)
+        }
+      })
+      .catch(() => {})
+  }, [activeTab, token])
 
   const fetchData = async () => {
     try {
@@ -89,99 +311,48 @@ function AdminPanel() {
 
       const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
       const headers = getAuthHeaders()
-      
-      // API request log kaldırıldı (gereksiz)
 
-      if (activeTab === 'orders') {
-        const response = await fetch(`${apiUrl}/admin/orders`, { headers })
-        const data = await response.json()
-        
-        // Kısa log - base64 içermiyor
-        if (data.success) {
-          console.log('✅ Siparişler:', data.orders?.length || 0, 'adet')
-        } else {
-          console.warn('⚠️ Siparişler alınamadı:', data.message || data.error)
-        }
-        
-        // Eğer rawCount undefined ise, backend'de bir sorun var
-        if (data.rawCount === undefined) {
-          console.error('❌ Backend rawCount eksik')
-        }
-        
-        if (response.ok) {
-          if (data.success) {
-            setOrders(data.orders || [])
-            
-            // Eğer sipariş yoksa logla
-            if (!data.orders || data.orders.length === 0) {
-              console.warn('⚠️ Sipariş bulunamadı')
-            }
-          } else {
-            console.error('❌ Hata:', data.message || data.error)
-            throw new Error(data.message || 'Siparişler yüklenemedi')
-          }
-        } else {
-          console.error('❌ Hata:', response.status, data.message || data.error)
-          throw new Error(data.message || data.error || 'Siparişler yüklenemedi')
-        }
-      } else if (activeTab === 'users') {
-        const response = await fetch(`${apiUrl}/admin/users`, { headers })
-        const data = await response.json()
-        
-        if (response.ok) {
-          if (data.success) {
-            setUsers(data.users || [])
-          } else {
-            throw new Error(data.message || 'Kullanıcılar yüklenemedi')
-          }
-        } else {
-          console.error('❌ Users hatası:', response.status, data.message || data.error)
-          throw new Error(data.message || data.error || 'Kullanıcılar yüklenemedi')
-        }
-      } else if (activeTab === 'stats') {
-        const response = await fetch(`${apiUrl}/admin/stats`, { headers })
-        const data = await response.json()
-        
-        if (response.ok) {
-          if (data.success) {
-            setStats(data.stats)
-          } else {
-            throw new Error(data.message || 'İstatistikler yüklenemedi')
-          }
-        } else {
-          console.error('❌ Stats hatası:', response.status, data.message || data.error)
-          throw new Error(data.message || data.error || 'İstatistikler yüklenemedi')
-        }
-      } else if (activeTab === 'reviews') {
-        const response = await fetch(`${apiUrl}/reviews/admin/all`, { headers })
-        const data = await response.json()
-        
-        if (response.ok && data.success) {
-          setReviews(data.reviews || [])
-        } else {
-          throw new Error(data.message || 'Yorumlar yüklenemedi')
-        }
-      } else if (activeTab === 'gallery') {
-        const filter = galleryFilter !== 'all' ? `?category=${galleryFilter}` : ''
-        const response = await fetch(`${apiUrl}/gallery/admin/all${filter}`, { headers })
-        const data = await response.json()
-        
-        if (response.ok && data.success) {
-          setGalleries(data.galleries || [])
-        } else {
-          throw new Error(data.message || 'Galeri yüklenemedi')
-        }
-      } else if (activeTab === 'announcements') {
-        const typeFilter = announcementTypeFilter !== 'all' ? `?type=${announcementTypeFilter}` : ''
-        const statusFilter = announcementStatusFilter !== 'all' ? `${typeFilter ? '&' : '?'}isActive=${announcementStatusFilter === 'active'}` : ''
-        const response = await fetch(`${apiUrl}/announcements/admin/all${typeFilter}${statusFilter}`, { headers })
-        const data = await response.json()
-        
-        if (response.ok && data.success) {
-          setAnnouncements(data.announcements || [])
-        } else {
-          throw new Error(data.message || 'Popup\'lar yüklenemedi')
-        }
+      // Panele girer girmez tüm verileri paralel çek (sekmelerde 0 görünmesin)
+      const [ordersRes, usersRes, statsRes, reviewsRes, productsRes, announcementsRes, carouselRes] = await Promise.all([
+        fetch(`${apiUrl}/admin/orders`, { headers }),
+        fetch(`${apiUrl}/admin/users`, { headers }),
+        fetch(`${apiUrl}/admin/stats`, { headers }),
+        fetch(`${apiUrl}/reviews/admin/all`, { headers }),
+        fetch(`${apiUrl}/products/admin/all`, { headers }),
+        fetch(`${apiUrl}/announcements/admin/all`, { headers }),
+        fetch(`${apiUrl}/carousel/admin/all`, { headers })
+      ])
+
+      const ordersData = await ordersRes.json()
+      const usersData = await usersRes.json()
+      const statsData = await statsRes.json()
+      const reviewsData = await reviewsRes.json()
+      const productsData = await productsRes.json()
+      const announcementsData = await announcementsRes.json()
+      const carouselData = await carouselRes.json()
+
+      if (ordersRes.ok && ordersData.success) {
+        setOrders(ordersData.orders || [])
+      } else if (!ordersRes.ok) {
+        setError(ordersData.message || ordersData.error || 'Siparişler yüklenemedi')
+      }
+      if (usersRes.ok && usersData.success) {
+        setUsers(usersData.users || [])
+      }
+      if (statsRes.ok && statsData.success) {
+        setStats(statsData.stats)
+      }
+      if (reviewsRes.ok && reviewsData.success) {
+        setReviews(reviewsData.reviews || [])
+      }
+      if (productsRes.ok && productsData.success) {
+        setProducts(productsData.products || [])
+      }
+      if (announcementsRes.ok && announcementsData.success) {
+        setAnnouncements(announcementsData.announcements || [])
+      }
+      if (carouselRes.ok && carouselData.success) {
+        setCarouselSlides(carouselData.slides || [])
       }
     } catch (err) {
       console.error('❌ Veri yükleme hatası:', err.message)
@@ -304,7 +475,7 @@ function AdminPanel() {
       })
       const data = await response.json()
       if (response.ok && data.success) {
-        alert(`✅ Veritabanı temizlendi!\n\nSilinen:\n- ${data.deleted.orders} sipariş\n- ${data.deleted.users} kullanıcı\n- ${data.deleted.galleries} galeri\n- ${data.deleted.categories} kategori\n- ${data.deleted.reviews} yorum\n- ${data.deleted.announcements} duyuru`)
+        toast.show(`Veritabanı temizlendi.\nSilinen: ${data.deleted.orders} sipariş, ${data.deleted.users} kullanıcı, ${data.deleted.galleries} galeri, ${data.deleted.categories} kategori, ${data.deleted.reviews} yorum, ${data.deleted.announcements} duyuru`, 'success')
         setClearDatabaseConfirm(false)
         await fetchData()
       } else {
@@ -318,6 +489,15 @@ function AdminPanel() {
     } finally {
       setClearDatabaseLoading(false)
     }
+  }
+
+  // Şifre çözülememiş base64 string'leri gösterme (backend çözemediyse)
+  const maskIfEncrypted = (val) => {
+    if (val == null || val === '') return '—'
+    if (typeof val !== 'string') return String(val)
+    const t = val.replace(/\s/g, '')
+    if (t.length > 60 && /^[A-Za-z0-9+/]+=*$/.test(t)) return '—'
+    return val
   }
 
   // Siparişleri orderGroupId'ye göre grupla
@@ -366,6 +546,19 @@ function AdminPanel() {
       (user.phone || '').includes(searchTerm)
     )
   })
+
+  if (authLoading) {
+    return (
+      <>
+        <Navbar />
+        <div className="container" style={{ padding: '2rem 0', textAlign: 'center', minHeight: '40vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem' }}>
+          <p style={{ color: '#666', fontSize: '1.1rem' }}>Giriş bilgileri yükleniyor…</p>
+          <div style={{ width: '40px', height: '40px', border: '4px solid #eee', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </>
+    )
+  }
 
   if (!isAuthenticated || !isAdmin) {
     return null
@@ -432,7 +625,7 @@ function AdminPanel() {
               transition: 'all 0.2s'
             }}
           >
-            <Icon name="cart" size={16} /> Siparişler ({orders.length})
+            <Icon name="cart" size={16} /> Siparişler ({loading ? '…' : orders.length})
           </button>
           <button
             onClick={() => setActiveTab('users')}
@@ -448,7 +641,7 @@ function AdminPanel() {
               transition: 'all 0.2s'
             }}
           >
-            <Icon name="user" size={16} /> Kullanıcılar ({users.length})
+            <Icon name="user" size={16} /> Kullanıcılar ({loading ? '…' : users.length})
           </button>
           <button
             onClick={() => setActiveTab('stats')}
@@ -496,23 +689,23 @@ function AdminPanel() {
               transition: 'all 0.2s'
             }}
           >
-            <Icon name="check-circle" size={16} /> Yorumlar ({reviews.length})
+            <Icon name="check-circle" size={16} /> Yorumlar ({loading ? '…' : reviews.length})
           </button>
           <button
-            onClick={() => setActiveTab('gallery')}
+            onClick={() => setActiveTab('products')}
             style={{
               padding: '1rem 2rem',
-              background: activeTab === 'gallery' ? 'var(--primary-color)' : 'transparent',
-              color: activeTab === 'gallery' ? '#000000' : '#666',
+              background: activeTab === 'products' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'products' ? '#000000' : '#666',
               border: 'none',
-              borderBottom: activeTab === 'gallery' ? '3px solid #000000' : '3px solid transparent',
+              borderBottom: activeTab === 'products' ? '3px solid #000000' : '3px solid transparent',
               cursor: 'pointer',
               fontWeight: 'bold',
               fontSize: '1rem',
               transition: 'all 0.2s'
             }}
           >
-            <Icon name="image" size={16} /> Ürünler ({galleries.length})
+            <Icon name="ruler" size={16} /> Ürünler ({loading ? '…' : products.length})
           </button>
           <button
             onClick={() => setActiveTab('announcements')}
@@ -528,7 +721,55 @@ function AdminPanel() {
               transition: 'all 0.2s'
             }}
           >
-            <Icon name="megaphone" size={16} /> Popup'lar ({announcements.length})
+            <Icon name="megaphone" size={16} /> Popup'lar ({loading ? '…' : announcements.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('carousel')}
+            style={{
+              padding: '1rem 2rem',
+              background: activeTab === 'carousel' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'carousel' ? '#000000' : '#666',
+              border: 'none',
+              borderBottom: activeTab === 'carousel' ? '3px solid #000000' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Icon name="camera" size={16} /> Carousel ({loading ? '…' : carouselSlides.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('pages')}
+            style={{
+              padding: '1rem 2rem',
+              background: activeTab === 'pages' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'pages' ? '#000000' : '#666',
+              border: 'none',
+              borderBottom: activeTab === 'pages' ? '3px solid #000000' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Icon name="edit" size={16} /> Sayfa İçerikleri
+          </button>
+          <button
+            onClick={() => setActiveTab('theme')}
+            style={{
+              padding: '1rem 2rem',
+              background: activeTab === 'theme' ? 'var(--primary-color)' : 'transparent',
+              color: activeTab === 'theme' ? '#000000' : '#666',
+              border: 'none',
+              borderBottom: activeTab === 'theme' ? '3px solid #000000' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            Renkler
           </button>
         </div>
 
@@ -639,7 +880,7 @@ function AdminPanel() {
                 )}
               </div>
             ) : (
-              <div style={{ overflowX: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+              <div className="table-responsive" style={{ overflowX: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
                   <thead>
                     <tr style={{ background: '#2c3e50', color: 'white' }}>
@@ -693,12 +934,14 @@ function AdminPanel() {
                             <td style={{ padding: '1rem' }}>
                               {/* Birden fazla fotoğraf varsa göster */}
                               {order.photos && order.photos.length > 0 ? (
-                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                  {order.photos.slice(0, 3).map((photo, idx) => (
-                                    photo?.base64 ? (
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                  {order.photos.slice(0, 3).map((photo, idx) => {
+                                    if (typeof photo !== 'object' || !photo || typeof photo.base64 !== 'string') return null
+                                    const base64 = photo.base64
+                                    return (
                                       <img 
                                         key={idx}
-                                        src={`data:${photo.mimetype || 'image/jpeg'};base64,${photo.base64}`}
+                                        src={`data:${(photo.mimetype || 'image/jpeg')};base64,${base64}`}
                                         alt={`Fotoğraf ${idx + 1}`}
                                         style={{
                                           width: '60px',
@@ -711,9 +954,10 @@ function AdminPanel() {
                                         }}
                                         onClick={() => setSelectedOrder(order)}
                                         title={`${order.photos.length} fotoğraf - Tıklayarak detayları görüntüleyin`}
+                                        onError={(e) => { e.target.style.display = 'none' }}
                                       />
-                                    ) : null
-                                  ))}
+                                    )
+                                  })}
                                   {order.photos.length > 3 && (
                                     <div style={{
                                       width: '60px',
@@ -769,17 +1013,15 @@ function AdminPanel() {
                               )}
                             </td>
                         <td style={{ padding: '1rem' }}>
-                          {order.customerInfo?.firstName || 'Müşteri'} {order.customerInfo?.lastName || ''}
+                          {maskIfEncrypted(order.customerInfo?.firstName) || 'Müşteri'} {maskIfEncrypted(order.customerInfo?.lastName) || ''}
                         </td>
                         <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <Icon name="mail" size={14} /> {order.customerInfo?.email || '-'}
+                            <Icon name="mail" size={14} /> {(maskIfEncrypted(order.customerInfo?.email) && maskIfEncrypted(order.customerInfo?.email) !== '—') ? maskIfEncrypted(order.customerInfo?.email) : 'Belirtilmedi'}
                           </div>
-                          {order.customerInfo?.phone && (
-                            <div style={{ color: '#666', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <Icon name="phone" size={14} /> {order.customerInfo.phone}
-                            </div>
-                          )}
+                          <div style={{ color: '#666', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <Icon name="phone" size={14} /> {(maskIfEncrypted(order.customerInfo?.phone) && maskIfEncrypted(order.customerInfo?.phone) !== '—') ? maskIfEncrypted(order.customerInfo?.phone) : 'Belirtilmedi'}
+                          </div>
                         </td>
                         <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
                           <div><strong>Boyut:</strong> {
@@ -931,7 +1173,7 @@ function AdminPanel() {
                 <h2 style={{ color: '#666' }}>Kullanıcı bulunamadı</h2>
               </div>
             ) : (
-              <div style={{ overflowX: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+              <div className="table-responsive" style={{ overflowX: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: '#2c3e50', color: 'white' }}>
@@ -1494,7 +1736,7 @@ function AdminPanel() {
                               })
                               const data = await response.json()
                               if (data.success) {
-                                alert('Yorum onaylandı')
+                                toast.show('Yorum onaylandı', 'success')
                                 fetchData()
                               }
                             } catch (error) {
@@ -1530,7 +1772,7 @@ function AdminPanel() {
                               })
                               const data = await response.json()
                               if (data.success) {
-                                alert('Yorum reddedildi')
+                                toast.show('Yorum reddedildi', 'success')
                                 fetchData()
                               }
                             } catch (error) {
@@ -1552,22 +1794,22 @@ function AdminPanel() {
                       )}
                       <button
                         onClick={async () => {
-                          if (confirm('Bu yorumu silmek istediğinizden emin misiniz?')) {
-                            try {
-                              const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
-                              const headers = getAuthHeaders()
-                              const response = await fetch(`${apiUrl}/reviews/admin/${review._id}`, {
-                                method: 'DELETE',
-                                headers
-                              })
-                              const data = await response.json()
-                              if (data.success) {
-                                alert('Yorum silindi')
-                                fetchData()
-                              }
-                            } catch (error) {
-                              console.error('Yorum silme hatası:', error)
+                          const ok = await toast.confirm('Bu yorumu silmek istediğinizden emin misiniz?', 'Yorumu sil')
+                          if (!ok) return
+                          try {
+                            const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                            const headers = getAuthHeaders()
+                            const response = await fetch(`${apiUrl}/reviews/admin/${review._id}`, {
+                              method: 'DELETE',
+                              headers
+                            })
+                            const data = await response.json()
+                            if (data.success) {
+                              toast.show('Yorum silindi', 'success')
+                              fetchData()
                             }
+                          } catch (error) {
+                            console.error('Yorum silme hatası:', error)
                           }
                         }}
                         style={{
@@ -1582,224 +1824,6 @@ function AdminPanel() {
                       >
                         Sil
                       </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Gallery Tab */}
-        {activeTab === 'gallery' && (
-          <>
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              marginBottom: '1.5rem',
-              flexWrap: 'wrap',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <select
-                value={galleryFilter}
-                onChange={(e) => {
-                  setGalleryFilter(e.target.value)
-                  fetchData()
-                }}
-                style={{
-                  padding: '0.75rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontSize: '1rem'
-                }}
-              >
-                <option value="all">Tüm Kategoriler</option>
-                <option value="10x15">10x15 cm</option>
-                <option value="15x20">15x20 cm</option>
-                <option value="20x30">20x30 cm</option>
-                <option value="30x40">30x40 cm</option>
-                <option value="30x45">30x45 cm</option>
-                <option value="40x50">40x50 cm</option>
-                <option value="50x70">50x70 cm</option>
-                <option value="70x100">70x100 cm</option>
-                <option value="custom">Özel Boyut</option>
-              </select>
-              <button
-                onClick={() => {
-                  setSelectedGallery(null)
-                  setShowGalleryForm(true)
-                }}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#667eea',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                <Icon name="plus" size={16} style={{ marginRight: '0.5rem' }} />
-                Yeni Ürün Ekle
-              </button>
-            </div>
-
-            {/* Galeri Form Modal */}
-            {showGalleryForm && (
-              <div style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0, 0, 0, 0.7)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10000,
-                padding: '2rem'
-              }}
-              onClick={() => {
-                setShowGalleryForm(false)
-                setSelectedGallery(null)
-              }}
-              >
-                <div
-                  style={{
-                    background: 'white',
-                    borderRadius: '12px',
-                    padding: '2rem',
-                    maxWidth: '600px',
-                    width: '100%',
-                    maxHeight: '90vh',
-                    overflowY: 'auto'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <h2 style={{ marginTop: 0 }}>
-                    {selectedGallery ? 'Ürünü Düzenle' : 'Yeni Ürün Ekle'}
-                  </h2>
-                  <GalleryForm
-                    gallery={selectedGallery}
-                    onSuccess={() => {
-                      setShowGalleryForm(false)
-                      setSelectedGallery(null)
-                      fetchData()
-                    }}
-                    onCancel={() => {
-                      setShowGalleryForm(false)
-                      setSelectedGallery(null)
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {galleries.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem' }}>
-                <p>Henüz ürün yok.</p>
-                <p style={{ color: '#666', marginTop: '0.5rem' }}>Yukarıdaki &quot;Yeni Ürün Ekle&quot; butonu ile ürün ekleyebilirsiniz.</p>
-              </div>
-            ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: '1.5rem'
-              }}>
-                {galleries.map((gallery) => (
-                  <div
-                    key={gallery._id}
-                    style={{
-                      background: 'white',
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      border: gallery.isVisible ? '2px solid #10b981' : '2px solid #f59e0b'
-                    }}
-                  >
-                    <div style={{
-                      width: '100%',
-                      height: '200px',
-                      overflow: 'hidden',
-                      background: '#f3f4f6'
-                    }}>
-                      {gallery.image?.base64 && (
-                        <img
-                          src={`data:${gallery.image.mimetype || 'image/jpeg'};base64,${gallery.image.base64}`}
-                          alt={gallery.title}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover'
-                          }}
-                        />
-                      )}
-                    </div>
-                    <div style={{ padding: '1rem' }}>
-                      <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>
-                        {gallery.title}
-                      </h3>
-                      <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>
-                        <div>Kategori: {gallery.category}</div>
-                        <div>Boyut: {gallery.size}</div>
-                        <div>Görünür: {gallery.isVisible ? 'Evet' : 'Hayır'}</div>
-                        <div>Öne Çıkan: {gallery.isFeatured ? 'Evet' : 'Hayır'}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => {
-                            setSelectedGallery(gallery)
-                            setShowGalleryForm(true)
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: '0.5rem',
-                            background: '#667eea',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem'
-                          }}
-                        >
-                          Düzenle
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (confirm('Bu galeri öğesini silmek istediğinizden emin misiniz?')) {
-                              try {
-                                const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
-                                const headers = getAuthHeaders()
-                                const response = await fetch(`${apiUrl}/gallery/admin/${gallery._id}`, {
-                                  method: 'DELETE',
-                                  headers
-                                })
-                                const data = await response.json()
-                                if (data.success) {
-                                  alert('Galeri öğesi silindi')
-                                  fetchData()
-                                }
-                              } catch (error) {
-                                console.error('Galeri silme hatası:', error)
-                              }
-                            }
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: '0.5rem',
-                            background: '#ef4444',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem'
-                          }}
-                        >
-                          Sil
-                        </button>
-                      </div>
                     </div>
                   </div>
                 ))}
@@ -2086,22 +2110,52 @@ function AdminPanel() {
 
                 <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
                   <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Müşteri Bilgileri</h3>
-                  <div><strong>Ad Soyad:</strong> {selectedOrder.customerInfo?.firstName || 'Müşteri'} {selectedOrder.customerInfo?.lastName || ''}</div>
-                  <div style={{ marginTop: '0.5rem' }}><strong>E-posta:</strong> {selectedOrder.customerInfo?.email || '-'}</div>
-                  {selectedOrder.customerInfo?.phone && (
-                    <div style={{ marginTop: '0.5rem' }}><strong>Telefon:</strong> {selectedOrder.customerInfo.phone}</div>
-                  )}
-                  <div style={{ marginTop: '0.5rem' }}>
-                    <strong>Adres:</strong>
-                    <p style={{ margin: '0.5rem 0 0 0', color: '#666' }}>{selectedOrder.customerInfo?.address || '-'}</p>
-                  </div>
+                  {(() => {
+                    const ci = selectedOrder?.customerInfo;
+                    const adSoyad = [maskIfEncrypted(ci?.firstName), maskIfEncrypted(ci?.lastName)].filter(Boolean).join(' ').trim();
+                    const eposta = maskIfEncrypted(ci?.email);
+                    const telefon = maskIfEncrypted(ci?.phone);
+                    const adres = maskIfEncrypted(ci?.address);
+                    const bosDeger = 'Belirtilmedi';
+                    const hepsiBos = [adSoyad, eposta, telefon, adres].every(v => !v || v === '—');
+                    const decryptionFailed = !!selectedOrder?._decryptionFailed;
+                    return (
+                      <>
+                        {hepsiBos && (
+                          <p style={{ margin: '0 0 0.75rem 0', padding: '0.5rem 0.75rem', background: decryptionFailed ? '#fee2e2' : '#fef3c7', color: decryptionFailed ? '#991b1b' : '#92400e', borderRadius: '6px', fontSize: '0.9rem' }}>
+                            {decryptionFailed
+                              ? 'Müşteri bilgileri şifrelenmiş ancak çözülemedi. Sunucuda .env dosyasında ENCRYPTION_KEY değerinin, sipariş oluşturulurken kullanılan anahtar ile aynı olduğundan emin olun. Backend\'i doğru anahtar ile yeniden başlatın.'
+                              : 'Bu siparişte müşteri bilgisi bulunamadı veya eski kayıt formatında.'}
+                          </p>
+                        )}
+                        <div><strong>Ad Soyad:</strong> {adSoyad || bosDeger}</div>
+                        <div style={{ marginTop: '0.5rem' }}><strong>E-posta:</strong> {(eposta && eposta !== '—') ? eposta : bosDeger}</div>
+                        <div style={{ marginTop: '0.5rem' }}><strong>Telefon:</strong> {(telefon && telefon !== '—') ? telefon : bosDeger}</div>
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <strong>Adres:</strong>
+                          <p style={{ margin: '0.5rem 0 0 0', color: '#666' }}>{(adres && String(adres) !== '—') ? adres : bosDeger}</p>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
-                {/* Birden fazla fotoğraf varsa göster */}
-                {selectedOrder.photos && selectedOrder.photos.length > 0 ? (
+                {/* Birden fazla fotoğraf varsa göster - tekilleştirilmiş (aynı fotoğraf iki kez kaydedilmişse bir kez göster) */}
+                {(() => {
+                  const rawPhotos = selectedOrder.photos && Array.isArray(selectedOrder.photos)
+                    ? selectedOrder.photos.filter(p => typeof p === 'object' && p && typeof p.base64 === 'string')
+                    : [];
+                  const seenKeys = new Set();
+                  const displayablePhotos = rawPhotos.filter((p) => {
+                    const key = (p.originalName || p.filename || '') + '-' + (p.base64?.length ?? 0);
+                    if (seenKeys.has(key)) return false;
+                    seenKeys.add(key);
+                    return true;
+                  });
+                  return displayablePhotos.length > 0 ? (
                   <div>
                     <h3 style={{ marginBottom: '1rem', color: '#2c3e50' }}>
-                      Fotoğraflar ({selectedOrder.photos.length} adet)
+                      Fotoğraflar ({displayablePhotos.length} adet)
                     </h3>
                     <div style={{
                       display: 'grid',
@@ -2109,9 +2163,8 @@ function AdminPanel() {
                       gap: '1rem',
                       marginBottom: '1rem'
                     }}>
-                      {selectedOrder.photos.map((photo, idx) => (
-                        photo?.base64 ? (
-                          <div key={idx} style={{ position: 'relative' }}>
+                      {displayablePhotos.map((photo, idx) => (
+                        <div key={idx} style={{ position: 'relative' }}>
                             <img 
                               src={`data:${photo.mimetype || 'image/jpeg'};base64,${photo.base64}`}
                               alt={`Fotoğraf ${idx + 1}`}
@@ -2157,11 +2210,10 @@ function AdminPanel() {
                               </div>
                             )}
                           </div>
-                        ) : null
                       ))}
                     </div>
                   </div>
-                ) : selectedOrder.photo?.base64 && (
+                ) : selectedOrder.photo?.base64 ? (
                   <div style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
                     <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Icon name="camera" size={18} /> Sipariş Fotoğrafı
@@ -2228,7 +2280,8 @@ function AdminPanel() {
                       )}
                     </div>
                   </div>
-                )}
+                ) : null;
+                })()}
 
                 {/* Sipariş Durumu Güncelleme Formu */}
                 <div style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px', border: '2px solid #667eea' }}>
@@ -2238,10 +2291,17 @@ function AdminPanel() {
                   
                   <form onSubmit={async (e) => {
                     e.preventDefault()
+                    if (!token) {
+                      toast.show('Oturum süreniz dolmuş olabilir. Lütfen tekrar giriş yapın.', 'error')
+                      return
+                    }
                     setStatusUpdateLoading(true)
                     try {
                       const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
-                      const headers = getAuthHeaders()
+                      const headers = {
+                        'Content-Type': 'application/json',
+                        ...(token && { Authorization: `Bearer ${token}` })
+                      }
                       
                       // Form değerlerini kullan, yoksa mevcut değerleri kullan
                       const updateData = {
@@ -2262,27 +2322,24 @@ function AdminPanel() {
                         updateData.shippingCompany = selectedOrder.shippingCompany
                       }
                       
-                      const response = await fetch(`${apiUrl}/orders/${selectedOrder._id || selectedOrder.id}/status`, {
+                      const response = await fetch(`${apiUrl}/admin/orders/${selectedOrder._id || selectedOrder.id}/status`, {
                         method: 'PATCH',
-                        headers: {
-                          ...headers,
-                          'Content-Type': 'application/json'
-                        },
+                        headers,
                         body: JSON.stringify(updateData)
                       })
 
                       const data = await response.json()
 
                       if (response.ok && data.success) {
-                        alert('Sipariş durumu başarıyla güncellendi!')
+                        toast.show('Sipariş durumu başarıyla güncellendi!', 'success')
                         setSelectedOrder(null)
                         fetchData()
                       } else {
-                        alert(data.message || 'Sipariş durumu güncellenemedi')
+                        toast.show(data.message || 'Sipariş durumu güncellenemedi', 'error')
                       }
                     } catch (error) {
                       console.error('Sipariş durumu güncelleme hatası:', error)
-                      alert('Sipariş durumu güncellenirken bir hata oluştu')
+                      toast.show('Sipariş durumu güncellenirken bir hata oluştu', 'error')
                     } finally {
                       setStatusUpdateLoading(false)
                     }
@@ -2409,6 +2466,94 @@ function AdminPanel() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Products Tab (Fiyat ürünleri) */}
+        {activeTab === 'products' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+              <button
+                onClick={() => { setSelectedProduct(null); setShowProductForm(true); }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'var(--primary-color)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <Icon name="plus" size={16} /> Ürün Ekle
+              </button>
+            </div>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>Yükleniyor...</div>
+            ) : (
+              <div className="table-responsive" style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#2c3e50', color: 'white' }}>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Boyut</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Ad</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Birim Fiyat</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Toplam (15 adet)</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>Öne çıkan</th>
+                      <th style={{ padding: '1rem', textAlign: 'left' }}>İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((p) => (
+                      <tr key={p.id || p._id} style={{ borderBottom: '1px solid #eee' }}>
+                        <td style={{ padding: '1rem' }}>{p.size}</td>
+                        <td style={{ padding: '1rem' }}>{p.name}</td>
+                        <td style={{ padding: '1rem' }}>₺{p.unitPrice}</td>
+                        <td style={{ padding: '1rem' }}>₺{p.totalPrice}</td>
+                        <td style={{ padding: '1rem' }}>{p.featured ? 'Evet' : 'Hayır'}</td>
+                        <td style={{ padding: '1rem' }}>
+                          <button
+                            onClick={() => { setSelectedProduct(p); setShowProductForm(true); }}
+                            style={{ marginRight: '0.5rem', padding: '0.4rem 0.8rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}
+                          >
+                            Düzenle
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const ok = await toast.confirm(`"${p.name}" ürününü silmek istediğinize emin misiniz?`, 'Ürünü sil')
+                              if (!ok) return
+                              try {
+                                const res = await fetch(`${API_URL.includes('/api') ? API_URL : `${API_URL}/api`}/products/admin/${p.id || p._id}`, { method: 'DELETE', headers: getAuthHeaders() })
+                                const data = await res.json()
+                                if (data.success) { toast.show('Ürün silindi', 'success'); fetchData(); }
+                              } catch (e) { console.error(e); }
+                            }}
+                            style={{ padding: '0.4rem 0.8rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}
+                          >
+                            Sil
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {products.length === 0 && !loading && (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Henüz ürün yok. "Ürün Ekle" ile ekleyin veya ana sayfayı açarak varsayılan ürünlerin yüklenmesini sağlayın.</div>
+                )}
+              </div>
+            )}
+            {showProductForm && (
+              <ProductFormModal
+                product={selectedProduct}
+                onClose={() => { setShowProductForm(false); setSelectedProduct(null); fetchData(); }}
+                onSave={() => { setShowProductForm(false); setSelectedProduct(null); fetchData(); }}
+                apiUrl={API_URL.includes('/api') ? API_URL : `${API_URL}/api`}
+                getAuthHeaders={getAuthHeaders}
+              />
+            )}
+          </>
         )}
 
         {/* Announcements Tab */}
@@ -2599,23 +2744,24 @@ function AdminPanel() {
                           </button>
                           <button
                             onClick={async () => {
-                              if (confirm('Bu popup\'ı silmek istediğinizden emin misiniz?')) {
-                                try {
-                                  const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
-                                  const headers = getAuthHeaders()
-                                  const response = await fetch(`${apiUrl}/announcements/admin/${announcement._id || announcement.id}`, {
-                                    method: 'DELETE',
-                                    headers
-                                  })
-                                  const data = await response.json()
-                                  if (data.success) {
-                                    await fetchData()
-                                  } else {
-                                    setError(data.message || 'Silme başarısız')
-                                  }
-                                } catch (error) {
-                                  setError('Silme hatası: ' + error.message)
+                              const ok = await toast.confirm('Bu popup\'ı silmek istediğinizden emin misiniz?', 'Popup\'ı sil')
+                              if (!ok) return
+                              try {
+                                const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                                const headers = getAuthHeaders()
+                                const response = await fetch(`${apiUrl}/announcements/admin/${announcement._id || announcement.id}`, {
+                                  method: 'DELETE',
+                                  headers
+                                })
+                                const data = await response.json()
+                                if (data.success) {
+                                  toast.show('Popup silindi', 'success')
+                                  await fetchData()
+                                } else {
+                                  setError(data.message || 'Silme başarısız')
                                 }
+                              } catch (error) {
+                                setError('Silme hatası: ' + error.message)
                               }
                             }}
                             style={{
@@ -2748,6 +2894,286 @@ function AdminPanel() {
                 </div>
               </div>
             )}
+          </>
+        )}
+
+        {activeTab === 'carousel' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-color)' }}>Carousel</h2>
+              <button
+                type="button"
+                onClick={() => { setSelectedCarouselSlide(null); setShowCarouselForm(true) }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: 'var(--primary-color)',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontSize: '0.9rem'
+                }}
+              >
+                <Icon name="plus" size={14} /> Yeni slayt
+              </button>
+            </div>
+            {showCarouselForm && (
+              <CarouselSlideForm
+                slide={selectedCarouselSlide}
+                apiUrl={API_URL.includes('/api') ? API_URL : `${API_URL}/api`}
+                headers={getAuthHeaders()}
+                onSuccess={() => { setShowCarouselForm(false); setSelectedCarouselSlide(null); fetchData() }}
+                onCancel={() => { setShowCarouselForm(false); setSelectedCarouselSlide(null) }}
+              />
+            )}
+            <p style={{ color: '#666', fontSize: '0.85rem', marginBottom: '1rem' }}>
+              Ana sayfada dönen slaytlar. Eklediğiniz slaytlar öne alınır; yoksa varsayılan görseller kullanılır.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+              {(carouselSlides.length > 0 ? carouselSlides : DEFAULT_CAROUSEL_IMAGES.filter(s => !hiddenDefaultCarouselIds.includes(s.id))).map((slide, index) => {
+                const isFromDb = carouselSlides.some(s => (s.id || s._id) === (slide.id || slide._id))
+                return (
+                  <div
+                    key={slide.id || slide._id || index}
+                    style={{
+                      background: 'var(--bg-color)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                  >
+                    <div style={{ aspectRatio: '16/9', background: '#eee', position: 'relative' }}>
+                      <img
+                        src={slide.image}
+                        alt={slide.alt || ''}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.style.background = '#ccc' }}
+                      />
+                      {!isFromDb && (
+                        <span style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px' }}>Varsayılan</span>
+                      )}
+                    </div>
+                    <div style={{ padding: '0.6rem 0.75rem', flex: 1 }}>
+                      <div style={{ fontWeight: '600', fontSize: '0.9rem', marginBottom: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slide.title || 'Başlıksız'}</div>
+                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const slideToEdit = isFromDb ? slide : { ...slide, id: undefined, _id: undefined }
+                            setSelectedCarouselSlide(slideToEdit)
+                            setShowCarouselForm(true)
+                          }}
+                          style={{ flex: 1, padding: '0.4rem', background: '#3498db', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          Düzenle
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!window.confirm(isFromDb ? 'Bu slaytı silmek istediğinize emin misiniz?' : 'Bu varsayılan slaytı kaldırmak istediğinize emin misiniz?')) return
+                            if (isFromDb) {
+                              const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                              const res = await fetch(`${apiUrl}/carousel/admin/${slide.id || slide._id}`, { method: 'DELETE', headers: getAuthHeaders() })
+                              const data = await res.json()
+                              if (res.ok && data.success) {
+                                setCarouselSlides(prev => prev.filter(s => (s.id || s._id) !== (slide.id || slide._id)))
+                                toast.show('Slayt silindi', 'success')
+                              } else toast.show(data.error || 'Silinemedi', 'error')
+                            } else {
+                              const id = slide.id || slide._id
+                              const next = [...hiddenDefaultCarouselIds, id]
+                              setHiddenDefaultCarouselIds(next)
+                              setHiddenDefaultIds(next)
+                              toast.show('Kaldırıldı', 'success')
+                            }
+                          }}
+                          style={{ flex: 1, padding: '0.4rem', background: '#e74c3c', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          Sil
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {activeTab === 'pages' && (
+          <>
+            <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem', color: 'var(--text-color)' }}>Sayfa İçerikleri</h2>
+            <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
+              Sitedeki yazılı sayfaların başlık ve içeriğini buradan düzenleyebilirsiniz. İçerik alanında HTML kullanabilirsiniz (örn. &lt;h2&gt;, &lt;p&gt;, &lt;a href="..."&gt;, &lt;ul&gt;&lt;li&gt;).
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+              {[
+                { slug: 'about', label: 'Hakkımızda' },
+                { slug: 'contact', label: 'İletişim' },
+                { slug: 'privacy', label: 'Gizlilik Sözleşmesi' },
+                { slug: 'delivery-returns', label: 'Teslimat ve İade' },
+                { slug: 'distance-selling', label: 'Mesafeli Satış' },
+                { slug: 'faq', label: 'Sık Sorulan Sorular' }
+              ].map(({ slug, label }) => (
+                <button
+                  key={slug}
+                  type="button"
+                  onClick={() => setSelectedPageSlug(slug)}
+                  style={{
+                    padding: '0.6rem 1rem',
+                    background: selectedPageSlug === slug ? 'var(--primary-color)' : '#f0f0f0',
+                    color: selectedPageSlug === slug ? '#000' : '#333',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: selectedPageSlug === slug ? '600' : '500'
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {selectedPageSlug && (
+              <div style={{ background: '#f5f6f8', padding: '1.25rem', borderRadius: '12px', maxWidth: '900px' }}>
+                {pageContentLoading ? (
+                  <p style={{ color: '#666', padding: '1rem 0' }}>Mevcut yazılar yükleniyor…</p>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '600', fontSize: '0.9rem' }}>Sayfa başlığı</label>
+                      <input
+                        type="text"
+                        value={pageEditTitle}
+                        onChange={(e) => setPageEditTitle(e.target.value)}
+                        style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #ddd' }}
+                        placeholder="Örn. Hakkımızda"
+                      />
+                    </div>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '600', fontSize: '0.9rem' }}>İçerik (HTML) — sitede görünen mevcut metin</label>
+                      <textarea
+                        value={pageEditContent}
+                        onChange={(e) => setPageEditContent(e.target.value)}
+                        rows={18}
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd', fontFamily: 'monospace', fontSize: '0.9rem' }}
+                        placeholder="<h2>Başlık</h2><p>Paragraf...</p>"
+                      />
+                    </div>
+                  </>
+                )}
+                <button
+                  type="button"
+                  disabled={pageSaving || pageContentLoading}
+                  onClick={async () => {
+                    setPageSaving(true)
+                    const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                    const res = await fetch(`${apiUrl}/pages/admin/${selectedPageSlug}`, {
+                      method: 'PUT',
+                      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ pageTitle: pageEditTitle, content: pageEditContent })
+                    })
+                    const data = await res.json()
+                    if (res.ok && data.success) {
+                      toast.show('İçerik kaydedildi', 'success')
+                    } else {
+                      toast.show(data.error || 'Kaydedilemedi', 'error')
+                    }
+                    setPageSaving(false)
+                  }}
+                  style={{
+                    padding: '0.5rem 1.25rem',
+                    background: 'var(--primary-color)',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {pageSaving ? 'Kaydediliyor…' : 'Kaydet'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'theme' && (
+          <>
+            <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem', color: 'var(--text-color)' }}>Site renkleri</h2>
+            <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Sitede kullanılan ana renkleri değiştirin. Kaydettikten sonra tüm sayfalarda anında uygulanır.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', maxWidth: '800px', marginBottom: '1.5rem' }}>
+              {[
+                { key: 'primaryColor', label: 'Ana renk (butonlar, vurgular)' },
+                { key: 'primaryDark', label: 'Ana renk koyu' },
+                { key: 'primaryLight', label: 'Ana renk açık' },
+                { key: 'secondaryColor', label: 'İkincil renk' },
+                { key: 'textColor', label: 'Metin rengi' },
+                { key: 'textLight', label: 'Metin rengi açık' },
+                { key: 'bgColor', label: 'Arka plan' },
+                { key: 'bgLight', label: 'Arka plan açık' },
+                { key: 'bgGray', label: 'Arka plan gri' },
+                { key: 'borderColor', label: 'Çerçeve rengi' }
+              ].map(({ key, label }) => (
+                <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-color)' }}>{label}</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="color"
+                      value={themeColors[key] || '#000000'}
+                      onChange={(e) => setThemeColors(prev => ({ ...prev, [key]: e.target.value }))}
+                      style={{ width: '44px', height: '38px', padding: 2, border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer' }}
+                    />
+                    <input
+                      type="text"
+                      value={themeColors[key] || ''}
+                      onChange={(e) => setThemeColors(prev => ({ ...prev, [key]: e.target.value }))}
+                      style={{ flex: 1, padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontFamily: 'monospace', fontSize: '0.9rem' }}
+                      placeholder="#hex"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={themeSaving}
+              onClick={async () => {
+                setThemeSaving(true)
+                const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                const res = await fetch(`${apiUrl}/theme`, {
+                  method: 'PUT',
+                  headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                  body: JSON.stringify(themeColors)
+                })
+                const data = await res.json()
+                if (res.ok && data.success) {
+                  applyTheme(data.theme || themeColors)
+                  toast.show('Renkler kaydedildi', 'success')
+                } else {
+                  toast.show(data.error || 'Kaydedilemedi', 'error')
+                }
+                setThemeSaving(false)
+              }}
+              style={{
+                padding: '0.6rem 1.25rem',
+                background: 'var(--primary-color)',
+                color: '#000',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              {themeSaving ? 'Kaydediliyor…' : 'Renkleri kaydet'}
+            </button>
           </>
         )}
 

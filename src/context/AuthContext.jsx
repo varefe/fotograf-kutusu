@@ -120,9 +120,6 @@ export const AuthProvider = ({ children }) => {
   // Giriş yap
   const login = async (email, password, rememberMe = false) => {
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'AuthContext.jsx:login',message:'Login function called',data:{apiUrl:API_URL,email}})}).catch(()=>{});
-      // #endregion
       const browserId = getBrowserId()
       // API_URL zaten tam URL ise (https://...) /api ekle, değilse olduğu gibi kullan
       let apiEndpoint
@@ -133,10 +130,6 @@ export const AuthProvider = ({ children }) => {
         // Relative path (/api gibi)
         apiEndpoint = `${API_URL}/user/login`
       }
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'AuthContext.jsx:login',message:'Attempting login request',data:{apiEndpoint}})}).catch(()=>{});
-      // #endregion
-      // Login endpoint log kaldırıldı (gereksiz)
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
@@ -190,9 +183,6 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.message || 'Giriş başarısız' }
       }
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'AuthContext.jsx:login',message:'Login error caught',data:{errorType:error.constructor.name,errorMessage:error.message,errorStack:error.stack?.substring(0,200)}})}).catch(()=>{});
-      // #endregion
       console.error('Giriş hatası:', error)
       return { success: false, error: 'Giriş yapılırken bir hata oluştu' }
     }

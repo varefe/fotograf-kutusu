@@ -13,11 +13,50 @@ import { calculatePrice } from '../utils/priceCalculator'
 import { API_URL } from '../config/api'
 import { saveOrderToStorage } from '../utils/encryption'
 
+/** Base64 görüntüyü boyut/kalite ile sıkıştırır; JSON payload ve "Invalid string length" hatasını önler. */
+function compressBase64Image(base64, mimetype, maxWidth = 1200, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    if (!base64 || base64.length < 100) {
+      resolve({ base64, mimetype: mimetype || 'image/jpeg' })
+      return
+    }
+    const dataUrl = `data:${mimetype || 'image/jpeg'};base64,${base64}`
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      let w = img.width
+      let h = img.height
+      if (w > maxWidth) {
+        h = Math.round((h * maxWidth) / w)
+        w = maxWidth
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        resolve({ base64, mimetype: mimetype || 'image/jpeg' })
+        return
+      }
+      ctx.drawImage(img, 0, 0, w, h)
+      try {
+        const dataUrlOut = canvas.toDataURL('image/jpeg', quality)
+        const outBase64 = dataUrlOut.indexOf(',') >= 0 ? dataUrlOut.split(',')[1] : dataUrlOut
+        resolve({ base64: outBase64, mimetype: 'image/jpeg' })
+      } catch (e) {
+        resolve({ base64, mimetype: mimetype || 'image/jpeg' })
+      }
+    }
+    img.onerror = () => resolve({ base64, mimetype: mimetype || 'image/jpeg' })
+    img.src = dataUrl
+  })
+}
+
 function Cart() {
   const navigate = useNavigate()
   const location = useLocation()
   const { cartItems, removeFromCart, clearCart, getCartTotal, updateCartItemPhoto, addToCart, addMultipleToCart } = useCart()
-  const { user, isAuthenticated, getAuthHeaders } = useAuth()
+  const { user, isAuthenticated, getAuthHeaders, token: authToken } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isProcessingPhotos, setIsProcessingPhotos] = useState(false) // Fotoğraflar işleniyor mu?
   const [submitSuccess, setSubmitSuccess] = useState(false)
@@ -115,11 +154,6 @@ function Cart() {
 
   // Modal açıkken, sepet güncellendiğinde selectedItemGroup'u güncelle
   useEffect(() => {
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Cart.jsx:useEffect:selectedItemGroup',message:'useEffect triggered',data:{hasSelectedItemGroup:!!selectedItemGroup,selectedItemGroupId:selectedItemGroup?.id,cartItemsCount:cartItems.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
     if (!selectedItemGroup) return
     
     try {
@@ -129,10 +163,6 @@ function Cart() {
         const key = `${item.product?.size || 'unknown'}-${item.quantity || 0}-${item.product?.name || 'unknown'}`
         return key === currentGroupKey
       })
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Cart.jsx:useEffect:selectedItemGroup',message:'Matching items found',data:{currentGroupKey,matchingItemsCount:matchingItems.length,previousItemsCount:selectedItemGroup.items.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
 
       if (matchingItems.length > 0) {
         // SessionStorage'dan preview'ları yükle
@@ -181,9 +211,6 @@ function Cart() {
         // Sadece gerçekten değiştiyse güncelle (sonsuz döngüyü önlemek için)
         if (currentGroup.items.length !== selectedItemGroup.items.length || 
             JSON.stringify(currentGroup.items.map(i => i.id)) !== JSON.stringify(selectedItemGroup.items.map(i => i.id))) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Cart.jsx:useEffect:selectedItemGroup',message:'Updating selectedItemGroup',data:{newItemsCount:currentGroup.items.length,oldItemsCount:selectedItemGroup.items.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-          // #endregion
           setSelectedItemGroup(currentGroup)
         }
       } else {
@@ -191,9 +218,6 @@ function Cart() {
         setSelectedItemGroup(null)
       }
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Cart.jsx:useEffect:selectedItemGroup',message:'Error in useEffect',data:{errorMessage:error.message,errorStack:error.stack},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
       console.error('Modal güncelleme hatası:', error)
       // Hata durumunda modal'ı kapat
       setSelectedItemGroup(null)
@@ -227,9 +251,6 @@ function Cart() {
   }
 
   const handleCheckout = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'Cart.jsx:handleCheckout:start',message:'handleCheckout start',data:{isAuthenticated,cartItemsCount:cartItems.length,showContactInfo,showPaymentForm},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     // Kullanıcı giriş kontrolü
     if (!isAuthenticated) {
       showAlert('Sipariş verebilmek için lütfen giriş yapın veya kayıt olun', 'warning')
@@ -389,12 +410,9 @@ function Cart() {
           ? `${API_URL}/api/orders/${orderId}/payment-status`
           : `/api/orders/${orderId}/payment-status`
       
-      const token = localStorage.getItem('token')
       const headers = {
-        'Content-Type': 'application/json'
-      }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
+        'Content-Type': 'application/json',
+        ...(authToken && { Authorization: `Bearer ${authToken}` })
       }
       
       const response = await fetch(apiEndpoint, {
@@ -429,29 +447,27 @@ function Cart() {
       // Önce location.state'ten fotoğrafları al
       let photoFilesToProcess = []
       
-      // 1. Önce File objelerini topla (location.state, photoFiles, veya cartItems'tan)
+      // 1. Önce File objelerini topla (aynı dosya name+size ile tekilleştir – çift görünmeyi önler)
+      const fileKey = (f) => (f?.name ?? '') + '-' + (f?.size ?? 0)
       const fileObjects = []
+      const seenKeys = new Set()
+      const addFile = (photo) => {
+        if (!(photo instanceof File)) return
+        const key = fileKey(photo)
+        if (seenKeys.has(key)) return
+        seenKeys.add(key)
+        fileObjects.push(photo)
+      }
       if (location.state?.photos && location.state.photos.length > 0) {
-        location.state.photos.forEach(photo => {
-          if (photo instanceof File) {
-            fileObjects.push(photo)
-          }
-        })
+        location.state.photos.forEach(addFile)
       }
       if (photoFiles && photoFiles.length > 0) {
-        photoFiles.forEach(photo => {
-          if (photo instanceof File && !fileObjects.includes(photo)) {
-            fileObjects.push(photo)
-          }
-        })
+        photoFiles.forEach(addFile)
       }
-      // CartItems'tan file objelerini topla
       cartItems.forEach(item => {
-        if (item.photo?.file instanceof File && !fileObjects.includes(item.photo.file)) {
-          fileObjects.push(item.photo.file)
-        }
+        if (item.photo?.file instanceof File) addFile(item.photo.file)
       })
-      
+
       // 2. Eğer File objesi varsa, onları kullan
       if (fileObjects.length > 0) {
         photoFilesToProcess = fileObjects
@@ -612,7 +628,7 @@ function Cart() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(authToken && { Authorization: `Bearer ${authToken}` })
         },
         body: JSON.stringify(updatedOrderData)
       })
@@ -731,9 +747,6 @@ function Cart() {
     // setCvcLastDigit(null) // CVV bilgisini sıfırla
   }
   const goToSummary = () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run_tabs',hypothesisId:'H1',location:'Cart.jsx:goToSummary',message:'goToSummary called',data:{activeTab,showContactInfo,showPaymentForm},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     setShowReview(false)
     resetPaymentState()
     setShowContactInfo(false)
@@ -749,19 +762,12 @@ function Cart() {
       showAlert(`Minimum 15 fotoğraf seçmelisiniz. Şu anda sepette ${totalPhotoCount} fotoğraf var.`, 'warning')
       return
     }
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run_tabs',hypothesisId:'H2',location:'Cart.jsx:goToContact',message:'goToContact called',data:{activeTab,showContactInfo,showPaymentForm,isAuthenticated},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     setShowReview(false)
     resetPaymentState()
     setShowContactInfo(true)
   }
   const goToPayment = () => {
     if (showPaymentForm) return
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run_tabs',hypothesisId:'H3',location:'Cart.jsx:goToPayment',message:'goToPayment called',data:{activeTab,showContactInfo,showPaymentForm,cartItemsCount:cartItems.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     setShowReview(false)
     handleCheckout()
   }
@@ -786,19 +792,14 @@ function Cart() {
       setIsProcessingPhotos(true)
       
       // Fotoğraflar OLMADAN sadece iletişim bilgileri ve durumu kaydet
-      // Test modu için paymentStatus: 'test' gönder (backend'de validasyon atlanır)
       const orderDataWithoutPhotos = {
         ...preparedOrderData,
         photos: [], // Fotoğraflar boş
         photo: null, // Fotoğraflar boş
-        paymentStatus: 'test', // Test modu - backend'de validasyon atlanır
+        paymentStatus: 'pending',
         status: 'Bekliyor',
         notes: `${cartItems.length} fotoğraf (ödeme sonrası eklenecek)`
       }
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'Cart.jsx:saveOrderForReview',message:'Sending order data',data:{paymentStatus:orderDataWithoutPhotos.paymentStatus,hasToken:!!localStorage.getItem('token'),orderId},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       
       // Backend'e kaydet (fotoğraflar olmadan)
       const apiEndpoint = API_URL === '/api' || API_URL.startsWith('/api')
@@ -807,28 +808,16 @@ function Cart() {
           ? `${API_URL}/api/orders`
           : '/api/orders'
       
-      // Test modunda token gönderme (optionalAuth token olmadan da çalışır)
       const headers = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...(authToken && { Authorization: `Bearer ${authToken}` })
       }
-      const token = localStorage.getItem('token')
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'Cart.jsx:saveOrderForReview',message:'Fetch request',data:{apiEndpoint,hasAuthHeader:!!headers.Authorization,paymentStatus:orderDataWithoutPhotos.paymentStatus},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify(orderDataWithoutPhotos)
       })
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'Cart.jsx:saveOrderForReview',message:'Response received',data:{status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       
       if (!response.ok) {
         const errorText = await response.text()
@@ -865,7 +854,7 @@ function Cart() {
     }
   }
 
-  // Siparişi oluştur (ödeme olmadan - test için)
+  // Siparişi oluştur (ödeme sonrası veya ödeme atlanarak gözden geçir sekmesinden)
   const createOrderWithoutPayment = async () => {
     // Önce sipariş verilerini hazırla (eğer yoksa)
     if (!preparedOrderData) {
@@ -935,7 +924,7 @@ function Cart() {
         },
         price: finalTotal,
         status: 'Bekliyor',
-        paymentStatus: 'test',
+        paymentStatus: 'pending',
         notes: `${cartItems.length} fotoğraf`,
         createdAt: new Date().toISOString()
       }
@@ -990,28 +979,27 @@ function Cart() {
       // Önce location.state'ten fotoğrafları al
       let photoFilesToProcess = []
       
-      // 1. Önce File objelerini topla
+      // 1. Önce File objelerini topla (aynı dosya name+size ile tekilleştir – çift görünmeyi önler)
+      const fileKey = (f) => (f?.name ?? '') + '-' + (f?.size ?? 0)
       const fileObjects = []
+      const seenKeys = new Set()
+      const addFile = (photo) => {
+        if (!(photo instanceof File)) return
+        const key = fileKey(photo)
+        if (seenKeys.has(key)) return
+        seenKeys.add(key)
+        fileObjects.push(photo)
+      }
       if (location.state?.photos && location.state.photos.length > 0) {
-        location.state.photos.forEach(photo => {
-          if (photo instanceof File) {
-            fileObjects.push(photo)
-          }
-        })
+        location.state.photos.forEach(addFile)
       }
       if (photoFiles && photoFiles.length > 0) {
-        photoFiles.forEach(photo => {
-          if (photo instanceof File && !fileObjects.includes(photo)) {
-            fileObjects.push(photo)
-          }
-        })
+        photoFiles.forEach(addFile)
       }
       cartItems.forEach(item => {
-        if (item.photo?.file instanceof File && !fileObjects.includes(item.photo.file)) {
-          fileObjects.push(item.photo.file)
-        }
+        if (item.photo?.file instanceof File) addFile(item.photo.file)
       })
-      
+
       // 2. Eğer File objesi varsa, onları kullan
       if (fileObjects.length > 0) {
         photoFilesToProcess = fileObjects
@@ -1041,6 +1029,8 @@ function Cart() {
       if (photoFilesToProcess.length === 0) {
         console.warn('Fotoğraf bulunamadı, sipariş fotoğrafsız kaydedildi')
         setIsProcessingPhotos(false)
+        clearCart()
+        navigate('/', { state: { orderSuccess: true, orderCode: newOrderCode } })
         return true
       }
 
@@ -1051,9 +1041,6 @@ function Cart() {
             const reader = new FileReader()
             reader.onloadend = () => {
               const base64String = reader.result.split(',')[1]
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'Cart.jsx:convertPhoto',message:'Photo converted from File',data:{index,base64Length:base64String?.length,filename:photoFile.name}})}).catch(()=>{});
-              // #endregion
               resolve({
                 filename: photoFile.name || `photo-${index}.jpg`,
                 originalName: photoFile.name || `photo-${index}.jpg`,
@@ -1067,9 +1054,6 @@ function Cart() {
           } else if (photoFile.preview && photoFile.preview.startsWith('data:image/')) {
             const base64String = photoFile.preview.split(',')[1]
             const mimetype = photoFile.preview.match(/data:image\/([^;]+)/)?.[1] || 'jpeg'
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'Cart.jsx:convertPhoto',message:'Photo converted from preview',data:{index,base64Length:base64String?.length,filename:photoFile.filename}})}).catch(()=>{});
-            // #endregion
             resolve({
               filename: photoFile.filename || `photo-${index}.jpg`,
               originalName: photoFile.filename || `photo-${index}.jpg`,
@@ -1078,9 +1062,6 @@ function Cart() {
               size: photoFile.size || 0
             })
           } else {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'Cart.jsx:convertPhoto',message:'Photo conversion failed',data:{index,hasFile:photoFile instanceof File,hasPreview:!!photoFile.preview}})}).catch(()=>{});
-            // #endregion
             reject(new Error(`Fotoğraf ${index} işlenemedi`))
           }
         })
@@ -1118,13 +1099,16 @@ function Cart() {
         photosArray.push(...convertedPhotos)
       }
       
+      // Payload boyutunu düşürmek için fotoğrafları sıkıştır (RangeError: Invalid string length önlemi)
+      const compressedPhotos = await Promise.all(photosArray.map(async (p) => {
+        const { base64, mimetype } = await compressBase64Image(p.base64, p.mimetype)
+        return { ...p, base64, mimetype }
+      }))
+      
       // Mevcut siparişi güncelle (PATCH)
       // savedOrderId'nin string formatında olduğundan emin ol
       const orderIdString = savedOrderId ? savedOrderId.toString() : orderId.toString()
       console.log('🔍 PATCH için sipariş ID:', orderIdString)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'Cart.jsx:createOrderWithoutPayment:PATCH',message:'Sending PATCH request with photos',data:{orderId:orderIdString,photosCount:photosArray.length,hasPhotos:photosArray.length>0,firstPhotoBase64Length:photosArray[0]?.base64?.length}})}).catch(()=>{});
-      // #endregion
       
       const apiEndpoint = API_URL === '/api' || API_URL.startsWith('/api')
         ? `/api/orders/${orderIdString}`
@@ -1133,25 +1117,19 @@ function Cart() {
           : `/api/orders/${orderIdString}`
       
       const headers = {
-        'Content-Type': 'application/json'
-      }
-      const token = localStorage.getItem('token')
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
+        'Content-Type': 'application/json',
+        ...(authToken && { Authorization: `Bearer ${authToken}` })
       }
       
       const updateResponse = await fetch(apiEndpoint, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({
-          photos: photosArray,
-          photo: photosArray[0] || null,
-          notes: `${photosArray.length} fotoğraf`
+          photos: compressedPhotos,
+          photo: compressedPhotos[0] || null,
+          notes: `${compressedPhotos.length} fotoğraf`
         })
       })
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'Cart.jsx:createOrderWithoutPayment:PATCH',message:'PATCH response received',data:{status:updateResponse.status,ok:updateResponse.ok}})}).catch(()=>{});
-      // #endregion
       
       if (!updateResponse.ok) {
         const errorText = await updateResponse.text()
@@ -1172,23 +1150,30 @@ function Cart() {
       }
       
       setIsProcessingPhotos(false)
+      clearCart()
+      navigate('/', { state: { orderSuccess: true, orderCode: newOrderCode } })
       return true
     } catch (error) {
       console.error('Fotoğrafları kaydetme hatası:', error)
       showAlert('Sipariş oluşturuldu ancak fotoğraflar kaydedilirken bir hata oluştu. Lütfen destek ekibiyle iletişime geçin.', 'warning')
       setIsProcessingPhotos(false)
-      // Sipariş oluşturuldu ama fotoğraflar kaydedilemedi - yine de başarılı say
+      clearCart()
+      navigate('/', { state: { orderSuccess: true, orderCode: newOrderCode } })
       return true
     }
   }
   const canGoBack = activeTab !== 'summary'
-  // Fotoğraf adedi kontrolü: summary'den contact'e geçerken minimum 15 fotoğraf olmalı
+  // Fotoğraf adedi: summary'den sonraki adıma geçmek için minimum 15 fotoğraf
   const totalPhotoCount = cartItems.length
-  const canGoNext = activeTab !== 'review' && (isAuthenticated || activeTab !== 'summary') && (activeTab !== 'summary' || totalPhotoCount >= 15)
+  // İletişim adımından sonrakine geçmek için e-posta ve adres dolu olmalı
+  const contactFilled = !!(customerInfo.email?.trim() && customerInfo.address?.trim())
+  // Ödeme adımından gözden geçir'e geçmek için ödeme tamamlanmış olmalı
+  const canGoNext = activeTab !== 'review' &&
+    (isAuthenticated || activeTab !== 'summary') &&
+    (activeTab !== 'summary' || totalPhotoCount >= 15) &&
+    (activeTab !== 'contact' || contactFilled) &&
+    (activeTab !== 'payment' || paymentCompleted)
   const goBack = () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run_tabs',hypothesisId:'H4',location:'Cart.jsx:goBack',message:'goBack clicked',data:{activeTab},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (activeTab === 'review') {
       setShowReview(false)
       setShowPaymentForm(true)
@@ -1199,11 +1184,7 @@ function Cart() {
     }
   }
   const goNext = () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run_tabs',hypothesisId:'H5',location:'Cart.jsx:goNext',message:'goNext clicked',data:{activeTab,isAuthenticated},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (activeTab === 'summary') {
-      // Fotoğraf adedi kontrolü (minimum 15)
       const totalPhotoCount = cartItems.length
       if (totalPhotoCount < 15) {
         showAlert(`Minimum 15 fotoğraf seçmelisiniz. Şu anda sepette ${totalPhotoCount} fotoğraf var.`, 'warning')
@@ -1211,9 +1192,16 @@ function Cart() {
       }
       goToContact()
     } else if (activeTab === 'contact') {
+      if (!contactFilled) {
+        showAlert('Lütfen e-posta ve adres bilgilerini doldurun.', 'warning')
+        return
+      }
       goToPayment()
     } else if (activeTab === 'payment') {
-      // Gözden geçir sekmesine geç
+      if (!paymentCompleted) {
+        showAlert('Siparişi tamamlamak için ödeme işlemini yapmanız gerekiyor.', 'warning')
+        return
+      }
       goToReview()
     }
   }
@@ -1562,9 +1550,6 @@ function Cart() {
   }, [show3DSecure, threeDSecureHtml])
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'Cart.jsx:paymentView:state',message:'payment/contact visibility',data:{showPaymentForm,hasPreparedOrderData:!!preparedOrderData,showContactInfo},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   }, [showPaymentForm, preparedOrderData, showContactInfo])
 
   // Sepet toplamını hesapla (tüm grupların fiyatlarını topla)
@@ -1842,17 +1827,20 @@ function Cart() {
 
             {/* Sipariş Özeti */}
             <div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                gap: '0.4rem',
-                padding: '0.35rem',
-                background: '#f1f5f9',
-                borderRadius: '14px',
-                border: '1px solid #e2e8f0',
-                marginBottom: '1rem',
-                width: '100%'
-              }}>
+              <div
+                className="cart-tabs"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                  gap: '0.4rem',
+                  padding: '0.35rem',
+                  background: '#f1f5f9',
+                  borderRadius: '14px',
+                  border: '1px solid #e2e8f0',
+                  marginBottom: '1rem',
+                  width: '100%'
+                }}
+              >
                 {[
                   { id: 'summary', label: 'Sipariş Özeti' },
                   { id: 'contact', label: 'İletişim' },
@@ -1860,33 +1848,49 @@ function Cart() {
                   { id: 'review', label: 'Gözden Geçir' }
                 ].map((tab) => {
                   const isActive = activeTab === tab.id
+                  const isTabDisabled = (tab.id !== 'summary' && cartItems.length < 15) ||
+                    (tab.id === 'payment' && !contactFilled) ||
+                    (tab.id === 'review' && (!contactFilled || !paymentCompleted))
                   const handleTabClick = () => {
-                    // Fotoğraf adedi kontrolü: contact, payment ve review sekmelerine geçerken minimum 15 fotoğraf olmalı
+                    const totalPhotoCount = cartItems.length
                     if (tab.id === 'summary') {
                       goToSummary()
                     } else if (tab.id === 'contact') {
-                      const totalPhotoCount = cartItems.length
                       if (totalPhotoCount < 15) {
                         showAlert(`Minimum 15 fotoğraf seçmelisiniz. Şu anda sepette ${totalPhotoCount} fotoğraf var.`, 'warning')
                         return
                       }
                       goToContact()
-                    } else if (tab.id === 'review') {
-                      // Gözden geçir sekmesine geç
-                      goToReview()
-                    } else {
-                      // payment sekmesi için de kontrol
-                      const totalPhotoCount = cartItems.length
+                    } else if (tab.id === 'payment') {
                       if (totalPhotoCount < 15) {
                         showAlert(`Minimum 15 fotoğraf seçmelisiniz. Şu anda sepette ${totalPhotoCount} fotoğraf var.`, 'warning')
                         return
                       }
+                      if (!contactFilled) {
+                        showAlert('Ödeme adımına geçmek için önce e-posta ve adres bilgilerini doldurun.', 'warning')
+                        return
+                      }
                       goToPayment()
+                    } else if (tab.id === 'review') {
+                      if (totalPhotoCount < 15) {
+                        showAlert(`Minimum 15 fotoğraf seçmelisiniz. Şu anda sepette ${totalPhotoCount} fotoğraf var.`, 'warning')
+                        return
+                      }
+                      if (!contactFilled) {
+                        showAlert('Gözden geçir adımına geçmek için önce iletişim bilgilerini doldurun.', 'warning')
+                        return
+                      }
+                      if (!paymentCompleted) {
+                        showAlert('Gözden geçir adımına geçmek için önce ödeme işlemini tamamlayın.', 'warning')
+                        return
+                      }
+                      goToReview()
                     }
                   }
                   return (
                     <div
                       key={tab.id}
+                      className="cart-tab"
                       onClick={handleTabClick}
                       style={{
                         width: '100%',
@@ -1898,28 +1902,20 @@ function Cart() {
                         fontWeight: 600,
                         borderRadius: '10px',
                         background: isActive ? '#2563eb' : 'transparent',
-                        color: isActive ? '#ffffff' : (
-                          (tab.id !== 'summary' && cartItems.length < 15)
-                            ? '#94a3b8' 
-                            : '#64748b'
-                        ),
+                        color: isActive ? '#ffffff' : (isTabDisabled ? '#94a3b8' : '#64748b'),
                         transition: 'all 0.2s ease',
-                        cursor: (
-                          (tab.id !== 'summary' && cartItems.length < 15)
-                        ) ? 'not-allowed' : 'pointer',
+                        cursor: isTabDisabled ? 'not-allowed' : 'pointer',
                         userSelect: 'none',
                         lineHeight: 1.2,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        opacity: (
-                          (tab.id !== 'summary' && cartItems.length < 15)
-                        ) ? 0.5 : 1,
+                        opacity: isTabDisabled ? 0.5 : 1,
                         boxSizing: 'border-box'
                       }}
                       title={
-                        tab.id !== 'summary' && cartItems.length < 15 
-                          ? 'Minimum 15 fotoğraf seçmelisiniz' 
+                        isTabDisabled
+                          ? (tab.id === 'payment' && !contactFilled ? 'Önce iletişim bilgilerini doldurun' : tab.id === 'review' && !paymentCompleted ? 'Önce ödemeyi tamamlayın' : 'Minimum 15 fotoğraf seçmelisiniz')
                           : ''
                       }
                     >
@@ -2051,65 +2047,37 @@ function Cart() {
 
                       {preparedOrderData && (
                         <>
-                          {/* Test Modu: Ödeme formunu atla, direkt gözden geçir sekmesine geç */}
-                          <div style={{
-                            marginBottom: '1.5rem',
-                            padding: '1rem',
-                            background: '#f0f9ff',
-                            border: '1px solid #bae6fd',
-                            borderRadius: '8px',
-                            textAlign: 'center'
-                          }}>
-                            <p style={{ margin: 0, color: '#0369a1', fontSize: '0.9rem' }}>
-                              🧪 Test Modu: Ödeme formunu atlayıp direkt gözden geçir sekmesine geçebilirsiniz
-                            </p>
-                          </div>
-                          
-                          <button
-                            onClick={async () => {
-                              // Önce siparişi veritabanına kaydet (fotoğraflar olmadan)
-                              const saved = await saveOrderForReview()
-                              if (saved) {
-                                // Başarılı olduysa gözden geçir sekmesine geç
-                                setShowReview(true)
-                                setShowContactInfo(false)
-                                setShowPaymentForm(false)
-                              }
-                            }}
-                            disabled={isProcessingPhotos}
-                            style={{
-                              width: '100%',
-                              padding: '1rem',
-                              background: isProcessingPhotos ? '#e2e8f0' : '#10b981',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '8px',
-                              fontSize: '1.1rem',
-                              fontWeight: 'bold',
-                              cursor: isProcessingPhotos ? 'not-allowed' : 'pointer',
-                              marginBottom: '1.5rem',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            {isProcessingPhotos ? 'Kaydediliyor...' : 'Ödeme Olmadan Gözden Geçir (Test)'}
-                          </button>
-                          
-                          <div style={{
-                            marginBottom: '1.5rem',
-                            textAlign: 'center',
-                            color: '#64748b',
-                            fontSize: '0.85rem'
-                          }}>
-                            veya
-                          </div>
-                          
                           <PaymentForm 
                             onSubmit={handlePaymentSubmit}
                             loading={isSubmitting || isProcessingPhotos}
                             error={paymentError}
                             actionLabel="Ödeme Yap ve Gözden Geçir"
                           />
-
+                          <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowReview(true)
+                                setShowContactInfo(false)
+                                setShowPaymentForm(false)
+                              }}
+                              disabled={isProcessingPhotos || isSubmitting}
+                              style={{
+                                width: '100%',
+                                padding: '0.75rem 1rem',
+                                fontSize: '0.95rem',
+                                fontWeight: 600,
+                                background: (isProcessingPhotos || isSubmitting) ? '#e2e8f0' : '#f1f5f9',
+                                color: (isProcessingPhotos || isSubmitting) ? '#94a3b8' : '#475569',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                cursor: (isProcessingPhotos || isSubmitting) ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              Şimdilik ödemeyi atla, siparişi oluştur
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>

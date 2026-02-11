@@ -1,13 +1,16 @@
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import SEO from '../components/SEO'
+import { usePageContent } from '../hooks/usePageContent'
 
 function About() {
+  const { pageTitle, content, loading, error } = usePageContent('about')
+
   return (
     <>
-      <SEO 
-        title="Hakkımızda"
-        description="Fotoğraf Kutusu hakkında bilgi edinin. Profesyonel fotoğraf baskı ve çerçeveleme hizmetlerimiz, kalite standartlarımız ve müşteri memnuniyeti odaklı yaklaşımımız."
+      <SEO
+        title={pageTitle || 'Hakkımızda'}
+        description="Fotoğraf Kutusu hakkında bilgi edinin. Profesyonel fotoğraf baskı ve çerçeveleme hizmetlerimiz."
         keywords="fotoğraf kutusu hakkında, fotoğraf baskı firması, çerçeveleme hizmeti"
         url="/about"
       />
@@ -15,47 +18,16 @@ function About() {
       <main>
         <div className="page-header">
           <div className="container">
-            <h1>Hakkımızda</h1>
+            <h1>{loading ? 'Yükleniyor…' : (pageTitle || 'Hakkımızda')}</h1>
           </div>
         </div>
-
         <section className="content-section">
           <div className="container">
             <div className="content-wrapper">
-              <h2>Biz Kimiz?</h2>
-              <p>
-                Fotoğraf baskı ve çerçeveleme hizmeti sunan firmamız, yıllardır müşterilerimize 
-                yüksek kaliteli baskı hizmeti sağlamaktadır. Anılarınızı ölümsüzleştirmek ve 
-                evinize, ofisinize değer katmak için buradayız.
-              </p>
-
-              <h2>Misyonumuz</h2>
-              <p>
-                Müşterilerimizin en değerli anılarını en yüksek kalitede baskıya dönüştürmek 
-                ve profesyonel çerçeveleme hizmetiyle sunmak. Her siparişte müşteri memnuniyetini 
-                ön planda tutarak, güvenilir ve hızlı teslimat sağlamak.
-              </p>
-
-              <h2>Vizyonumuz</h2>
-              <p>
-                Türkiye'nin en güvenilir ve kaliteli fotoğraf baskı hizmeti sağlayıcısı olmak. 
-                Teknolojik yenilikleri takip ederek, müşterilerimize en iyi deneyimi sunmak.
-              </p>
-
-              <h2>Neden Bizi Seçmelisiniz?</h2>
-              <ul className="feature-list">
-                <li>Yüksek kaliteli baskı teknolojisi</li>
-                <li>Profesyonel çerçeveleme hizmeti</li>
-                <li>Hızlı ve güvenli teslimat</li>
-                <li>Uygun fiyat garantisi</li>
-                <li>Müşteri odaklı hizmet anlayışı</li>
-                <li>Güvenli ödeme sistemi (iyzico)</li>
-              </ul>
-
-              <h2>İletişim</h2>
-              <p>
-                Sorularınız, önerileriniz veya destek talepleriniz için bizimle iletişime geçebilirsiniz.
-              </p>
+              {error && <p style={{ color: '#c33' }}>{error}</p>}
+              {!loading && !error && content && (
+                <div dangerouslySetInnerHTML={{ __html: content }} />
+              )}
             </div>
           </div>
         </section>
@@ -66,10 +38,3 @@ function About() {
 }
 
 export default About
-
-
-
-
-
-
-

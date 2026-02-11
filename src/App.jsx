@@ -1,11 +1,29 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { CartProvider } from './context/CartContext'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { ToastProvider } from './context/ToastContext'
+import { restoreConsoleForAdmin } from './utils/consoleGuard'
+import { useSiteTheme } from './hooks/useSiteTheme'
 import WhatsAppButton from './components/WhatsAppButton'
 import AnnouncementPopup from './components/AnnouncementPopup'
 import './App.css'
+
+// Sadece admin giriş yaptığında console logları açılır
+function ConsoleForAdmin() {
+  const { user } = useAuth()
+  useEffect(() => {
+    if (user?.role === 'admin') restoreConsoleForAdmin()
+  }, [user])
+  return null
+}
+
+// Site renklerini API'den yükleyip :root CSS değişkenlerine uygular
+function ThemeLoader() {
+  useSiteTheme()
+  return null
+}
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import('./pages/Home'))
@@ -32,7 +50,6 @@ const DistanceSelling = lazy(() => import('./pages/DistanceSelling'))
 const Contact = lazy(() => import('./pages/Contact'))
 const FAQ = lazy(() => import('./pages/FAQ'))
 const Reviews = lazy(() => import('./pages/Reviews'))
-const Gallery = lazy(() => import('./pages/Gallery'))
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings'))
 
 // Loading component
@@ -67,7 +84,10 @@ function App() {
   return (
     <HelmetProvider>
       <AuthProvider>
+        <ThemeLoader />
+        <ConsoleForAdmin />
         <CartProvider>
+          <ToastProvider>
           <Router>
             <div className="App">
             <WhatsAppButton />
@@ -99,12 +119,12 @@ function App() {
               <Route path="/distance-selling" element={<DistanceSelling />} />
               <Route path="/faq" element={<FAQ />} />
               <Route path="/reviews" element={<Reviews />} />
-              <Route path="/gallery" element={<Gallery />} />
               <Route path="/notification-settings" element={<NotificationSettings />} />
           </Routes>
           </Suspense>
         </div>
       </Router>
+          </ToastProvider>
     </CartProvider>
   </AuthProvider>
     </HelmetProvider>

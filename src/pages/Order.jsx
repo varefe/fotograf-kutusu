@@ -6,11 +6,13 @@ import Icon from '../components/Icon'
 import { saveOrderToStorage, getOrdersFromStorage, decryptData } from '../utils/encryption'
 import { calculatePrice } from '../utils/priceCalculator'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { API_URL } from '../config/api'
 
 function Order() {
   const navigate = useNavigate()
-  const { isAuthenticated, loading: authLoading, getAuthHeaders } = useAuth()
+  const { isAuthenticated, loading: authLoading, getAuthHeaders, user } = useAuth()
+  const toast = useToast()
   const [preview, setPreview] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
   const [showCustomSize, setShowCustomSize] = useState(false)
@@ -23,6 +25,8 @@ function Order() {
     customHeight: '',
     quantity: 15, // Minimum 15 adet
     shippingType: 'standard',
+    firstName: '',
+    lastName: '',
     email: '',
     address: '',
     phone: ''
@@ -154,36 +158,40 @@ function Order() {
     
     // Validasyon
     if (!selectedFile) {
-      alert('Lütfen bir fotoğraf seçin')
+      toast.show('Lütfen bir fotoğraf seçin', 'error')
       return
     }
     
+    if (!formData.firstName?.trim() || !formData.lastName?.trim()) {
+      toast.show('Lütfen ad ve soyad giriniz', 'error')
+      return
+    }
     if (!formData.email || !formData.address) {
-      alert('Lütfen e-posta ve adres bilgilerini doldurun')
+      toast.show('Lütfen e-posta ve adres bilgilerini doldurun', 'error')
       return
     }
 
     // Email format kontrolü
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(formData.email.trim())) {
-      alert('Geçerli bir e-posta adresi giriniz')
+      toast.show('Geçerli bir e-posta adresi giriniz', 'error')
       return
     }
 
     // Adres uzunluk kontrolü
     if (formData.address.trim().length < 10) {
-      alert('Adres en az 10 karakter olmalıdır')
+      toast.show('Adres en az 10 karakter olmalıdır', 'error')
       return
     }
 
     // Miktar kontrolü (minimum 15)
     if (parseInt(formData.quantity) < 15) {
-      alert('Minimum 15 adet seçmelisiniz')
+      toast.show('Minimum 15 adet seçmelisiniz', 'error')
       return
     }
     
     if (formData.size === 'custom' && (!formData.customWidth || !formData.customHeight)) {
-      alert('Özel boyut için genişlik ve yükseklik girmelisiniz')
+      toast.show('Özel boyut için genişlik ve yükseklik girmelisiniz', 'error')
       return
     }
 
@@ -192,66 +200,61 @@ function Order() {
       const width = parseFloat(formData.customWidth)
       const height = parseFloat(formData.customHeight)
       if (isNaN(width) || isNaN(height) || width <= 0 || width > 200 || height <= 0 || height > 200) {
-        alert('Özel boyut 0-200 cm arası olmalıdır')
+        toast.show('Özel boyut 0-200 cm arası olmalıdır', 'error')
         return
       }
     }
-    
-    setIsSubmitting(true)
-    console.log('🚀 Sipariş gönderiliyor...')
-    
-    try {
-      // Fotoğrafı base64'e çevir
-      const reader = new FileReader()
-      reader.onloadend = async () => {
-        const base64String = reader.result.split(',')[1] // data:image/... kısmını kaldır
-        
-        // API'ye gönderilecek veri
+
+    // Anında ana sayfaya yönlendir; sipariş arka planda kaydedilsin
+    toast.show('Siparişiniz alındı, ana sayfaya yönlendiriliyorsunuz.', 'info')
+    navigate('/', { replace: true })
+
+    const fileToRead = selectedFile
+    const form = { ...formData }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      try {
+        const base64String = reader.result.split(',')[1]
         const orderData = {
           photo: {
-            filename: selectedFile.name,
-            originalName: selectedFile.name,
+            filename: fileToRead.name,
+            originalName: fileToRead.name,
             base64: base64String,
-            mimetype: selectedFile.type,
-            size: selectedFile.size
+            mimetype: fileToRead.type,
+            size: fileToRead.size
           },
-          size: formData.size,
-          customSize: formData.size === 'custom' ? {
-            width: parseFloat(formData.customWidth),
-            height: parseFloat(formData.customHeight)
+          size: form.size,
+          customSize: form.size === 'custom' ? {
+            width: parseFloat(form.customWidth),
+            height: parseFloat(form.customHeight)
           } : undefined,
-          quantity: parseInt(formData.quantity),
-          shippingType: formData.shippingType,
-          email: formData.email,
-          address: formData.address,
-          phone: formData.phone || '',
-          firstName: 'Müşteri',
-          lastName: 'Müşteri',
+          quantity: parseInt(form.quantity),
+          shippingType: form.shippingType,
+          email: form.email,
+          address: form.address,
+          phone: form.phone || '',
+          firstName: (form.firstName || '').trim() || 'Müşteri',
+          lastName: (form.lastName || '').trim() || 'Müşteri',
           notes: '',
-          // Varsayılan değerler (backend uyumluluğu için)
           frameType: 'none',
           paperType: 'glossy',
           colorMode: 'color'
         }
-        
-        // Fiyatı hesapla
         const calculatedPrice = calculatePrice(
-          formData.size,
-          parseInt(formData.quantity),
-          formData.shippingType,
-          formData.size === 'custom' ? {
-            width: parseFloat(formData.customWidth),
-            height: parseFloat(formData.customHeight)
+          form.size,
+          parseInt(form.quantity),
+          form.shippingType,
+          form.size === 'custom' ? {
+            width: parseFloat(form.customWidth),
+            height: parseFloat(form.customHeight)
           } : undefined
         )
-        
-        // ÖNEMLİ: Önce ödeme alınacak, sonra backend'e kaydedilecek
-        // Sipariş verisini oluştur ve localStorage'a kaydet
         const orderId = Date.now().toString()
         const orderDataForStorage = {
           id: orderId,
-          photos: [orderData.photo], // Tek fotoğraf array olarak
-          photo: orderData.photo, // Geriye uyumluluk
+          photos: [orderData.photo],
+          photo: orderData.photo,
           size: orderData.size,
           customSize: orderData.customSize,
           quantity: orderData.quantity,
@@ -269,34 +272,54 @@ function Order() {
             address: orderData.address
           },
           price: calculatedPrice,
-          status: 'Yeni',
-          paymentStatus: 'pending', // Ödeme bekleniyor
+          status: 'Bekliyor',
+          paymentStatus: 'pending',
           notes: orderData.notes || '',
           createdAt: new Date().toISOString()
         }
-        
-        // localStorage'a kaydet (base64 dahil - ödeme sayfasında kullanılacak)
         saveOrderToStorage(orderDataForStorage)
-        
-        // Ödeme sayfasına yönlendir
-        navigate('/payment', {
-          state: {
-            orderId: orderId,
-            orderData: orderDataForStorage,
-            photoFiles: [selectedFile] // File objesi ödeme sayfasında base64'e çevrilecek
-          }
-        })
-        
-        setIsSubmitting(false)
+
+        // Arka planda backend'e kaydet (beklemeden)
+        const ordersEndpoint = API_URL.includes('/api') ? `${API_URL}/orders` : `${API_URL}/api/orders`
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(isAuthenticated && getAuthHeaders ? getAuthHeaders() : {})
+        }
+        fetch(ordersEndpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            photo: orderDataForStorage.photo,
+            photos: orderDataForStorage.photos,
+            size: orderDataForStorage.size,
+            customSize: orderDataForStorage.customSize,
+            quantity: orderDataForStorage.quantity,
+            frameType: orderDataForStorage.frameType || 'none',
+            paperType: orderDataForStorage.paperType || 'glossy',
+            colorMode: orderDataForStorage.colorMode || 'color',
+            shippingType: orderDataForStorage.shippingType,
+            email: orderDataForStorage.email,
+            address: orderDataForStorage.address,
+            phone: orderDataForStorage.phone || '',
+            firstName: orderDataForStorage.firstName,
+            lastName: orderDataForStorage.lastName,
+            customerInfo: orderDataForStorage.customerInfo,
+            price: orderDataForStorage.price,
+            notes: orderDataForStorage.notes || '',
+            paymentStatus: 'pending',
+            status: 'Bekliyor',
+            userId: user?.id || null
+          })
+        }).catch(() => {})
+      } catch (err) {
+        console.error('Sipariş hazırlama hatası:', err)
       }
-      
-      reader.readAsDataURL(selectedFile)
-    } catch (error) {
-      console.error('Sipariş gönderme hatası:', error)
-      alert('Sipariş gönderilirken bir hata oluştu. Lütfen tekrar deneyin.')
-    } finally {
-      setIsSubmitting(false)
     }
+    reader.onerror = () => {
+      // Kullanıcı zaten ana sayfada; hata sessizce loglansın
+      console.error('Fotoğraf okunamadı.')
+    }
+    reader.readAsDataURL(fileToRead)
   }
 
   // Eğer kullanıcı giriş yapmamışsa, loading göster veya yönlendirme yapıldıysa boş döndür
@@ -349,9 +372,6 @@ function Order() {
                 <p style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-light)' }}>
                   Siparişiniz backend'e kaydedildi ve admin panelinde görüntülenebilir.
                 </p>
-                <p style={{ fontSize: '0.9rem', marginBottom: '2rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
-                  Test Modu: Ödeme akışı geçici olarak devre dışı bırakıldı.
-                </p>
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <Link to="/" className="btn btn-secondary">
                     Ana Sayfaya Dön
@@ -366,6 +386,8 @@ function Order() {
                         customHeight: '',
                         quantity: 1,
                         shippingType: 'standard',
+                        firstName: '',
+                        lastName: '',
                         email: '',
                         address: '',
                         phone: ''
@@ -550,6 +572,32 @@ function Order() {
 
               <div className="form-section">
                 <h2>4. İletişim Bilgileri</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label htmlFor="firstName">Ad <span className="required">*</span></label>
+                    <input
+                      type="text"
+                      id="firstName"
+                      name="firstName"
+                      required
+                      placeholder="Adınız"
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="lastName">Soyad <span className="required">*</span></label>
+                    <input
+                      type="text"
+                      id="lastName"
+                      name="lastName"
+                      required
+                      placeholder="Soyadınız"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </div>
                 <div className="form-group">
                   <label htmlFor="email">E-posta <span className="required">*</span></label>
                   <input 
@@ -678,7 +726,7 @@ function Order() {
                   style={{ fontSize: '18px', padding: '15px 40px' }}
                   disabled={isSubmitting || !selectedFile}
                 >
-                  {isSubmitting ? 'Sipariş Oluşturuluyor...' : 'Sipariş Ver (Test Modu)'}
+                  {isSubmitting ? 'Sipariş Oluşturuluyor...' : 'Sipariş Ver'}
                 </button>
                 {isSubmitting && (
                   <p style={{ marginTop: '1rem', color: 'var(--text-light)', fontSize: '0.9rem' }}>

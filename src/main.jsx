@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import { initAnalytics } from './utils/analytics'
+import { initConsoleGuard } from './utils/consoleGuard'
+
+// Admin dışında kimse console loglarını görmesin
+initConsoleGuard()
 
 // Initialize Google Analytics if measurement ID is provided
 if (import.meta.env.VITE_GA_MEASUREMENT_ID) {

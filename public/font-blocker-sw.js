@@ -48,47 +48,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Sadece İyzico font isteklerini engelle
-  if (url.includes('static.iyzipay.com/fonts') || 
-      (url.includes('fonts/MarkPro') && url.includes('iyzipay')) ||
-      (url.includes('.woff') && url.includes('iyzipay') && url.includes('static.iyzipay.com'))) {
-    console.log('🚫 [Service Worker] Font isteği engellendi:', url);
-    
-    // Boş ama geçerli bir font response döndür (CORS hatasını önlemek için)
+  // İyzico font istekleri: static.iyzipay.com CORS vermediği için kendi proxy'mizden sun
+  const iyzipayFontMatch = url.match(/https:\/\/static\.iyzipay\.com\/fonts\/MarkPro\/([^/?]+)/i);
+  if (iyzipayFontMatch) {
+    const filename = iyzipayFontMatch[1];
+    const proxyUrl = new URL('/api/payment/fonts/MarkPro/' + encodeURIComponent(filename), self.location.origin).href;
     event.respondWith(
-      new Response(new Uint8Array(0), {
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({
-          'Content-Type': url.includes('.woff2') ? 'font/woff2' : 'font/woff',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Content-Length': '0'
+      fetch(proxyUrl, { mode: 'cors', credentials: 'omit' })
+        .then((res) => {
+          if (!res.ok) return res;
+          const ct = res.headers.get('Content-Type') || (filename.endsWith('.woff2') ? 'font/woff2' : filename.endsWith('.woff') ? 'font/woff' : 'application/octet-stream');
+          return new Response(res.body, { status: 200, headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=31536000' } });
         })
-      })
+        .catch(() => new Response('', { status: 404 }))
     );
     return;
   }
-  
-  // OPTIONS request'leri için CORS header'ları ekle (sadece font istekleri için)
-  if (method === 'OPTIONS' && url.includes('fonts') && url.includes('iyzipay')) {
-    event.respondWith(
-      new Response(null, {
-        status: 200,
-        headers: new Headers({
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Max-Age': '86400'
-        })
-      })
-    );
-    return;
-  }
-  
-  // Diğer tüm istekleri normal şekilde işle (event.respondWith çağrısı yapma, direkt geçir)
-  // Service worker sadece font isteklerine müdahale eder
+
+  // Diğer tüm istekleri normal şekilde işle
 });
 

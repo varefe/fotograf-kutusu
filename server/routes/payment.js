@@ -40,15 +40,11 @@ router.get('/fonts/MarkPro/:filename', (req, res) => {
       proxyRes.pipe(res);
     } else {
       console.warn(`⚠️ Font dosyası bulunamadı: ${filename} (${proxyRes.statusCode})`);
-      // Boş bir font dosyası döndür (CORS hatasını önlemek için)
-      res.setHeader('Content-Type', 'font/woff2');
-      res.status(200).send('');
+      res.status(404).json({ error: 'Font not found' });
     }
   }).on('error', (err) => {
     console.error('❌ Font proxy hatası:', err.message);
-    // Hata durumunda boş response döndür (CORS hatasını önlemek için)
-    res.setHeader('Content-Type', 'font/woff2');
-    res.status(200).send('');
+    if (!res.headersSent) res.status(502).json({ error: 'Font proxy error' });
   });
 });
 
@@ -401,10 +397,13 @@ router.get('/callback', async (req, res) => {
           console.log('✅ Ödeme başarılı, success sayfasına yönlendiriliyor');
           res.redirect(`${frontendUrl}/payment/success?token=${token}`);
         } else {
-          // Ödeme başarısız veya iptal edildi
+          // Ödeme başarısız veya iptal edildi - orderId'yi conversationId'den ekle (failed sayfasında bilgiler görünsün)
           const reason = result.paymentStatus === 'CANCELLED' ? 'cancelled' : 'failed';
+          const convId = result.conversationId || '';
+          const orderIdMatch = convId.match(/ORDER-(\d+)/);
+          const orderIdParam = orderIdMatch ? `&orderId=${orderIdMatch[1]}` : '';
           console.log('❌ Ödeme başarısız/iptal, failed sayfasına yönlendiriliyor:', reason);
-          res.redirect(`${frontendUrl}/payment/failed?token=${token}&reason=${reason}`);
+          res.redirect(`${frontendUrl}/payment/failed?token=${token}&reason=${reason}${orderIdParam}`);
         }
       });
     } else {
@@ -643,8 +642,10 @@ router.post('/callback', async (req, res) => {
             }
           } else {
             const reason = result.paymentStatus === 'CANCELLED' ? 'cancelled' : 'failed';
+            const orderIdParam = orderId ? `&orderId=${orderId}` : '';
+            const tokenParam = goreqData?.id ? `&token=${goreqData.id}` : '';
             console.log('❌ 3D Secure ödeme başarısız/iptal:', reason);
-            res.redirect(`${frontendUrl}/payment/failed?reason=${reason}`);
+            res.redirect(`${frontendUrl}/payment/failed?reason=${reason}${tokenParam}${orderIdParam}`);
           }
         });
       } else {
@@ -680,8 +681,11 @@ router.post('/callback', async (req, res) => {
           res.redirect(`${frontendUrl}/payment/success?token=${token}`);
         } else {
           const reason = result.paymentStatus === 'CANCELLED' ? 'cancelled' : 'failed';
+          const convId = result.conversationId || '';
+          const orderIdMatch = convId.match(/ORDER-(\d+)/);
+          const orderIdParam = orderIdMatch ? `&orderId=${orderIdMatch[1]}` : '';
           console.log('❌ Ödeme başarısız/iptal, failed sayfasına yönlendiriliyor:', reason);
-          res.redirect(`${frontendUrl}/payment/failed?token=${token}&reason=${reason}`);
+          res.redirect(`${frontendUrl}/payment/failed?token=${token}&reason=${reason}${orderIdParam}`);
         }
       });
     } else {

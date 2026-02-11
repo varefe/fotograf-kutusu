@@ -7,7 +7,6 @@ const VAPID_PUBLIC_KEY = 'YOUR_VAPID_PUBLIC_KEY'; // Frontend'den gelecek
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/logo.png',
   '/manifest.json'
 ];
 
@@ -48,7 +47,26 @@ self.addEventListener('activate', (event) => {
 // Fetch event - Network first, fallback to cache
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
+  const url = request.url;
+
+  // İyzico fontları: static.iyzipay.com CORS vermediği için kendi proxy'mizden sun (en başta)
+  const iyzipayFontMatch = url.match(/https:\/\/static\.iyzipay\.com\/fonts\/MarkPro\/([^/?]+)/i);
+  if (iyzipayFontMatch && request.method === 'GET') {
+    const filename = iyzipayFontMatch[1];
+    const proxyUrl = new URL('/api/payment/fonts/MarkPro/' + encodeURIComponent(filename), self.location.origin).href;
+    event.respondWith(
+      fetch(proxyUrl, { mode: 'cors', credentials: 'omit' })
+        .then((res) => {
+          if (!res.ok) return new Response('', { status: 404 });
+          const ct = res.headers.get('Content-Type') || (filename.endsWith('.woff2') ? 'font/woff2' : filename.endsWith('.woff') ? 'font/woff' : 'application/octet-stream');
+          return new Response(res.body, { status: 200, headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=31536000' } });
+        })
+        .catch(() => new Response('', { status: 404 }))
+    );
+    return;
+  }
+
+  const urlObj = new URL(request.url);
 
   // Skip non-GET requests
   if (request.method !== 'GET') {
@@ -56,12 +74,12 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Skip API calls (they should always be online)
-  if (url.pathname.startsWith('/api/')) {
+  if (urlObj.pathname.startsWith('/api/')) {
     return;
   }
 
   // Skip external URLs
-  if (url.origin !== location.origin) {
+  if (urlObj.origin !== location.origin) {
     return;
   }
 
@@ -112,8 +130,8 @@ self.addEventListener('push', (event) => {
   let notificationData = {
     title: 'Fotoğraf Kutusu',
     body: 'Yeni bildirim',
-    icon: '/logo.jpg',
-    badge: '/logo.jpg',
+    icon: '/favicon.ico',
+    badge: '/favicon.ico',
     data: {}
   };
 

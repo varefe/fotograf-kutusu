@@ -31,7 +31,6 @@ function Footer() {
             <ul className="footer-links">
               <li><Link to="/">Ana Sayfa</Link></li>
               <li><Link to="/product">Ürünler</Link></li>
-              <li><Link to="/gallery">Galeri</Link></li>
               <li><Link to="/about">Hakkımızda</Link></li>
               <li><Link to="/reviews">Yorumlar</Link></li>
               <li><Link to="/contact">İletişim</Link></li>

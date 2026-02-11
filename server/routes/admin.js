@@ -2,7 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { connectDB } from '../config/database.js';
 import User from '../models/UserSchema.js';
-import '../models/OrderSchema.js'; // Modeli kaydet (mongoose.model('Order', ...))
+import Order from '../models/OrderSchema.js'; // Model + formatOrder (şifre çözme)
 import Gallery from '../models/GallerySchema.js';
 import Category from '../models/CategorySchema.js';
 import Review from '../models/ReviewSchema.js';
@@ -472,7 +472,6 @@ router.get('/orders', requireAdminRole, async (req, res) => {
   try {
     console.log('📥 Admin sipariş isteği alındı - TÜM siparişler isteniyor');
     await connectDB();
-    const OrderModel = mongoose.model('Order');
     console.log('✅ Veritabanı bağlantısı kontrol edildi');
     
     // Veritabanı ve koleksiyon bilgilerini logla
@@ -485,12 +484,12 @@ router.get('/orders', requireAdminRole, async (req, res) => {
       readyStateText: mongoose.connection.readyState === 1 ? 'Bağlı' : 'Bağlı değil'
     });
     
-    // Önce ham sayıyı kontrol et (request-time model kullan)
-    const totalCount = await OrderModel.countDocuments({});
+    // Önce ham sayıyı kontrol et (Order = Mongoose model from OrderSchema)
+    const totalCount = await Order.countDocuments({});
     console.log(`🔍 MongoDB'de toplam sipariş sayısı: ${totalCount} (Koleksiyon: ${collectionName}, DB: ${dbName})`);
     
     // TÜM siparişleri çek - HİÇBİR TARİH FİLTRESİ YOK (ESKİ VE YENİ TÜM SİPARİŞLER)
-    const rawOrders = await OrderModel.find({})
+    const rawOrders = await Order.find({})
       .sort({ createdAt: -1 }) // En yeni önce
       .lean();
     
@@ -512,11 +511,10 @@ router.get('/orders', requireAdminRole, async (req, res) => {
       });
     }
     
-    // Siparişleri formatla ve şifreleri çöz
+    // Siparişleri formatla ve şifreleri çöz (Order.formatOrder = decryptSensitiveFields for admin)
     const formattedOrders = rawOrders.map((order) => {
       try {
-        // Admin için şifreleri çöz (OrderModel.formatOrder OrderSchema'da eklenir)
-        const formatted = OrderModel.formatOrder ? OrderModel.formatOrder(order, true) : order;
+        const formatted = Order.formatOrder ? Order.formatOrder(order, true) : order;
         
         // Eksik alanları ekle
         return {
@@ -528,21 +526,23 @@ router.get('/orders', requireAdminRole, async (req, res) => {
         };
       } catch (formatError) {
         console.error(`❌ Sipariş formatlama hatası (ID: ${order._id}):`, formatError);
-        // Hata durumunda en azından temel bilgileri döndür
+        // Hata durumunda en azından temel bilgileri döndür (şifreli customerInfo gösterme)
         return {
           id: order._id?.toString(),
           _id: order._id?.toString(),
-          price: orderData.price,
-          status: orderData.status || 'Yeni',
-          paymentStatus: orderData.paymentStatus || 'pending',
-          createdAt: orderData.createdAt,
-          updatedAt: orderData.updatedAt,
-          size: orderData.size,
-          quantity: orderData.quantity || 1,
+          price: order.price,
+          status: order.status || 'Yeni',
+          paymentStatus: order.paymentStatus || 'pending',
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+          size: order.size,
+          quantity: order.quantity || 1,
           customerInfo: {
             email: 'Format hatası',
             firstName: '',
-            lastName: ''
+            lastName: '',
+            phone: '',
+            address: ''
           },
           error: 'Format hatası'
         };
@@ -601,6 +601,45 @@ router.get('/orders', requireAdminRole, async (req, res) => {
       message: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
+  }
+});
+
+/**
+ * Sipariş durumu güncelle (Admin) - GET /api/admin/orders ile aynı auth kullanır
+ */
+router.patch('/orders/:id/status', requireAdminRole, async (req, res) => {
+  try {
+    await connectDB();
+    const OrderModel = mongoose.models.Order || Order;
+    const { status, trackingNumber, shippingCompany } = req.body;
+    const order = await OrderModel.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Sipariş bulunamadı' });
+    }
+    const oldStatus = order.status;
+    const updateData = { updatedAt: new Date() };
+    if (status) updateData.status = status;
+    if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber;
+    if (shippingCompany !== undefined) updateData.shippingCompany = shippingCompany;
+    const updatedOrder = await OrderModel.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (status && status !== oldStatus && order.userId) {
+      try {
+        const { sendOrderStatusNotification, sendOrderShippedNotification, sendOrderDeliveredNotification } = await import('../utils/notificationService.js');
+        if (status === 'Kargoya Verildi' && trackingNumber) {
+          await sendOrderShippedNotification(order.userId.toString(), order._id.toString(), trackingNumber, shippingCompany);
+        } else if (status === 'Teslim Edildi') {
+          await sendOrderDeliveredNotification(order.userId.toString(), order._id.toString());
+        } else {
+          await sendOrderStatusNotification(order.userId.toString(), order._id.toString(), status, { price: order.price });
+        }
+      } catch (notifError) {
+        console.error('Bildirim gönderme hatası:', notifError);
+      }
+    }
+    res.json({ success: true, message: 'Sipariş durumu güncellendi', order: updatedOrder });
+  } catch (error) {
+    console.error('Sipariş durumu güncelleme hatası:', error);
+    res.status(500).json({ success: false, error: 'Sipariş güncellenemedi', message: error.message });
   }
 });
 

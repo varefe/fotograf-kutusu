@@ -136,6 +136,9 @@ export const requireAdminRole = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:requireAdminRole',message:'401',data:{reason:'no_header_or_not_bearer',hasHeader:!!authHeader},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
       return res.status(401).json({
         success: false,
         error: 'Yetkilendirme gerekli',
@@ -148,6 +151,9 @@ export const requireAdminRole = async (req, res, next) => {
     const decoded = verifyToken(token);
     
     if (!decoded) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:requireAdminRole',message:'401',data:{reason:'invalid_token'},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
       return res.status(401).json({
         success: false,
         error: 'Geçersiz token',
@@ -159,6 +165,9 @@ export const requireAdminRole = async (req, res, next) => {
     const user = await User.findById(decoded.userId);
     
     if (!user) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:requireAdminRole',message:'401',data:{reason:'user_not_found'},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
       return res.status(401).json({
         success: false,
         error: 'Kullanıcı bulunamadı',
@@ -168,6 +177,9 @@ export const requireAdminRole = async (req, res, next) => {
 
     // Admin kontrolü
     if (user.role !== 'admin') {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:requireAdminRole',message:'403',data:{reason:'not_admin',role:user.role},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
       return res.status(403).json({
         success: false,
         error: 'Yetkisiz erişim',
@@ -185,6 +197,9 @@ export const requireAdminRole = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Admin role kontrolü hatası:', error);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:requireAdminRole',message:'401 catch',data:{reason:'exception',err:error.message},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
     return res.status(401).json({
       success: false,
       error: 'Yetkilendirme hatası',

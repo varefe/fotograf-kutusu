@@ -1,68 +1,73 @@
 #!/bin/bash
 
-# FTP Upload using curl
-HOST="fotografkutusu.com"
-USER="pfotogex"
-PASS="fot539IJdh}"
+# FTP ile domain'e (fotografkutusu.com) yükleme
+# Kullanım: ./upload_curl.sh
+# Veya:    FTP_USER=kullanici FTP_PASS=sifre ./upload_curl.sh
+
+HOST="${FTP_HOST:-fotografkutusu.com}"
+USER="${FTP_USER:-pfotogex}"
+# Şifre } ile bitiyorsa FTP_PASS ile verin: FTP_PASS='sifreniz' ./upload_curl.sh
+PASS="${FTP_PASS:-fot539IJdh}"
 REMOTE_DIR="public_html"
 LOCAL_DIR="dist"
 
-echo "📤 FTP ile dosya yükleme başlıyor..."
-echo "Host: $HOST"
+echo "📤 Domain'e FTP yükleme: $HOST"
 echo ""
 
 cd "$(dirname "$0")"
 
-# Tüm dosyaları yükle
+if [ ! -d "$LOCAL_DIR" ]; then
+    echo "❌ $LOCAL_DIR/ klasörü yok. Önce build alın:"
+    echo "   VITE_API_URL=https://heartfelt-embrace-production-8a92.up.railway.app npm run build:full"
+    exit 1
+fi
+
+if [ ! -f "$LOCAL_DIR/index.html" ]; then
+    echo "❌ $LOCAL_DIR/index.html yok. Önce: npm run build:full"
+    exit 1
+fi
+
+# .htaccess yoksa kökten kopyala (SPA routing için gerekli)
+if [ ! -f "$LOCAL_DIR/.htaccess" ] && [ -f ".htaccess" ]; then
+    cp .htaccess "$LOCAL_DIR/.htaccess"
+    echo "📋 .htaccess dist'e kopyalandı"
+fi
+
 upload_file() {
     local file=$1
     local remote_path=${file#$LOCAL_DIR/}
     
     if [ -d "$file" ]; then
-        echo "📁 Klasör atlanıyor: $file"
-        return
+        return 0
     fi
     
-    echo "📤 Yükleniyor: $remote_path"
-    
-    curl -T "$file" \
-        -u "$USER:$PASS" \
-        "ftp://$HOST/$REMOTE_DIR/$remote_path" \
-        --ftp-create-dirs \
-        --silent --show-error
-    
-    if [ $? -eq 0 ]; then
-        echo "   ✅ Başarılı"
+    echo -n "   $remote_path ... "
+    curl -T "$file" -u "$USER:$PASS" "ftp://$HOST/$REMOTE_DIR/$remote_path" --ftp-create-dirs --silent --show-error -w "%{http_code}" -o /dev/null 2>/dev/null
+    local ret=$?
+    if [ $ret -eq 0 ]; then
+        echo "✅"
     else
-        echo "   ❌ Hata"
+        echo "❌ (curl exit $ret)"
         return 1
     fi
 }
 
-# Önce .htaccess'i yükle
-if [ -f "$LOCAL_DIR/.htaccess" ]; then
-    upload_file "$LOCAL_DIR/.htaccess"
-fi
+echo "📤 Dosyalar yükleniyor..."
+upload_file "$LOCAL_DIR/.htaccess" 2>/dev/null || true
+upload_file "$LOCAL_DIR/index.html"
 
-# index.html'i yükle
-if [ -f "$LOCAL_DIR/index.html" ]; then
-    upload_file "$LOCAL_DIR/index.html"
-fi
+for file in "$LOCAL_DIR"/*; do
+    [ -e "$file" ] || continue
+    if [ -f "$file" ]; then
+        upload_file "$file"
+    fi
+done
 
-# assets klasöründeki dosyaları yükle
 if [ -d "$LOCAL_DIR/assets" ]; then
     for file in "$LOCAL_DIR/assets"/*; do
-        if [ -f "$file" ]; then
-            upload_file "$file"
-        fi
+        [ -f "$file" ] && upload_file "$file"
     done
 fi
 
-# vite.svg'i yükle
-if [ -f "$LOCAL_DIR/vite.svg" ]; then
-    upload_file "$LOCAL_DIR/vite.svg"
-fi
-
 echo ""
-echo "✅ Yükleme tamamlandı!"
-echo "🌐 Site: https://$HOST"
+echo "✅ Yükleme bitti. Site: https://$HOST"

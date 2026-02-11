@@ -187,10 +187,14 @@ export const validateOrderData = (orderData) => {
   // Fotoğraf - photos array veya photo objesi kontrolü
   const hasPhotos = orderData.photos && Array.isArray(orderData.photos) && orderData.photos.length > 0;
   const hasPhoto = orderData.photo && orderData.photo.base64;
-  
-  if (!hasPhotos && !hasPhoto) {
+  // Ödemeyi atla / gözden geçir akışı: önce sipariş fotoğrafsız kaydedilir, fotoğraflar PATCH ile sonra eklenir
+  const notesStr = orderData.notes && typeof orderData.notes === 'string' ? orderData.notes : '';
+  const photosDeferred = orderData.photos && Array.isArray(orderData.photos) && orderData.photos.length === 0 &&
+    notesStr && (notesStr.includes('ödeme sonrası eklenecek') || notesStr.includes('sonrası eklenecek'));
+
+  if (!hasPhotos && !hasPhoto && !photosDeferred) {
     errors.push('Fotoğraf gerekli');
-  } else {
+  } else if (!photosDeferred) {
     // photos array varsa onu kullan, yoksa photo objesini kullan
     const photosToValidate = hasPhotos ? orderData.photos : (orderData.photo ? [orderData.photo] : []);
     const isTestMode = orderData.paymentStatus === 'test';

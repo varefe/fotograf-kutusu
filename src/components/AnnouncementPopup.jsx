@@ -80,7 +80,8 @@ function AnnouncementPopup() {
         }
       }
     } catch (error) {
-      console.error('Popup yükleme hatası:', error)
+      const isNetworkError = error?.message === 'Failed to fetch' || (error?.name === 'TypeError' && error?.message?.includes?.('fetch'))
+      if (!isNetworkError) console.error('Popup yükleme hatası:', error)
     }
   }
 

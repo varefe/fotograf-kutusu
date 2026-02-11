@@ -6,23 +6,7 @@ const ENCRYPTION_KEY = 'fotograf-baski-admin-2024'
 // Şifreleme fonksiyonu - UTF-8 uyumlu
 export const encryptData = (data) => {
   try {
-    // #region agent log
-    try {
-      const dataSize = JSON.stringify(data).length
-      const photosCount = data.photos?.length || 0
-      const photosBase64Size = data.photos?.reduce((sum, p) => sum + (p?.base64?.length || 0), 0) || 0
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'encryption.js:7',message:'encryptData entry',data:{dataSize,photosCount,photosBase64Size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
-    
     const jsonString = JSON.stringify(data)
-    
-    // #region agent log
-    try {
-      const jsonStringSize = jsonString.length
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'encryption.js:11',message:'After JSON.stringify',data:{jsonStringSize},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
     
     // Önce Base64'e çevir (UTF-8 uyumlu)
     const base64String = btoa(unescape(encodeURIComponent(jsonString)))
@@ -73,15 +57,6 @@ export const decryptData = (encryptedData) => {
 // Siparişleri localStorage'a kaydet
 export const saveOrderToStorage = (orderData) => {
   try {
-    // #region agent log
-    try {
-      const photosCount = orderData.photos?.length || 0
-      const photosBase64Size = orderData.photos?.reduce((sum, p) => sum + (p?.base64?.length || 0), 0) || 0
-      const photoBase64Size = orderData.photo?.base64?.length || 0
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'encryption.js:58',message:'saveOrderToStorage entry',data:{photosCount,photosBase64Size,photoBase64Size,hasPhotos:!!orderData.photos,hasPhoto:!!orderData.photo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
-    
     // Base64 fotoğrafları kaldır (localStorage quota için)
     const orderDataWithoutBase64 = {
       ...orderData,
@@ -98,16 +73,6 @@ export const saveOrderToStorage = (orderData) => {
       })) : undefined
     }
     
-    // #region agent log
-    try {
-      const cleanedPhotosCount = orderDataWithoutBase64.photos?.length || 0
-      const cleanedPhotosBase64Size = orderDataWithoutBase64.photos?.reduce((sum, p) => sum + (p?.base64?.length || 0), 0) || 0
-      const cleanedPhotoBase64Size = orderDataWithoutBase64.photo?.base64?.length || 0
-      const orderDataSize = JSON.stringify(orderDataWithoutBase64).length
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'encryption.js:75',message:'After cleaning base64',data:{cleanedPhotosCount,cleanedPhotosBase64Size,cleanedPhotoBase64Size,orderDataSize},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
-    
     const existingOrders = getOrdersFromStorage()
     
     // Eski siparişleri temizle (son 50 siparişi tut)
@@ -123,13 +88,6 @@ export const saveOrderToStorage = (orderData) => {
       createdAt: orderData.createdAt || new Date().toISOString(),
       encrypted: true
     }
-    
-    // #region agent log
-    try {
-      const newOrderSize = JSON.stringify(newOrder).length
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'encryption.js:95',message:'Before encryptData',data:{newOrderSize},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
     
     // Şifrele
     const encrypted = encryptData(newOrder)

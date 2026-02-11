@@ -23,12 +23,9 @@ router.get('/', async (req, res) => {
       ]
     };
 
-    // Sayfa filtresi
+    // Sayfa filtresi: showOnPages dizisi 'all' veya page içermeli (query.$or'ı ezmeden)
     if (page !== 'all') {
-      query.$or = [
-        { showOnPages: 'all' },
-        { showOnPages: page }
-      ];
+      query.showOnPages = { $in: ['all', page] };
     }
 
     const announcements = await Announcement.find(query)

@@ -61,25 +61,9 @@ export const CartProvider = ({ children }) => {
 
   // Sepete toplu ekle (performans için)
   const addMultipleToCart = (items) => {
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:45',message:'addMultipleToCart called',data:{itemsCount:items?.length||0,currentCartItemsCount:cartItems.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
     if (!items || items.length === 0) {
-      // #region agent log
-      try {
-        fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:47',message:'addMultipleToCart early return',data:{reason:'empty items'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-      } catch(e) {}
-      // #endregion
       return
     }
-    
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:48',message:'Before mapping items',data:{itemsCount:items.length,firstItemPreviewSize:items[0]?.photo?.preview?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
     
     const baseTimestamp = Date.now()
     const newItems = items.map((item, index) => ({
@@ -88,28 +72,8 @@ export const CartProvider = ({ children }) => {
       createdAt: new Date().toISOString()
     }))
     
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:54',message:'Before setCartItems',data:{newItemsCount:newItems.length,currentCartItemsCount:cartItems.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
-    
     setCartItems(prevCartItems => {
-      // #region agent log
-      try {
-        fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:56',message:'Inside setCartItems functional update',data:{prevCartItemsCount:prevCartItems.length,newItemsCount:newItems.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
-      } catch(e) {}
-      // #endregion
-      
       const updatedCart = [...prevCartItems, ...newItems]
-      
-      // #region agent log
-      try {
-        const previewSizes = updatedCart.map(i => i.photo?.preview?.length || 0)
-        const totalPreviewSize = previewSizes.reduce((sum, size) => sum + size, 0)
-        fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:60',message:'Before cartForStorage mapping',data:{updatedCartLength:updatedCart.length,totalPreviewSize,previewSizes:previewSizes.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
-      } catch(e) {}
-      // #endregion
       
       // Preview'ları sessionStorage'a kaydet (base64'e çevirmek için)
       try {
@@ -133,26 +97,9 @@ export const CartProvider = ({ children }) => {
         } : undefined
       }))
       
-      // #region agent log
-      try {
-        const cartSize = JSON.stringify(cartForStorage).length
-        fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:65',message:'Before localStorage.setItem',data:{cartSize,itemCount:cartForStorage.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-      } catch(e) {}
-      // #endregion
-      
       try {
         localStorage.setItem('cart', JSON.stringify(cartForStorage))
-        // #region agent log
-        try {
-          fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:67',message:'localStorage.setItem success',data:{cartSize:JSON.stringify(cartForStorage).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-        } catch(e) {}
-        // #endregion
       } catch (error) {
-        // #region agent log
-        try {
-          fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:68',message:'localStorage.setItem error',data:{errorName:error.name,errorMessage:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-        } catch(e) {}
-        // #endregion
         if (error.name === 'QuotaExceededError') {
           const cleanedCart = updatedCart.slice(-20).map(item => ({
             ...item,
@@ -164,35 +111,13 @@ export const CartProvider = ({ children }) => {
           }))
           try {
             localStorage.setItem('cart', JSON.stringify(cleanedCart))
-            // #region agent log
-            try {
-              fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:77',message:'Cleaned cart saved',data:{cleanedCartSize:JSON.stringify(cleanedCart).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-            } catch(e) {}
-            // #endregion
             return updatedCart.slice(-20)
           } catch (retryError) {
-            // #region agent log
-            try {
-              fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:81',message:'Cleaned cart save failed',data:{errorName:retryError.name,errorMessage:retryError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-            } catch(e) {}
-            // #endregion
             localStorage.removeItem('cart')
             return updatedCart.slice(-20)
           }
-        } else {
-          // #region agent log
-          try {
-            fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:85',message:'Non-quota error in localStorage',data:{errorName:error.name,errorMessage:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-          } catch(e) {}
-          // #endregion
         }
       }
-      
-      // #region agent log
-      try {
-        fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:86',message:'Returning updatedCart',data:{updatedCartLength:updatedCart.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
-      } catch(e) {}
-      // #endregion
       
       return updatedCart
     })
@@ -200,11 +125,6 @@ export const CartProvider = ({ children }) => {
 
   // Sepete ekle
   const addToCart = (item) => {
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:29',message:'addToCart called',data:{photoFilename:item.photo?.filename,itemPrice:item.price,itemQuantity:item.quantity,itemSize:item.product?.size,currentCartItemsCount:cartItems.length,currentCartItems:cartItems.map(i=>({id:i.id,price:i.price,quantity:i.quantity,size:i.product?.size}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
     // State'te preview ve file objelerini tut (görüntüleme ve base64'e çevirme için)
     // localStorage'a kaydederken bunları kaldıracağız
     const newItem = {
@@ -212,20 +132,11 @@ export const CartProvider = ({ children }) => {
       ...item,
       createdAt: new Date().toISOString()
     }
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:49',message:'Before setCartItems with functional update',data:{newItemId:newItem.id,newItemPrice:newItem.price,newItemQuantity:newItem.quantity,currentCartItemsCount:cartItems.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    } catch(e) {}
-    // #endregion
     // FIX: Functional update kullanarak state güncelleme sorununu çöz
     // State güncellemesi asenkron olduğu için, functional update kullanarak her çağrıda güncel state'i al
     setCartItems(prevCartItems => {
       // State'te preview'ları tut (görüntüleme için)
       const updatedCart = [...prevCartItems, newItem]
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:56',message:'Inside functional update',data:{prevCartItemsCount:prevCartItems.length,updatedCartLength:updatedCart.length,newItemId:newItem.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      
       // Preview'ları sessionStorage'a kaydet (base64'e çevirmek için)
       try {
         const previewsMap = {}
@@ -251,18 +162,8 @@ export const CartProvider = ({ children }) => {
       }))
       // localStorage quota kontrolü
       try {
-        // #region agent log
-        const cartSize = JSON.stringify(cartForStorage).length
-        fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:60',message:'Before localStorage.setItem',data:{cartSize,itemCount:cartForStorage.length,previewSizes:cartForStorage.map(i=>i.photo?.preview?.length||0)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-        // #endregion
         localStorage.setItem('cart', JSON.stringify(cartForStorage))
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:62',message:'localStorage.setItem success',data:{cartSize},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-        // #endregion
       } catch (error) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:64',message:'localStorage.setItem error',data:{errorName:error.name,errorMessage:error.message,cartSize:JSON.stringify(updatedCart).length,itemCount:updatedCart.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-        // #endregion
         if (error.name === 'QuotaExceededError') {
           console.warn('⚠️ Sepet localStorage quota aşıldı, eski öğeler temizleniyor...')
           // Son 20 öğeyi tut ve sadece metadata kaydet
@@ -277,16 +178,8 @@ export const CartProvider = ({ children }) => {
           }))
           try {
             localStorage.setItem('cart', JSON.stringify(cleanedCart))
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:68',message:'Cleaned cart saved',data:{cleanedCartSize:JSON.stringify(cleanedCart).length,itemCount:cleanedCart.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-            // #endregion
-            // State'te preview'ları tut (görüntüleme için)
             return updatedCart.slice(-20)
           } catch (retryError) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/6e10026d-a3f6-4a76-a74c-bdc502ce31cd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CartContext.jsx:72',message:'Cleaned cart save failed',data:{errorName:retryError.name,errorMessage:retryError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-            // #endregion
-            // Eğer hala quota aşılıyorsa, localStorage'ı tamamen temizle
             localStorage.removeItem('cart')
             // State'te preview'ları tut (görüntüleme için)
             return updatedCart.slice(-20)
