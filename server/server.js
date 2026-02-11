@@ -150,12 +150,7 @@ const orderLimiter = rateLimit({
     message: 'Lütfen bir süre sonra tekrar deneyin'
   },
   skip: (req) => {
-    // GET isteklerini skip et (sadece POST isteklerine uygula)
     if (req.method !== 'POST') return true;
-    
-    // Test modu için rate limiting'i atla (body'de paymentStatus: 'test' varsa)
-    // Not: Body henüz parse edilmemiş olabilir, bu yüzden bu kontrol çalışmayabilir
-    // Alternatif: Development modunda rate limiting'i devre dışı bırak
     return false;
   }
 });

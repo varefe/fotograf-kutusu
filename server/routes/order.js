@@ -238,15 +238,8 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
     } = req.body;
     
     // TEST MODU KONTROLÜNÜ EN BAŞTA YAP (userId kontrolünden ÖNCE)
-    const isTestMode = (paymentStatus === 'test');
-    // #region agent log
-    logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:isTestMode check',message:'isTestMode calculation',data:{paymentStatus,paymentStatusType:typeof paymentStatus,isTestMode,paymentStatusEqualsTest:paymentStatus==='test',hasUser:!!req.user}});
-    // #endregion
-    console.log('🔍 [DEBUG] isTestMode check (EARLY):', { 
-      paymentStatus, 
-      isTestMode,
-      hasUser: !!req.user
-    });
+    // paymentStatus 'test' kabul edilmez; ödeme baypası kapalı
+    const effectivePaymentStatus = (paymentStatus === 'test') ? 'pending' : (paymentStatus || 'pending');
 
     // Veri temizleme
     // Email ve address'i hem üst seviyede hem customerInfo içinde tut (validasyon için)
@@ -300,58 +293,35 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
         address: finalAddress
       },
       notes: notes ? sanitizeInput(notes) : '',
-      paymentStatus: paymentStatus || 'pending' // Test modu kontrolü için
+      paymentStatus: effectivePaymentStatus
     };
 
-    // isTestMode zaten yukarıda kontrol edildi
-    // #region agent log
-    console.log('🔍 [DEBUG] Before validation check:', { 
-      paymentStatus, 
-      isTestMode,
-      hasUser: !!req.user,
-      userId: req.user?.id || null
-    });
-    // #endregion
-    console.log('🧪 PaymentStatus kontrolü:', { paymentStatus, isTestMode });
-    
-    if (isTestMode) {
-      // TEST MODU: HİÇBİR KONTROL YOK - DİREKT KAYDET
-      console.log('🧪 TEST MODU: TÜM KONTROLLER ATLANDI - DİREKT KAYIT');
-    } else {
-      // Normal modda kontrolleri yap
-      
-      // Minimum 15 adet kontrolü
-      if (sanitizedData.quantity < 15) {
-        return res.status(400).json({
-          success: false,
-          error: 'Minimum adet hatası',
-          message: 'Minimum 15 adet seçmelisiniz (tekli fiyat yok)',
-          details: { quantity: 'Minimum 15 adet gerekli' }
-        });
-      }
-      
-      // Normal modda validasyon yap
-      const validation = validateOrderData(sanitizedData);
-      if (!validation.isValid) {
-        console.error('❌ Validasyon hataları:', validation.errors);
-        return res.status(400).json({
-          success: false,
-          error: 'Validasyon hatası',
-          message: 'Girilen bilgiler geçersiz',
-          details: validation.errors
-        });
-      }
+    // Minimum 15 adet kontrolü
+    if (sanitizedData.quantity < 15) {
+      return res.status(400).json({
+        success: false,
+        error: 'Minimum adet hatası',
+        message: 'Minimum 15 adet seçmelisiniz (tekli fiyat yok)',
+        details: { quantity: 'Minimum 15 adet gerekli' }
+      });
+    }
+
+    // Validasyon
+    const validation = validateOrderData(sanitizedData);
+    if (!validation.isValid) {
+      console.error('❌ Validasyon hataları:', validation.errors);
+      return res.status(400).json({
+        success: false,
+        error: 'Validasyon hatası',
+        message: 'Girilen bilgiler geçersiz',
+        details: validation.errors
+      });
     }
 
     // Fiyat hesapla (eğer request'te fiyat gönderilmişse onu kullan, yoksa hesapla)
-    // Test modunda fiyat hesaplama hatası olmasın diye try-catch ile sar
     let price;
     if (requestPrice) {
       price = parseFloat(requestPrice);
-    } else if (isTestMode) {
-      // Test modunda basit fiyat hesapla (validasyon yok)
-      price = (sanitizedData.quantity || 15) * 20 + 15; // Basit hesaplama
-      console.log('🧪 TEST MODU: Basit fiyat hesaplandı:', price);
     } else {
       price = calculatePrice(
         sanitizedData.size,
@@ -361,94 +331,29 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
       );
     }
 
-    // Kullanıcı ID'sini al (optionalAuth ile gelen kullanıcı veya test modu)
-    // optionalAuth middleware'i kullanıcıyı req.user'a ekler (varsa)
-    // ÖNEMLİ: isTestMode kontrolü yukarıda yapıldı, burada kullanıyoruz
+    // Kullanıcı ID'sini al (optionalAuth ile gelen kullanıcı - giriş zorunlu)
     let userId = null;
-    // #region agent log
-    console.log('🔍 [DEBUG] userId check:', { 
-      hasUser: !!req.user,
-      userId: req.user?.id || null,
-      isTestMode,
-      willRequireAuth: !isTestMode && !req.user
-    });
-    // #endregion
-    
-    // Test modunda userId kontrolü yapma, direkt devam et
-    // #region agent log
-    console.log('🔍 [DEBUG] Before userId check:', { 
-      isTestMode, 
-      paymentStatus,
-      hasUser: !!req.user,
-      userId: req.user?.id || null
-    });
-    // #endregion
-    
-    if (isTestMode) {
-      // #region agent log
-      console.log('🔍 [DEBUG] Test mode - skipping userId check, setting userId to null');
-      // #endregion
-      userId = null; // Test modunda userId null olabilir
-    } else if (req.user && req.user.id) {
-      // userId'yi ObjectId'ye çevir (MongoDB için)
+    if (req.user && req.user.id) {
       const mongoose = (await import('mongoose')).default;
       if (mongoose.Types.ObjectId.isValid(req.user.id)) {
         userId = new mongoose.Types.ObjectId(req.user.id);
       } else {
-        userId = req.user.id; // String olarak kullan
+        userId = req.user.id;
       }
     } else {
-      // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:401 return',message:'Returning 401',data:{isTestMode,paymentStatus,hasUser:!!req.user,userId:req.user?.id||null}});
-      // #endregion
-      console.log('🔍 [DEBUG] Returning 401 - not test mode and no user');
-      // Test modu değilse ve kullanıcı yoksa hata döndür
       return res.status(401).json({
         success: false,
         error: 'Yetkilendirme gerekli',
         message: 'Sipariş verebilmek için lütfen giriş yapın veya kayıt olun'
       });
     }
-    // Test modunda userId null olabilir (misafir siparişi)
-    // #region agent log
-    console.log('🔍 [DEBUG] userId set:', { userId: userId?.toString() || null, isTestMode });
-    // #endregion
 
-    // Payment status ve status'u al (eğer gönderilmişse)
-    const finalPaymentStatus = paymentStatus || 'pending';
+    const finalPaymentStatus = effectivePaymentStatus;
     const finalStatus = status || 'Yeni';
-    
-    console.log('📝 Final payment status:', finalPaymentStatus);
 
-    // Aynı kullanıcının siparişlerini birbirine bağlamak için orderGroupId oluştur
-    // Aynı email/kullanıcı için mevcut orderGroupId varsa onu kullan, yoksa yeni oluştur
-    // Eğer test modunda ve aynı email ile henüz ödeme alınmamış bir sipariş varsa, onu güncelle
+    // Aynı kullanıcının siparişlerini birbirine bağlamak için orderGroupId
     let orderGroupId = null;
-    let existingOrderToUpdate = null;
-    
-    if (finalEmail && isTestMode) {
-      // Test modunda: Aynı email ile son 1 saat içinde oluşturulmuş ve henüz ödeme alınmamış bir sipariş var mı?
-      const oneHourAgo = new Date();
-      oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-      
-      existingOrderToUpdate = await Order.findOne({
-        $or: [
-          { 'customerInfo.email': finalEmail },
-          { userId: userId }
-        ],
-        createdAt: { $gte: oneHourAgo },
-        paymentStatus: { $in: ['test', 'pending'] },
-        status: { $ne: 'Ödeme Alındı' }
-      }).sort({ createdAt: -1 }).lean();
-      
-      if (existingOrderToUpdate) {
-        // Mevcut siparişi güncelle, yeni sipariş oluşturma
-        orderGroupId = existingOrderToUpdate.orderGroupId;
-        console.log('🔄 Mevcut test siparişi bulundu, güncellenecek:', existingOrderToUpdate._id);
-      }
-    }
-    
-    if (!orderGroupId && finalEmail) {
+    if (finalEmail) {
       // Aynı email ile son 30 gün içinde oluşturulmuş bir sipariş var mı?
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -525,42 +430,13 @@ router.post('/', asyncHandler(optionalAuth), asyncHandler(async (req, res, next)
       collectionName
     });
 
-    let savedOrder;
-    
-    // Eğer test modunda ve mevcut bir sipariş varsa, onu güncelle
-    if (existingOrderToUpdate && isTestMode) {
-      // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:update-existing-order',message:'Attempting to update existing order',data:{existingOrderId:existingOrderToUpdate._id}});
-      // #endregion
-      console.log('🔄 Mevcut test siparişi güncelleniyor:', existingOrderToUpdate._id);
-      
-      // MongoDB'de update
-      await Order.findByIdAndUpdate(
-        existingOrderToUpdate._id,
-        { ...orderData, orderGroupId: orderGroupId, updatedAt: new Date() },
-        { new: true }
-      );
-      savedOrder = await Order.findById(existingOrderToUpdate._id);
-      // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:update-existing-order',message:'Order updated successfully',data:{updatedOrderId:savedOrder?._id}});
-      // #endregion
-      console.log('✅ Mevcut sipariş güncellendi:', savedOrder._id);
-    } else {
-      // Yeni sipariş oluştur
-      // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:create-new-order',message:'Creating new order',data:{orderType:typeof Order}});
-      // #endregion
-      savedOrder = await Order.create(orderData);
-      // #region agent log
-      logDebug({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'order.js:create-new-order',message:'Order created successfully',data:{createdOrderId:savedOrder?._id}});
-      // #endregion
-      console.log('✅ Yeni sipariş başarıyla kaydedildi:', {
-        orderId: savedOrder._id,
-        dbName,
-        collectionName,
-        savedAt: new Date().toISOString()
-      });
-    }
+    const savedOrder = await Order.create(orderData);
+    console.log('✅ Yeni sipariş kaydedildi:', {
+      orderId: savedOrder._id,
+      dbName,
+      collectionName,
+      savedAt: new Date().toISOString()
+    });
     
     // Kaydedilen siparişin veritabanında olup olmadığını doğrula
     try {

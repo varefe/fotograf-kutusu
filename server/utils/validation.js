@@ -197,19 +197,13 @@ export const validateOrderData = (orderData) => {
   } else if (!photosDeferred) {
     // photos array varsa onu kullan, yoksa photo objesini kullan
     const photosToValidate = hasPhotos ? orderData.photos : (orderData.photo ? [orderData.photo] : []);
-    const isTestMode = orderData.paymentStatus === 'test';
-    
     photosToValidate.forEach((photo, index) => {
       if (!photo || !photo.base64) {
         errors.push(`Fotoğraf ${index + 1} geçersiz`);
         return;
       }
-      
-      if (!isTestMode) {
-        // Normal modda dosya boyutu kontrolü yap
-        if (!isValidFileSize(photo.base64, 10)) {
-          errors.push(`Fotoğraf ${index + 1} boyutu 10MB'dan küçük olmalıdır`);
-        }
+      if (!isValidFileSize(photo.base64, 10)) {
+        errors.push(`Fotoğraf ${index + 1} boyutu 10MB'dan küçük olmalıdır`);
       }
       
       // Dosya tipi
