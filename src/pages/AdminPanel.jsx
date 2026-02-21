@@ -225,13 +225,19 @@ function AdminPanel() {
   })
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(false)
 
+  // Kullanıcı/token değiştiğinde (farklı admin girişi) önceki veriyi temizle, sonra güncel token ile çek
   useEffect(() => {
     if (authLoading) return
     if (!isAuthenticated || !isAdmin || !token) {
       navigate('/')
       return
     }
-    fetchData()
+    setProducts([])
+    setCarouselSlides([])
+    setPageContents([])
+    setPageEditTitle('')
+    setPageEditContent('')
+    fetchData(token)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, isAuthenticated, isAdmin, token, authLoading])
 
@@ -296,13 +302,28 @@ function AdminPanel() {
       .catch(() => {})
   }, [activeTab, token])
 
-  const fetchData = async () => {
+  // Ürünler sekmesine girildiğinde ürün listesini tekrar çek (mevcut ürünler görünsün)
+  useEffect(() => {
+    if (activeTab !== 'products' || !token) return
+    const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+    const headers = getAuthHeaders()
+    fetch(`${apiUrl}/products/admin/all`, { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.products)) {
+          setProducts(data.products)
+        }
+      })
+      .catch(() => {})
+  }, [activeTab, token])
+
+  const fetchData = async (authToken) => {
+    const tokenToUse = authToken !== undefined ? authToken : token
     try {
       setLoading(true)
       setError(null)
 
-      // Token kontrolü
-      if (!token) {
+      if (!tokenToUse) {
         setError('Giriş yapmanız gerekiyor')
         setLoading(false)
         navigate('/login')
@@ -310,7 +331,10 @@ function AdminPanel() {
       }
 
       const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
-      const headers = getAuthHeaders()
+      const headers = {
+        'Authorization': `Bearer ${tokenToUse}`,
+        'Content-Type': 'application/json'
+      }
 
       // Panele girer girmez tüm verileri paralel çek (sekmelerde 0 görünmesin)
       const [ordersRes, usersRes, statsRes, reviewsRes, productsRes, announcementsRes, carouselRes] = await Promise.all([
@@ -3106,74 +3130,143 @@ function AdminPanel() {
         {activeTab === 'theme' && (
           <>
             <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem', color: 'var(--text-color)' }}>Site renkleri</h2>
-            <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Sitede kullanılan ana renkleri değiştirin. Kaydettikten sonra tüm sayfalarda anında uygulanır.
+            <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Aşağıda her rengin sitede nerede kullanıldığı yazıyor. Değiştirip kaydettikten sonra tüm sayfalarda anında uygulanır.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', maxWidth: '800px', marginBottom: '1.5rem' }}>
-              {[
-                { key: 'primaryColor', label: 'Ana renk (butonlar, vurgular)' },
-                { key: 'primaryDark', label: 'Ana renk koyu' },
-                { key: 'primaryLight', label: 'Ana renk açık' },
-                { key: 'secondaryColor', label: 'İkincil renk' },
-                { key: 'textColor', label: 'Metin rengi' },
-                { key: 'textLight', label: 'Metin rengi açık' },
-                { key: 'bgColor', label: 'Arka plan' },
-                { key: 'bgLight', label: 'Arka plan açık' },
-                { key: 'bgGray', label: 'Arka plan gri' },
-                { key: 'borderColor', label: 'Çerçeve rengi' }
-              ].map(({ key, label }) => (
-                <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-color)' }}>{label}</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <input
-                      type="color"
-                      value={themeColors[key] || '#000000'}
-                      onChange={(e) => setThemeColors(prev => ({ ...prev, [key]: e.target.value }))}
-                      style={{ width: '44px', height: '38px', padding: 2, border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer' }}
-                    />
-                    <input
-                      type="text"
-                      value={themeColors[key] || ''}
-                      onChange={(e) => setThemeColors(prev => ({ ...prev, [key]: e.target.value }))}
-                      style={{ flex: 1, padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontFamily: 'monospace', fontSize: '0.9rem' }}
-                      placeholder="#hex"
-                    />
-                  </div>
+
+            {[
+              {
+                group: 'Ana renk (vurgu rengi)',
+                items: [
+                  { key: 'primaryColor', label: 'Ana renk', where: 'Butonlar, linkler, ikonlar, rozetler, kategori kartları' },
+                  { key: 'primaryDark', label: 'Ana renk koyu', where: 'Buton hover, aktif durumlar' },
+                  { key: 'primaryLight', label: 'Ana renk açık', where: 'Gradient uç rengi, arka plan vurguları' }
+                ]
+              },
+              {
+                group: 'Diğer vurgu',
+                items: [
+                  { key: 'secondaryColor', label: 'İkincil renk', where: 'İkincil butonlar, bazı rozetler' }
+                ]
+              },
+              {
+                group: 'Metin',
+                items: [
+                  { key: 'textColor', label: 'Metin rengi', where: 'Başlıklar ve ana metin' },
+                  { key: 'textLight', label: 'Metin rengi açık', where: 'Alt başlıklar, açıklamalar, notlar' }
+                ]
+              },
+              {
+                group: 'Arka plan',
+                items: [
+                  { key: 'bgColor', label: 'Arka plan', where: 'Sayfa arka planı, kartlar, navbar' },
+                  { key: 'bgLight', label: 'Arka plan açık', where: 'Bölüm arka planları, input arka planı' },
+                  { key: 'bgGray', label: 'Arka plan gri', where: 'Navbar üst çizgi, bazı kutular' }
+                ]
+              },
+              {
+                group: 'Çerçeve',
+                items: [
+                  { key: 'borderColor', label: 'Çerçeve rengi', where: 'Kart kenarları, input çerçevesi, ayırıcı çizgiler' }
+                ]
+              }
+            ].map(({ group, items }) => (
+              <div key={group} style={{ marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-light)', marginBottom: '0.75rem' }}>{group}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
+                  {items.map(({ key, label, where }) => (
+                    <div key={key} style={{ padding: '1rem', background: 'var(--bg-light)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-color)', marginBottom: '0.25rem' }}>{label}</div>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '0.75rem', lineHeight: 1.4 }}>{where}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="color"
+                          value={themeColors[key] || '#000000'}
+                          onChange={(e) => setThemeColors(prev => ({ ...prev, [key]: e.target.value }))}
+                          style={{ width: '44px', height: '38px', padding: 2, border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer' }}
+                        />
+                        <input
+                          type="text"
+                          value={themeColors[key] || ''}
+                          onChange={(e) => setThemeColors(prev => ({ ...prev, [key]: e.target.value }))}
+                          style={{ flex: 1, padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontFamily: 'monospace', fontSize: '0.9rem' }}
+                          placeholder="#hex"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                disabled={themeSaving}
+                onClick={async () => {
+                  setThemeSaving(true)
+                  const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                  const res = await fetch(`${apiUrl}/theme`, {
+                    method: 'PUT',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(themeColors)
+                  })
+                  const data = await res.json()
+                  if (res.ok && data.success) {
+                    applyTheme(data.theme || themeColors)
+                    setThemeColors(data.theme || themeColors)
+                    toast.show('Renkler kaydedildi', 'success')
+                  } else {
+                    toast.show(data.error || 'Kaydedilemedi', 'error')
+                  }
+                  setThemeSaving(false)
+                }}
+                style={{
+                  padding: '0.6rem 1.25rem',
+                  background: 'var(--primary-color)',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                {themeSaving ? 'Kaydediliyor…' : 'Renkleri kaydet'}
+              </button>
+              <button
+                type="button"
+                disabled={themeSaving}
+                onClick={async () => {
+                  setThemeSaving(true)
+                  const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
+                  const res = await fetch(`${apiUrl}/theme`, {
+                    method: 'PUT',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reset: true })
+                  })
+                  const data = await res.json()
+                  if (res.ok && data.success && data.theme) {
+                    setThemeColors(data.theme)
+                    applyTheme(data.theme)
+                    toast.show('Renkler varsayılana döndürüldü', 'success')
+                  } else {
+                    toast.show(data.error || 'Sıfırlanamadı', 'error')
+                  }
+                  setThemeSaving(false)
+                }}
+                style={{
+                  padding: '0.6rem 1.25rem',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Varsayılana dön
+              </button>
             </div>
-            <button
-              type="button"
-              disabled={themeSaving}
-              onClick={async () => {
-                setThemeSaving(true)
-                const apiUrl = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
-                const res = await fetch(`${apiUrl}/theme`, {
-                  method: 'PUT',
-                  headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                  body: JSON.stringify(themeColors)
-                })
-                const data = await res.json()
-                if (res.ok && data.success) {
-                  applyTheme(data.theme || themeColors)
-                  toast.show('Renkler kaydedildi', 'success')
-                } else {
-                  toast.show(data.error || 'Kaydedilemedi', 'error')
-                }
-                setThemeSaving(false)
-              }}
-              style={{
-                padding: '0.6rem 1.25rem',
-                background: 'var(--primary-color)',
-                color: '#000',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              {themeSaving ? 'Kaydediliyor…' : 'Renkleri kaydet'}
-            </button>
           </>
         )}
 

@@ -9,6 +9,7 @@ export default function ProductFormModal({ product, onClose, onSave, apiUrl, get
     size: '',
     name: '',
     description: '',
+    category: '',
     unitPrice: '',
     totalPrice: '',
     features: '',
@@ -17,6 +18,9 @@ export default function ProductFormModal({ product, onClose, onSave, apiUrl, get
     isActive: true,
     order: 0
   })
+  const [categories, setCategories] = useState([])
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [addingCategory, setAddingCategory] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
@@ -27,6 +31,7 @@ export default function ProductFormModal({ product, onClose, onSave, apiUrl, get
         size: product.size || '',
         name: product.name || '',
         description: product.description || '',
+        category: product.category || '',
         unitPrice: product.unitPrice ?? '',
         totalPrice: product.totalPrice ?? '',
         features: Array.isArray(product.features) ? product.features.join('\n') : '',
@@ -40,6 +45,7 @@ export default function ProductFormModal({ product, onClose, onSave, apiUrl, get
         size: '',
         name: '',
         description: '',
+        category: '',
         unitPrice: '',
         totalPrice: '',
         features: '',
@@ -50,6 +56,42 @@ export default function ProductFormModal({ product, onClose, onSave, apiUrl, get
       })
     }
   }, [product])
+
+  useEffect(() => {
+    fetch(`${apiUrl}/categories`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.categories?.length) {
+          setCategories(data.categories.map(c => ({ value: c.name, label: c.name })))
+        }
+      })
+      .catch(() => {})
+  }, [apiUrl])
+
+  const handleAddCategory = async () => {
+    const name = newCategoryName.trim()
+    if (!name) return
+    setAddingCategory(true)
+    try {
+      const res = await fetch(`${apiUrl}/categories/admin`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      })
+      const data = await res.json()
+      if (data.success && data.category) {
+        setCategories(prev => [...prev, { value: data.category.name, label: data.category.name }])
+        setForm(f => ({ ...f, category: data.category.name }))
+        setNewCategoryName('')
+        toast.show('Kategori eklendi', 'success')
+      } else {
+        toast.show(data.error || 'Kategori eklenemedi', 'error')
+      }
+    } catch {
+      toast.show('Kategori eklenirken hata oluştu', 'error')
+    }
+    setAddingCategory(false)
+  }
 
   const baseUrl = apiUrl.replace(/\/api\/?$/, '')
 
@@ -90,6 +132,7 @@ export default function ProductFormModal({ product, onClose, onSave, apiUrl, get
         size: form.size.trim(),
         name: form.name.trim(),
         description: form.description.trim(),
+        category: form.category.trim() || '',
         unitPrice: Number(form.unitPrice),
         totalPrice: Number(form.totalPrice),
         features,
@@ -173,6 +216,48 @@ export default function ProductFormModal({ product, onClose, onSave, apiUrl, get
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px' }}
             />
+          </div>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600' }}>Kategori</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <select
+                value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px' }}
+              >
+                <option value="">Kategori seçin</option>
+                {categories.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
+              </select>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  placeholder="Yeni kategori adı"
+                  style={{ flex: 1, padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px' }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCategory}
+                  disabled={addingCategory || !newCategoryName.trim()}
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    background: addingCategory || !newCategoryName.trim() ? '#ccc' : 'var(--primary-color)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: addingCategory || !newCategoryName.trim() ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                >
+                  {addingCategory ? '...' : <><Icon name="plus" size={14} /> Kategori Ekle</>}
+                </button>
+              </div>
+            </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
             <div>

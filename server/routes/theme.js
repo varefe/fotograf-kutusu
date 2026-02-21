@@ -39,10 +39,15 @@ router.get('/', async (req, res) => {
   }
 });
 
-/** Admin: Tema güncelle */
+/** Admin: Tema güncelle (body.reset === true ise varsayılana sıfırla) */
 router.put('/', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
+    if (req.body && req.body.reset === true) {
+      await SiteTheme.updateOne({}, { $set: { ...DEFAULT_THEME, updatedAt: new Date() } }, { upsert: true });
+      const theme = { ...DEFAULT_THEME };
+      return res.json({ success: true, message: 'Renkler varsayılana döndürüldü', theme });
+    }
     const keys = ['primaryColor', 'primaryDark', 'primaryLight', 'secondaryColor', 'textColor', 'textLight', 'bgColor', 'bgLight', 'bgGray', 'borderColor'];
     let doc = await SiteTheme.findOne().lean();
     if (!doc) {

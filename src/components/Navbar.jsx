@@ -23,6 +23,7 @@ function Navbar() {
 
   const topLinks = (
     <>
+      <Link to="/kategoriler" onClick={closeMenu}>Kategoriler</Link>
       <Link to="/about" onClick={closeMenu}>Hakkımızda</Link>
       <Link to="/contact" onClick={closeMenu}>İletişim</Link>
       <Link to="/reviews" onClick={closeMenu}>Yorumlar</Link>

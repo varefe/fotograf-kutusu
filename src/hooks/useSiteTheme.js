@@ -20,7 +20,10 @@ export function applyTheme(theme) {
   if (!theme || typeof document === 'undefined') return
   const root = document.documentElement
   Object.entries(KEY_TO_CSS_VAR).forEach(([key, cssVar]) => {
-    if (theme[key]) root.style.setProperty(cssVar, theme[key])
+    const value = theme[key]
+    if (value && typeof value === 'string') {
+      root.style.setProperty(cssVar, value.trim(), 'important')
+    }
   })
 }
 
@@ -34,6 +37,8 @@ export function useSiteTheme() {
         if (data.success && data.theme) {
           setTheme(data.theme)
           applyTheme(data.theme)
+          // CSS yüklendikten sonra tekrar uygula (önceliği garantilemek için)
+          requestAnimationFrame(() => applyTheme(data.theme))
         }
       })
       .catch(() => {})

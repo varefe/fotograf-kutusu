@@ -120,22 +120,19 @@ if (NODE_ENV === 'production') {
 
 
 // Rate Limiting - DDoS koruması (CORS'dan sonra)
+// Limit yüksek tutuldu: SPA tek açılışta theme, carousel, products, announcements, user vb. birçok istek atar
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
-  max: 100, // maksimum 100 istek
+  max: 1000, // 15 dakikada en fazla 1000 istek (normal kullanım için yeterli)
   message: {
     success: false,
     error: 'Çok fazla istek',
     message: 'Lütfen bir süre sonra tekrar deneyin'
   },
-  standardHeaders: true, // Rate limit bilgilerini header'larda göster
+  standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Health check ve OPTIONS request'lerini rate limit'ten muaf tut
-    if (req.method === 'OPTIONS') {
-      console.log('🔍 OPTIONS isteği rate limiting\'den muaf tutuldu:', req.path);
-      return true;
-    }
+    if (req.method === 'OPTIONS') return true;
     return req.path === '/api/health';
   }
 });

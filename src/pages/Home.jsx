@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Icon from '../components/Icon'
@@ -17,6 +17,14 @@ const FALLBACK_PRODUCTS = [
   { size: '15x20', name: '15x20 cm', description: 'Orta boyut', unitPrice: 19, totalPrice: 285, features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat'], image: product2 },
   { size: '20x30', name: '20x30 cm', description: 'Popüler boyut', unitPrice: 26, totalPrice: 390, features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat'], featured: true, image: product3 },
   { size: '30x40', name: '30x40 cm', description: 'Büyük boyut', unitPrice: 36, totalPrice: 540, features: ['Yüksek kalite baskı', 'Çerçeve dahil', '15+ adet toplu fiyat'], image: product4 }
+]
+
+/** Ürünler üstünde kullanıcıyı yönlendiren kategoriler (ilgi / kullanım alanı) */
+const PRODUCT_CATEGORIES = [
+  { id: 'memories', label: 'Anılarımı çerçeveleyeceğim', subtitle: 'En çok tercih edilen boyut', targetSize: '20x30', icon: 'camera' },
+  { id: 'gift', label: 'Hediye arıyorum', subtitle: 'Sevdiklerinize özel', targetSize: '20x30', icon: 'cart' },
+  { id: 'small', label: 'Polo kart & küçük baskı', subtitle: '10x15, 15x20', targetSize: '10x15', icon: 'image' },
+  { id: 'wall', label: 'Duvar için büyük boy', subtitle: '30x40 ve üzeri', targetSize: '30x40', icon: 'crop' }
 ]
 
 function Home() {
@@ -45,9 +53,9 @@ function Home() {
   const hiddenDefaultIds = (() => { try { return JSON.parse(localStorage.getItem('carousel_hidden_default_ids') || '[]') } catch { return [] } })()
   const defaultSlidesFiltered = DEFAULT_CAROUSEL_IMAGES.filter(s => !hiddenDefaultIds.includes(s.id))
 
-  useEffect(() => {
+  const fetchCarousel = useCallback(() => {
     const apiBase = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
-    fetch(`${apiBase}/carousel`)
+    fetch(`${apiBase}/carousel?t=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (data.success && data.slides && data.slides.length > 0) {
@@ -58,6 +66,19 @@ function Home() {
       })
       .catch(() => setCarouselImages([]))
   }, [])
+
+  useEffect(() => {
+    fetchCarousel()
+  }, [fetchCarousel])
+
+  // Admin'de carousel güncellenince veya sekme tekrar açılınca güncel slaytları al
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchCarousel()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [fetchCarousel])
 
   useEffect(() => {
     const apiBase = API_URL.includes('/api') ? API_URL : `${API_URL}/api`
@@ -151,6 +172,19 @@ function Home() {
     navigate('/product', {
       state: { product }
     })
+  }
+
+  /** Kategori butonuna tıklanınca ürünler bölümüne scroll edip ilgili ürün kartını vurgular */
+  const scrollToProductCategory = (targetSize) => {
+    pricingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setTimeout(() => {
+      const el = document.getElementById(`product-${targetSize}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('product-card-highlight')
+        setTimeout(() => el.classList.remove('product-card-highlight'), 2000)
+      }
+    }, 400)
   }
 
   return (
@@ -341,46 +375,26 @@ function Home() {
           </div>
         </div>
 
-        <section 
-          ref={stepsRef}
-          className={`how-it-works ${isVisible.steps ? 'fade-in-up' : ''}`}
-          style={{
-            opacity: isVisible.steps ? 1 : 0,
-            transform: isVisible.steps ? 'translateY(0)' : 'translateY(30px)',
-            transition: 'opacity 0.8s ease-out, transform 0.8s ease-out'
-          }}
-        >
+        <section className="product-categories">
           <div className="container">
-            <h2>Nasıl Çalışır?</h2>
-            <div className="steps">
-              <div 
-                className="step"
-              >
-                <div className="step-number">1</div>
-                <h3>Fotoğrafınızı Yükleyin</h3>
-                <p>İstediğiniz boyutta fotoğrafınızı yükleyin</p>
-              </div>
-              <div 
-                className="step"
-              >
-                <div className="step-number">2</div>
-                <h3>Boyut ve Adet Seçin</h3>
-                <p>Standart veya özel boyut seçin, adet belirleyin</p>
-              </div>
-              <div 
-                className="step"
-              >
-                <div className="step-number">3</div>
-                <h3>Bilgilerinizi Girin</h3>
-                <p>İletişim ve adres bilgilerinizi tamamlayın</p>
-              </div>
-              <div 
-                className="step"
-              >
-                <div className="step-number">4</div>
-                <h3>Baskı ve Teslimat</h3>
-                <p>Otomatik baskı, çerçeveleme ve kargo</p>
-              </div>
+            <p className="product-categories-badge">Ne arıyorsunuz?</p>
+            <h2>İhtiyacınıza göre ürünü bulun</h2>
+            <p className="product-categories-sub">Bir kategori seçin, size uygun ürünü hemen görün.</p>
+            <div className="product-categories-grid">
+              {PRODUCT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className="product-category-card"
+                  onClick={() => scrollToProductCategory(cat.targetSize)}
+                >
+                  <span className="product-category-icon">
+                    <Icon name={cat.icon} size={26} />
+                  </span>
+                  <span className="product-category-label">{cat.label}</span>
+                  <span className="product-category-subtitle">{cat.subtitle}</span>
+                </button>
+              ))}
             </div>
           </div>
         </section>
@@ -407,6 +421,7 @@ function Home() {
               {products.map((product, index) => (
                 <div
                   key={product.size}
+                  id={`product-${product.size}`}
                   className={`pricing-card ${product.featured ? 'featured' : ''}`}
                   onClick={() => handleProductClick(product)}
                   style={{
@@ -512,6 +527,52 @@ function Home() {
             <div className="security-badge">
               <Icon name="lock" size={16} className="security-badge-icon" />
               <span>SSL Sertifikası ile Güvenli Alışveriş</span>
+            </div>
+          </div>
+        </section>
+
+        <section 
+          ref={stepsRef}
+          className={`highlights-section ${isVisible.steps ? 'fade-in-up' : ''}`}
+          style={{
+            opacity: isVisible.steps ? 1 : 0,
+            transform: isVisible.steps ? 'translateY(0)' : 'translateY(30px)',
+            transition: 'opacity 0.8s ease-out, transform 0.8s ease-out'
+          }}
+        >
+          <div className="container">
+            <p className="highlights-badge">Neden biz?</p>
+            <h2>Anılarınız güvende, teslimat hızlı</h2>
+            <p className="highlights-sub">Fotoğraf Kutusu ile sipariş vermek hem kolay hem güvenilir.</p>
+            <div className="highlights-grid">
+              <div className="highlight-card">
+                <span className="highlight-icon">
+                  <Icon name="camera" size={28} />
+                </span>
+                <h3>Profesyonel baskı</h3>
+                <p>Yüksek çözünürlüklü, renkleri canlı baskılar; çerçeve dahil.</p>
+              </div>
+              <div className="highlight-card">
+                <span className="highlight-icon">
+                  <Icon name="shield" size={28} />
+                </span>
+                <h3>Güvenli alışveriş</h3>
+                <p>Ödeme ve kişisel bilgileriniz güvende, güvenle sipariş verin.</p>
+              </div>
+              <div className="highlight-card">
+                <span className="highlight-icon">
+                  <Icon name="truck" size={28} />
+                </span>
+                <h3>Hızlı teslimat</h3>
+                <p>Baskı ve kargo süreçleri hızlı; siparişiniz kapınızda.</p>
+              </div>
+              <div className="highlight-card">
+                <span className="highlight-icon">
+                  <Icon name="check-circle" size={28} />
+                </span>
+                <h3>Kolay sipariş</h3>
+                <p>Yükle, boyut ve adet seç, bilgilerini gir; gerisini biz hallederiz.</p>
+              </div>
             </div>
           </div>
         </section>

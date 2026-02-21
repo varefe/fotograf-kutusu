@@ -48,6 +48,8 @@ const DeliveryReturns = lazy(() => import('./pages/DeliveryReturns'))
 const Privacy = lazy(() => import('./pages/Privacy'))
 const DistanceSelling = lazy(() => import('./pages/DistanceSelling'))
 const Contact = lazy(() => import('./pages/Contact'))
+const CategoryPage = lazy(() => import('./pages/CategoryPage'))
+const CategoriesListPage = lazy(() => import('./pages/CategoriesListPage'))
 const FAQ = lazy(() => import('./pages/FAQ'))
 const Reviews = lazy(() => import('./pages/Reviews'))
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings'))
@@ -95,6 +97,8 @@ function App() {
             <Suspense fallback={<LoadingSpinner />}>
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/kategoriler" element={<CategoriesListPage />} />
+              <Route path="/kategori/:slug" element={<CategoryPage />} />
               <Route path="/order" element={<Order />} />
               <Route path="/product/:size" element={<ProductUpload />} />
               <Route path="/product" element={<ProductUpload />} />

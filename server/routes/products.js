@@ -41,7 +41,7 @@ const DEFAULT_PRODUCTS = [
 ];
 
 /**
- * Ürün listesi (Public - ana sayfa için)
+ * Ürün listesi (Public - ana sayfa için). ?category=xxx ile kategoriye göre filtreler.
  */
 router.get('/', async (req, res) => {
   try {
@@ -50,7 +50,12 @@ router.get('/', async (req, res) => {
     if (count === 0) {
       await Product.insertMany(DEFAULT_PRODUCTS);
     }
-    const products = await Product.find({ isActive: true })
+    const query = { isActive: true };
+    const categoryParam = req.query.category;
+    if (categoryParam && typeof categoryParam === 'string' && categoryParam.trim()) {
+      query.category = categoryParam.trim();
+    }
+    const products = await Product.find(query)
       .sort({ order: 1, size: 1 })
       .lean();
     res.json({
@@ -60,6 +65,7 @@ router.get('/', async (req, res) => {
         size: p.size,
         name: p.name,
         description: p.description,
+        category: p.category || '',
         unitPrice: p.unitPrice,
         totalPrice: p.totalPrice,
         features: p.features || [],
@@ -132,7 +138,7 @@ router.post('/admin/upload', requireAdminRole, (req, res, next) => {
 router.post('/admin', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
-    const { size, name, description, unitPrice, totalPrice, features, image, featured, order, isActive } = req.body;
+    const { size, name, description, category, unitPrice, totalPrice, features, image, featured, order, isActive } = req.body;
     if (!size || !name || unitPrice == null || totalPrice == null) {
       return res.status(400).json({
         success: false,
@@ -143,6 +149,7 @@ router.post('/admin', requireAdminRole, async (req, res) => {
       size,
       name,
       description: description || '',
+      category: (category && typeof category === 'string') ? category.trim() : '',
       unitPrice: Number(unitPrice),
       totalPrice: Number(totalPrice),
       features: Array.isArray(features) ? features : [],
@@ -173,11 +180,12 @@ router.put('/admin/:id', requireAdminRole, async (req, res) => {
   try {
     await connectDB();
     const { id } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
     if (updateData.unitPrice != null) updateData.unitPrice = Number(updateData.unitPrice);
     if (updateData.totalPrice != null) updateData.totalPrice = Number(updateData.totalPrice);
     if (updateData.order != null) updateData.order = Number(updateData.order);
     if (updateData.features != null && !Array.isArray(updateData.features)) updateData.features = [];
+    if (updateData.category !== undefined) updateData.category = typeof updateData.category === 'string' ? updateData.category.trim() : '';
     updateData.updatedAt = new Date();
     const product = await Product.findByIdAndUpdate(id, updateData, { new: true });
     if (!product) {

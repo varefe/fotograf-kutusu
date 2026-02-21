@@ -2053,31 +2053,6 @@ function Cart() {
                             error={paymentError}
                             actionLabel="Ödeme Yap ve Gözden Geçir"
                           />
-                          <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowReview(true)
-                                setShowContactInfo(false)
-                                setShowPaymentForm(false)
-                              }}
-                              disabled={isProcessingPhotos || isSubmitting}
-                              style={{
-                                width: '100%',
-                                padding: '0.75rem 1rem',
-                                fontSize: '0.95rem',
-                                fontWeight: 600,
-                                background: (isProcessingPhotos || isSubmitting) ? '#e2e8f0' : '#f1f5f9',
-                                color: (isProcessingPhotos || isSubmitting) ? '#94a3b8' : '#475569',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                cursor: (isProcessingPhotos || isSubmitting) ? 'not-allowed' : 'pointer',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              Şimdilik ödemeyi atla, siparişi oluştur
-                            </button>
-                          </div>
                         </>
                       )}
                     </div>
